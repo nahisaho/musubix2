@@ -122,3 +122,16 @@ export {
   type WorkstreamStatus,
   type Workstream,
 } from './workstream.js';
+
+export {
+  ReviewOrchestrator,
+  createReviewOrchestrator,
+  type ReviewConfig,
+  type ReviewModelId,
+  type SDDArtifactType,
+  type ReviewIssue,
+  type ReviewResult,
+  type ReviewRound,
+  type ReviewOrchestrationResult,
+  type ReviewFunction,
+} from './review-orchestrator.js';

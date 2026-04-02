@@ -129,6 +129,16 @@ packages/<name>/
 - **設計書**: `references/musubix2/DES-MUSUBIX2-001.md` (v1.5, 69 DES 仕様)
 - **実装計画**: `references/musubix2/PLAN-MUSUBIX2-001.md` (77 タスク, 8 フェーズ)
 
+## Review Orchestration (Cross-Model Review)
+
+SDD アーティファクトの品質保証には、複数AIモデルによる交互レビューを実施する：
+
+1. **交互レビュー**: opus-4.6 → gpt-5.4 → opus-4.6 → ... (エラー0まで)
+2. **最終合意**: 両モデルが同時にPASSすること
+3. **実装許可**: requirements, design, plan 全てが承認済みであること
+
+`ReviewOrchestrator` クラス（`@musubix2/agent-orchestrator`）を使用する。
+
 ## Steering 参照ルール
 
 全スキル実行前に `steering/` を参照すること:
