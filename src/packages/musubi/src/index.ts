@@ -74,8 +74,16 @@ export {
   CLIDispatcher,
   createCLIDispatcher,
   getDefaultCommands,
+  parseArgs,
+  showHelp,
+  handleInit,
+  handleTasksValidate,
+  handleTasksList,
+  handleTasksStats,
+  parseTaskFile,
   type CLICommand,
   type CLIConfig,
+  type ParsedArgs,
 } from './cli.js';
 
 /**

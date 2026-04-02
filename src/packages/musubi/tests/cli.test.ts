@@ -117,7 +117,7 @@ describe('CLIDispatcher', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const dispatcher = createCLIDispatcher();
     await dispatcher.dispatch('init');
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('ProjectInitializer'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Initialized project'));
     await dispatcher.dispatch('req');
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('EARSValidator'));
     logSpy.mockRestore();
