@@ -70,6 +70,8 @@ export {
 
 export const MUSUBI_VERSION = '0.1.0';
 
+export { CLIDispatcher, createCLIDispatcher, getDefaultCommands, type CLICommand, type CLIConfig } from './cli.js';
+
 /**
  * Quick-start helper: create a configured EARS validator + parser combo.
  */
