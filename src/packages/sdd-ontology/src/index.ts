@@ -515,13 +515,13 @@ export class TurtleLoader {
 
   private inferConceptType(concept: TurtleConcept): SDDConceptType {
     const label = concept.label.toLowerCase();
-    if (label.includes('requirement') || label.includes('constraint')) return 'requirement';
-    if (label.includes('design') || label.includes('pattern')) return 'design-spec';
-    if (label.includes('test')) return 'test-case';
-    if (label.includes('implementation') || label.includes('source')) return 'source-code';
-    if (label.includes('decision')) return 'decision';
-    if (label.includes('policy') || label.includes('article') || label.includes('constitution')) return 'policy';
-    if (label.includes('phase') || label.includes('task') || label.includes('workflow')) return 'task';
+    if (label.includes('requirement') || label.includes('constraint')) {return 'requirement';}
+    if (label.includes('design') || label.includes('pattern')) {return 'design-spec';}
+    if (label.includes('test')) {return 'test-case';}
+    if (label.includes('implementation') || label.includes('source')) {return 'source-code';}
+    if (label.includes('decision')) {return 'decision';}
+    if (label.includes('policy') || label.includes('article') || label.includes('constitution')) {return 'policy';}
+    if (label.includes('phase') || label.includes('task') || label.includes('workflow')) {return 'task';}
     return 'constraint';
   }
 }
@@ -548,7 +548,7 @@ export class TurtleValidator {
     let hasPrefix = false;
     for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
+      if (!trimmed || trimmed.startsWith('#')) {continue;}
 
       if (trimmed.startsWith('@prefix')) {
         hasPrefix = true;

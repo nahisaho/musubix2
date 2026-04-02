@@ -221,7 +221,7 @@ export class CodeGenerator {
       `export interface I${options.name} {`,
       `  findById(id: string): ${entityName} | undefined;`,
       `  save(entity: ${entityName}): void;`,
-      `  delete(id: string): void;`,
+      '  delete(id: string): void;',
       `  findAll(): ${entityName}[];`,
       '}',
       '',
