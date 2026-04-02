@@ -8,6 +8,13 @@
  * @see DES-GOV-002 — テストファースト強制
  */
 
+export {
+  BalanceRuleEngine,
+  type BalanceMetrics,
+  type BalanceRuleConfig,
+  DEFAULT_BALANCE_CONFIG,
+} from './balance-rule.js';
+
 export type PolicyId =
   | 'CONST-001' | 'CONST-002' | 'CONST-003' | 'CONST-004' | 'CONST-005'
   | 'CONST-006' | 'CONST-007' | 'CONST-008' | 'CONST-009';
