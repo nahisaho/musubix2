@@ -8,6 +8,11 @@
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "tests"],
   "references": [
-    { "path": "../core" }
+    { "path": "../core" },
+    { "path": "../policy" },
+    { "path": "../ontology-mcp" },
+    { "path": "../codegraph" },
+    { "path": "../security" },
+    { "path": "../workflow-engine" }
   ]
 }
