@@ -1,12 +1,47 @@
 {
-  "name": "@musubix2/musubi",
+  "name": "musubix2",
   "version": "0.1.0",
-  "description": "MUSUBIX2 Musubi — Lightweight wrapper for core SDD operations",
+  "description": "MUSUBIX2 — Specification Driven Development System",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
-  "files": ["dist"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "musubix": "./bin/musubix.mjs",
+    "musubix2": "./bin/musubix.mjs"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "keywords": [
+    "sdd",
+    "specification-driven-development",
+    "musubix",
+    "ears",
+    "traceability",
+    "requirements",
+    "design",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nahisaho/musubix2.git",
+    "directory": "src/packages/musubi"
+  },
+  "homepage": "https://github.com/nahisaho/musubix2#readme",
+  "bugs": {
+    "url": "https://github.com/nahisaho/musubix2/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "nahisaho",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist *.tsbuildinfo",

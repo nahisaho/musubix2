@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "bin": {
-    "musubix": "packages/core/bin/musubix.js"
+    "musubix": "packages/musubi/bin/musubix.mjs"
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
