@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/knowledge" },
+    { "path": "packages/decisions" },
+    { "path": "packages/policy" },
+    { "path": "packages/musubi" }
+  ]
+}

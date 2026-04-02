@@ -1,0 +1,55 @@
+name: MUSUBIX2
+version: 0.1.0
+locale: ja
+description: Specification Driven Development System
+
+tech_stack:
+  languages:
+    - TypeScript
+  runtime: Node.js >= 20
+  package_manager: npm
+  build_system: tsc -b (Project References)
+  test_framework: Vitest
+  linter: ESLint
+  formatter: Prettier
+  module_system: ESM (NodeNext)
+
+architecture:
+  style: monorepo
+  layers:
+    - domain
+    - application
+    - infrastructure
+    - interface
+  pattern: Clean Architecture / DDD
+
+packages:
+  - name: core
+    scope: "@musubix2"
+    description: SDD ワークフローエンジンの中核
+
+sdd:
+  phases:
+    - name: Requirements
+      number: 1
+      format: EARS
+    - name: Design
+      number: 2
+      format: C4 + ADR
+    - name: Tasks
+      number: 3
+    - name: Implementation
+      number: 4
+      policy: test-first
+    - name: Quality Gate
+      number: 5
+      policy: coverage >= 80%
+
+review_gate:
+  enabled: true
+  require_approval: true
+
+traceability:
+  enabled: true
+  require_bidirectional: true
+  id_pattern: "REQ-XXX-NNN"

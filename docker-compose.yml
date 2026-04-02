@@ -1,0 +1,27 @@
+services:
+  musubix2:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    volumes:
+      - ./src:/app
+      - /app/node_modules
+    working_dir: /app
+    command: ["npx", "vitest", "run"]
+    environment:
+      - NODE_ENV=development
+
+  musubix2-dev:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+      target: base
+    volumes:
+      - ./src:/app
+      - /app/node_modules
+    working_dir: /app
+    command: ["npx", "vitest", "--watch"]
+    environment:
+      - NODE_ENV=development
+    tty: true
+    stdin_open: true

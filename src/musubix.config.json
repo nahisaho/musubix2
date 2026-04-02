@@ -1,0 +1,14 @@
+{
+  "steeringDir": "steering",
+  "storageDir": "storage",
+  "llm": {
+    "provider": "github-copilot",
+    "model": "default"
+  },
+  "knowledge": {
+    "basePath": "storage/specs"
+  },
+  "integration": {
+    "confidenceThreshold": 0.85
+  }
+}
