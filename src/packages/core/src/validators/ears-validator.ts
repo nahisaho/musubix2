@@ -69,7 +69,6 @@ export class EARSValidator {
     options?: { sourceFormat?: 'plain' | 'markdown-blockquote' },
   ): EARSAnalysisResult {
     const cleaned = this.cleanText(text, options?.sourceFormat);
-    const suggestions: string[] = [];
 
     // Check for complex combinations first
     for (const combo of COMPLEX_COMBINATIONS) {
@@ -89,7 +88,7 @@ export class EARSValidator {
 
     // Try each pattern in priority order (most specific first)
     // Early termination: return immediately when confidence >= 0.85
-    let bestResult: EARSAnalysisResult | null = null;
+    let bestResult: EARSAnalysisResult | undefined;
 
     for (const rule of PATTERN_RULES) {
       if (rule.regex.test(cleaned)) {

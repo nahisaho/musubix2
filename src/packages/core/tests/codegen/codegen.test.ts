@@ -117,7 +117,7 @@ describe('DES-COD-001: CodeGenerator', () => {
     expect(types).toContain('test');
     expect(types).toContain('module');
     expect(types).toContain('cli-command');
-    expect(types).toHaveLength(6);
+    expect(types).toHaveLength(12);
   });
 
   it('should be created by factory function', () => {

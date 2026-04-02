@@ -92,10 +92,10 @@ describe('DES-CG-001: ASTParser', () => {
     expect(vars[0].name).toBe('VERSION');
   });
 
-  it('should return empty array for unsupported languages', () => {
+  it('should return non-empty results for all supported languages', () => {
     const parser = createASTParser();
-    expect(parser.parse('fn main() {}', 'rust')).toEqual([]);
-    expect(parser.parse('def main():', 'python')).toEqual([]);
+    expect(parser.parse('fn main() {}', 'rust').length).toBeGreaterThan(0);
+    expect(parser.parse('def main():\n    pass', 'python').length).toBeGreaterThan(0);
   });
 
   it('should report all 16 supported languages', () => {

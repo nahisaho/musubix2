@@ -4,7 +4,19 @@
  * テンプレートタイプに基づくTypeScriptコードスケルトン生成。
  */
 
-export type TemplateType = 'class' | 'interface' | 'function' | 'test' | 'module' | 'cli-command';
+export type TemplateType =
+  | 'class'
+  | 'interface'
+  | 'function'
+  | 'test'
+  | 'module'
+  | 'cli-command'
+  | 'enum'
+  | 'repository'
+  | 'factory'
+  | 'event'
+  | 'dto'
+  | 'validator';
 
 export interface CodeGenOptions {
   templateType: TemplateType;
@@ -28,7 +40,20 @@ export class CodeGenerator {
   }
 
   getTemplateTypes(): TemplateType[] {
-    return ['class', 'interface', 'function', 'test', 'module', 'cli-command'];
+    return [
+      'class',
+      'interface',
+      'function',
+      'test',
+      'module',
+      'cli-command',
+      'enum',
+      'repository',
+      'factory',
+      'event',
+      'dto',
+      'validator',
+    ];
   }
 
   private renderTemplate(options: CodeGenOptions): string {
@@ -45,6 +70,18 @@ export class CodeGenerator {
         return this.renderModule(options);
       case 'cli-command':
         return this.renderCliCommand(options);
+      case 'enum':
+        return this.renderEnum(options);
+      case 'repository':
+        return this.renderRepository(options);
+      case 'factory':
+        return this.renderFactory(options);
+      case 'event':
+        return this.renderEvent(options);
+      case 'dto':
+        return this.renderDto(options);
+      case 'validator':
+        return this.renderValidator(options);
     }
   }
 
@@ -154,6 +191,124 @@ export class CodeGenerator {
       '    // TODO: implement command logic',
       `    console.log('${options.name} executed');`,
       '  });',
+    ].join('\n');
+  }
+
+  private renderEnum(options: CodeGenOptions): string {
+    const desc = options.description ? `\n * ${options.description}` : '';
+    const members = (options.methods ?? [])
+      .map((m) => `  ${m.name} = '${m.name}'`)
+      .join(',\n');
+
+    return [
+      '/**',
+      ` * ${options.name}${desc}`,
+      ' */',
+      `export enum ${options.name} {`,
+      members || '  // TODO: define members',
+      '}',
+    ].join('\n');
+  }
+
+  private renderRepository(options: CodeGenOptions): string {
+    const desc = options.description ? `\n * ${options.description}` : '';
+    const entityName = options.name.replace(/Repository$/, '') || 'Entity';
+
+    return [
+      '/**',
+      ` * ${options.name}${desc}`,
+      ' */',
+      `export interface I${options.name} {`,
+      `  findById(id: string): ${entityName} | undefined;`,
+      `  save(entity: ${entityName}): void;`,
+      `  delete(id: string): void;`,
+      `  findAll(): ${entityName}[];`,
+      '}',
+      '',
+      `export class InMemory${options.name} implements I${options.name} {`,
+      `  private items = new Map<string, ${entityName}>();`,
+      '',
+      `  findById(id: string): ${entityName} | undefined {`,
+      '    return this.items.get(id);',
+      '  }',
+      '',
+      `  save(entity: ${entityName}): void {`,
+      "    this.items.set((entity as any).id ?? '', entity);",
+      '  }',
+      '',
+      '  delete(id: string): void {',
+      '    this.items.delete(id);',
+      '  }',
+      '',
+      `  findAll(): ${entityName}[] {`,
+      '    return [...this.items.values()];',
+      '  }',
+      '}',
+    ].join('\n');
+  }
+
+  private renderFactory(options: CodeGenOptions): string {
+    const desc = options.description ? `\n * ${options.description}` : '';
+    const productName = options.name.replace(/Factory$/, '') || 'Product';
+
+    return [
+      '/**',
+      ` * ${options.name}${desc}`,
+      ' */',
+      `export function create${productName}(options?: Partial<${productName}>): ${productName} {`,
+      `  return { ...options } as ${productName};`,
+      '}',
+    ].join('\n');
+  }
+
+  private renderEvent(options: CodeGenOptions): string {
+    const desc = options.description ? `\n * ${options.description}` : '';
+    const eventName = options.name;
+
+    return [
+      '/**',
+      ` * ${eventName}${desc}`,
+      ' */',
+      `export interface ${eventName} {`,
+      '  readonly type: string;',
+      '  readonly timestamp: Date;',
+      '  readonly payload: unknown;',
+      '}',
+      '',
+      `export type ${eventName}Handler = (event: ${eventName}) => void;`,
+    ].join('\n');
+  }
+
+  private renderDto(options: CodeGenOptions): string {
+    const desc = options.description ? `\n * ${options.description}` : '';
+    const members = (options.methods ?? [])
+      .map((m) => `  readonly ${m.name}: ${m.returnType};`)
+      .join('\n');
+
+    return [
+      '/**',
+      ` * ${options.name}${desc}`,
+      ' */',
+      `export interface ${options.name} {`,
+      members || '  // TODO: define fields',
+      '}',
+    ].join('\n');
+  }
+
+  private renderValidator(options: CodeGenOptions): string {
+    const desc = options.description ? `\n * ${options.description}` : '';
+
+    return [
+      '/**',
+      ` * ${options.name}${desc}`,
+      ' */',
+      `export class ${options.name} {`,
+      '  validate(input: unknown): { valid: boolean; errors: string[] } {',
+      '    const errors: string[] = [];',
+      '    // TODO: implement validation rules',
+      '    return { valid: errors.length === 0, errors };',
+      '  }',
+      '}',
     ].join('\n');
   }
 

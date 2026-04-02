@@ -1,6 +1,7 @@
 /**
  * @musubix2/sdd-ontology — SDD Domain Ontology
  * @see DES-SDD-001 — 5フェーズワークフロー管理
+ * @see REQ-INT-003 — Turtle definitions
  */
 
 export type SDDPhase =
@@ -260,4 +261,359 @@ export class OntologyModule {
     }
     return { concepts: this.concepts.size, relations: this.relations.length, byType, byPhase };
   }
+}
+
+// ---------------------------------------------------------------------------
+// REQ-INT-003: Turtle Module Definitions
+// ---------------------------------------------------------------------------
+
+export const SDD_CORE_TURTLE = `
+@prefix sdd: <http://musubix2.dev/ontology/sdd#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+sdd:Requirement a owl:Class ;
+  rdfs:label "Requirement" ;
+  rdfs:comment "An EARS-format requirement capturing stakeholder needs." .
+
+sdd:Design a owl:Class ;
+  rdfs:label "Design" ;
+  rdfs:comment "A design specification derived from requirements." .
+
+sdd:Implementation a owl:Class ;
+  rdfs:label "Implementation" ;
+  rdfs:comment "Source code artifact implementing a design." .
+
+sdd:Test a owl:Class ;
+  rdfs:label "Test" ;
+  rdfs:comment "A test case validating a requirement or implementation." .
+
+sdd:hasId a owl:DatatypeProperty ;
+  rdfs:domain sdd:Requirement ;
+  rdfs:label "hasId" .
+
+sdd:hasName a owl:DatatypeProperty ;
+  rdfs:label "hasName" .
+
+sdd:hasDescription a owl:DatatypeProperty ;
+  rdfs:label "hasDescription" .
+`;
+
+export const SDD_WORKFLOW_TURTLE = `
+@prefix sdd: <http://musubix2.dev/ontology/sdd#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+sdd:Phase a owl:Class ;
+  rdfs:label "Phase" ;
+  rdfs:comment "A workflow phase in the SDD lifecycle." .
+
+sdd:RequirementsPhase a sdd:Phase ;
+  rdfs:label "Requirements Phase" ;
+  sdd:order 1 .
+
+sdd:DesignPhase a sdd:Phase ;
+  rdfs:label "Design Phase" ;
+  sdd:order 2 .
+
+sdd:TaskBreakdownPhase a sdd:Phase ;
+  rdfs:label "Task Breakdown Phase" ;
+  sdd:order 3 .
+
+sdd:ImplementationPhase a sdd:Phase ;
+  rdfs:label "Implementation Phase" ;
+  sdd:order 4 .
+
+sdd:CompletionPhase a sdd:Phase ;
+  rdfs:label "Completion Phase" ;
+  sdd:order 5 .
+
+sdd:transitionsTo a owl:ObjectProperty ;
+  rdfs:domain sdd:Phase ;
+  rdfs:range sdd:Phase ;
+  rdfs:label "transitionsTo" .
+
+sdd:RequirementsPhase sdd:transitionsTo sdd:DesignPhase .
+sdd:DesignPhase sdd:transitionsTo sdd:TaskBreakdownPhase .
+sdd:TaskBreakdownPhase sdd:transitionsTo sdd:ImplementationPhase .
+sdd:ImplementationPhase sdd:transitionsTo sdd:CompletionPhase .
+`;
+
+export const SDD_TRACEABILITY_TURTLE = `
+@prefix sdd: <http://musubix2.dev/ontology/sdd#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+sdd:tracesTo a owl:ObjectProperty ;
+  rdfs:label "tracesTo" ;
+  rdfs:comment "Links a downstream artifact to its upstream source." .
+
+sdd:implements a owl:ObjectProperty ;
+  rdfs:subPropertyOf sdd:tracesTo ;
+  rdfs:domain sdd:Implementation ;
+  rdfs:range sdd:Design ;
+  rdfs:label "implements" .
+
+sdd:tests a owl:ObjectProperty ;
+  rdfs:subPropertyOf sdd:tracesTo ;
+  rdfs:domain sdd:Test ;
+  rdfs:range sdd:Requirement ;
+  rdfs:label "tests" .
+
+sdd:dependsOn a owl:ObjectProperty ;
+  rdfs:label "dependsOn" ;
+  rdfs:comment "Declares a dependency between two artifacts." .
+
+sdd:derivesFrom a owl:ObjectProperty ;
+  rdfs:label "derivesFrom" ;
+  rdfs:comment "Indicates that one artifact is derived from another." .
+
+sdd:conflictsWith a owl:ObjectProperty ;
+  rdfs:label "conflictsWith" ;
+  rdfs:comment "Indicates a conflict between two artifacts." .
+
+sdd:validates a owl:ObjectProperty ;
+  rdfs:label "validates" ;
+  rdfs:comment "Indicates that one artifact validates another." .
+`;
+
+export const SDD_GOVERNANCE_TURTLE = `
+@prefix sdd: <http://musubix2.dev/ontology/sdd#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+sdd:ConstitutionArticle a owl:Class ;
+  rdfs:label "Constitution Article" ;
+  rdfs:comment "An article in the MUSUBIX2 constitution governing development." .
+
+sdd:Policy a owl:Class ;
+  rdfs:label "Policy" ;
+  rdfs:comment "A governance policy derived from constitution articles." .
+
+sdd:articleNumber a owl:DatatypeProperty ;
+  rdfs:domain sdd:ConstitutionArticle ;
+  rdfs:label "articleNumber" .
+
+sdd:articleTitle a owl:DatatypeProperty ;
+  rdfs:domain sdd:ConstitutionArticle ;
+  rdfs:label "articleTitle" .
+
+sdd:policyName a owl:DatatypeProperty ;
+  rdfs:domain sdd:Policy ;
+  rdfs:label "policyName" .
+
+sdd:enforcedBy a owl:ObjectProperty ;
+  rdfs:domain sdd:Policy ;
+  rdfs:range sdd:ConstitutionArticle ;
+  rdfs:label "enforcedBy" .
+
+sdd:governsPhase a owl:ObjectProperty ;
+  rdfs:domain sdd:Policy ;
+  rdfs:range sdd:Phase ;
+  rdfs:label "governsPhase" .
+`;
+
+// ---------------------------------------------------------------------------
+// Turtle Module Names
+// ---------------------------------------------------------------------------
+
+const TURTLE_MODULES: Record<string, string> = {
+  core: SDD_CORE_TURTLE,
+  workflow: SDD_WORKFLOW_TURTLE,
+  traceability: SDD_TRACEABILITY_TURTLE,
+  governance: SDD_GOVERNANCE_TURTLE,
+};
+
+// ---------------------------------------------------------------------------
+// TurtleLoader
+// ---------------------------------------------------------------------------
+
+interface TurtleConcept {
+  uri: string;
+  label: string;
+  comment?: string;
+  type?: string;
+}
+
+export class TurtleLoader {
+  loadModule(name: string): OntologyModule {
+    const turtle = TURTLE_MODULES[name];
+    if (!turtle) {
+      throw new Error(`Unknown Turtle module: ${name}. Valid: ${Object.keys(TURTLE_MODULES).join(', ')}`);
+    }
+    const mod = new OntologyModule();
+    const concepts = this.extractConcepts(turtle);
+    const now = new Date().toISOString();
+
+    for (const concept of concepts) {
+      mod.addConcept({
+        id: concept.uri,
+        type: this.inferConceptType(concept),
+        name: concept.label,
+        description: concept.comment ?? '',
+        phase: 'requirements',
+        properties: {},
+        tags: [name],
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return mod;
+  }
+
+  loadAll(): OntologyModule[] {
+    return Object.keys(TURTLE_MODULES).map((name) => this.loadModule(name));
+  }
+
+  getModuleNames(): string[] {
+    return Object.keys(TURTLE_MODULES);
+  }
+
+  private extractConcepts(turtle: string): TurtleConcept[] {
+    const concepts: TurtleConcept[] = [];
+    const lines = turtle.split('\n');
+
+    let currentUri = '';
+    let currentLabel = '';
+    let currentComment = '';
+    let currentType = '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      const subjectMatch = /^(sdd:\w+)\s+a\s+([\w:]+)/.exec(trimmed);
+      if (subjectMatch) {
+        if (currentUri && currentLabel) {
+          concepts.push({ uri: currentUri, label: currentLabel, comment: currentComment || undefined, type: currentType || undefined });
+        }
+        currentUri = subjectMatch[1];
+        currentType = subjectMatch[2];
+        currentLabel = '';
+        currentComment = '';
+        continue;
+      }
+
+      const labelMatch = /rdfs:label\s+"([^"]+)"/.exec(trimmed);
+      if (labelMatch && currentUri) {
+        currentLabel = labelMatch[1];
+        continue;
+      }
+
+      const commentMatch = /rdfs:comment\s+"([^"]+)"/.exec(trimmed);
+      if (commentMatch && currentUri) {
+        currentComment = commentMatch[1];
+      }
+    }
+
+    if (currentUri && currentLabel) {
+      concepts.push({ uri: currentUri, label: currentLabel, comment: currentComment || undefined, type: currentType || undefined });
+    }
+
+    return concepts;
+  }
+
+  private inferConceptType(concept: TurtleConcept): SDDConceptType {
+    const label = concept.label.toLowerCase();
+    if (label.includes('requirement') || label.includes('constraint')) return 'requirement';
+    if (label.includes('design') || label.includes('pattern')) return 'design-spec';
+    if (label.includes('test')) return 'test-case';
+    if (label.includes('implementation') || label.includes('source')) return 'source-code';
+    if (label.includes('decision')) return 'decision';
+    if (label.includes('policy') || label.includes('article') || label.includes('constitution')) return 'policy';
+    if (label.includes('phase') || label.includes('task') || label.includes('workflow')) return 'task';
+    return 'constraint';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// TurtleValidator
+// ---------------------------------------------------------------------------
+
+export interface TurtleSyntaxResult {
+  valid: boolean;
+  errors: string[];
+}
+
+export interface TurtleSemanticsResult {
+  consistent: boolean;
+  issues: string[];
+}
+
+export class TurtleValidator {
+  validateSyntax(turtle: string): TurtleSyntaxResult {
+    const errors: string[] = [];
+    const lines = turtle.split('\n');
+
+    let hasPrefix = false;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      if (trimmed.startsWith('@prefix')) {
+        hasPrefix = true;
+        if (!trimmed.endsWith('.')) {
+          errors.push(`Prefix declaration must end with '.': ${trimmed}`);
+        }
+        continue;
+      }
+
+      if (trimmed.includes('rdfs:') && !hasPrefix) {
+        errors.push('rdfs prefix used but not declared');
+      }
+      if (trimmed.includes('owl:') && !hasPrefix) {
+        errors.push('owl prefix used but not declared');
+      }
+
+      // Check for unclosed string literals
+      const quoteCount = (trimmed.match(/"/g) ?? []).length;
+      if (quoteCount % 2 !== 0) {
+        errors.push(`Unclosed string literal on line: ${trimmed}`);
+      }
+    }
+
+    if (!hasPrefix) {
+      errors.push('No @prefix declarations found');
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  validateSemantics(modules: OntologyModule[]): TurtleSemanticsResult {
+    const issues: string[] = [];
+
+    if (modules.length === 0) {
+      issues.push('No modules provided for semantic validation');
+      return { consistent: false, issues };
+    }
+
+    const allDefinitions = new Set<string>();
+    for (const mod of modules) {
+      for (const def of mod.getAllDefinitions()) {
+        allDefinitions.add(def.type);
+      }
+    }
+
+    if (allDefinitions.size === 0) {
+      issues.push('No concept definitions found in any module');
+    }
+
+    // Check that core concept types are covered
+    const coreTypes: SDDConceptType[] = ['requirement', 'design-spec', 'source-code', 'test-case'];
+    for (const ct of coreTypes) {
+      if (!allDefinitions.has(ct)) {
+        issues.push(`Core concept type "${ct}" not defined in any module`);
+      }
+    }
+
+    return { consistent: issues.length === 0, issues };
+  }
+}
+
+export function createTurtleLoader(): TurtleLoader {
+  return new TurtleLoader();
+}
+
+export function createTurtleValidator(): TurtleValidator {
+  return new TurtleValidator();
 }

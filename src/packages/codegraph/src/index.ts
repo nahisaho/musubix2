@@ -115,14 +115,123 @@ const ALL_LANGUAGES: SupportedLanguage[] = [
   'lua',
 ];
 
-const JS_TS_LANGUAGES: Set<SupportedLanguage> = new Set(['typescript', 'javascript']);
+
+type LanguagePatterns = { kind: CodeNodeKind; regex: RegExp }[];
+
+const LANGUAGE_PATTERNS: Record<string, LanguagePatterns> = {
+  typescript: [
+    { kind: 'class', regex: /(?:export\s+)?class\s+(\w+)/ },
+    { kind: 'interface', regex: /(?:export\s+)?interface\s+(\w+)/ },
+    { kind: 'function', regex: /(?:export\s+)?(?:async\s+)?function\s+(\w+)/ },
+    { kind: 'import', regex: /import\s+.*from\s+['"](.[^'"]+)['"]/ },
+    { kind: 'export', regex: /export\s+\{\s*([^}]+)\}/ },
+    { kind: 'variable', regex: /(?:export\s+)?(?:const|let|var)\s+(\w+)/ },
+  ],
+  python: [
+    { kind: 'class', regex: /^class\s+(\w+)/ },
+    { kind: 'function', regex: /^(?:async\s+)?def\s+(\w+)/ },
+    { kind: 'import', regex: /^(?:from\s+(\S+)\s+import|import\s+(\S+))/ },
+    { kind: 'variable', regex: /^(\w+)\s*(?::\s*\w+)?\s*=/ },
+  ],
+  java: [
+    { kind: 'class', regex: /(?:public|private|protected)?\s*(?:abstract\s+)?class\s+(\w+)/ },
+    { kind: 'interface', regex: /(?:public\s+)?interface\s+(\w+)/ },
+    { kind: 'function', regex: /(?:public|private|protected)\s+(?:static\s+)?(?:\w+(?:<[^>]+>)?)\s+(\w+)\s*\(/ },
+    { kind: 'import', regex: /import\s+([\w.]+);/ },
+    { kind: 'variable', regex: /(?:public|private|protected)\s+(?:static\s+)?(?:final\s+)?\w+\s+(\w+)\s*[=;]/ },
+  ],
+  go: [
+    { kind: 'function', regex: /^func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)\s*\(/ },
+    { kind: 'class', regex: /^type\s+(\w+)\s+struct\b/ },
+    { kind: 'interface', regex: /^type\s+(\w+)\s+interface\b/ },
+    { kind: 'import', regex: /^\s*"([^"]+)"/ },
+    { kind: 'variable', regex: /^(?:var|const)\s+(\w+)/ },
+  ],
+  rust: [
+    { kind: 'class', regex: /(?:pub\s+)?struct\s+(\w+)/ },
+    { kind: 'interface', regex: /(?:pub\s+)?trait\s+(\w+)/ },
+    { kind: 'function', regex: /(?:pub\s+)?(?:async\s+)?fn\s+(\w+)/ },
+    { kind: 'import', regex: /use\s+([\w:]+)/ },
+    { kind: 'variable', regex: /(?:pub\s+)?(?:static|const)\s+(\w+)/ },
+  ],
+  c: [
+    { kind: 'class', regex: /(?:typedef\s+)?struct\s+(\w+)/ },
+    { kind: 'function', regex: /^\w[\w\s*]+\s+(\w+)\s*\([^)]*\)\s*\{/ },
+    { kind: 'import', regex: /#include\s+[<"]([^>"]+)[>"]/ },
+    { kind: 'variable', regex: /^(?:static\s+)?(?:const\s+)?\w+\s+(\w+)\s*[=;]/ },
+  ],
+  cpp: [
+    { kind: 'class', regex: /(?:class|struct)\s+(\w+)/ },
+    { kind: 'function', regex: /^\w[\w\s*:&<>]+\s+(\w+)\s*\([^)]*\)\s*(?:const\s*)?[{;]/ },
+    { kind: 'import', regex: /#include\s+[<"]([^>"]+)[>"]/ },
+    { kind: 'variable', regex: /^(?:static\s+)?(?:const\s+)?(?:auto|int|float|double|string|bool|char)\s+(\w+)/ },
+  ],
+  csharp: [
+    { kind: 'class', regex: /(?:public|private|internal|protected)?\s*(?:abstract\s+|static\s+)?class\s+(\w+)/ },
+    { kind: 'interface', regex: /(?:public\s+)?interface\s+(\w+)/ },
+    { kind: 'function', regex: /(?:public|private|protected|internal)\s+(?:static\s+)?(?:async\s+)?(?:\w+(?:<[^>]+>)?)\s+(\w+)\s*\(/ },
+    { kind: 'import', regex: /using\s+([\w.]+);/ },
+    { kind: 'variable', regex: /(?:public|private|protected)\s+(?:static\s+)?(?:readonly\s+)?\w+\s+(\w+)\s*[=;{]/ },
+  ],
+  ruby: [
+    { kind: 'class', regex: /^class\s+(\w+)/ },
+    { kind: 'module', regex: /^module\s+(\w+)/ },
+    { kind: 'function', regex: /^\s*def\s+(?:self\.)?(\w+)/ },
+    { kind: 'import', regex: /require(?:_relative)?\s+['"](.[^'"]+)['"]/ },
+    { kind: 'variable', regex: /^\s*(\w+)\s*=/ },
+  ],
+  php: [
+    { kind: 'class', regex: /(?:abstract\s+)?class\s+(\w+)/ },
+    { kind: 'interface', regex: /interface\s+(\w+)/ },
+    { kind: 'function', regex: /(?:public|private|protected)?\s*(?:static\s+)?function\s+(\w+)/ },
+    { kind: 'import', regex: /(?:use|require|include)\s+([\w\\]+)/ },
+    { kind: 'variable', regex: /(?:public|private|protected)\s+(?:static\s+)?\$(\w+)/ },
+  ],
+  swift: [
+    { kind: 'class', regex: /(?:public\s+|open\s+|internal\s+|private\s+)?class\s+(\w+)/ },
+    { kind: 'interface', regex: /(?:public\s+)?protocol\s+(\w+)/ },
+    { kind: 'function', regex: /(?:public\s+|private\s+|internal\s+)?(?:static\s+)?func\s+(\w+)/ },
+    { kind: 'import', regex: /import\s+(\w+)/ },
+    { kind: 'variable', regex: /(?:public\s+|private\s+)?(?:static\s+)?(?:let|var)\s+(\w+)/ },
+  ],
+  kotlin: [
+    { kind: 'class', regex: /(?:data\s+|sealed\s+|abstract\s+|open\s+)?class\s+(\w+)/ },
+    { kind: 'interface', regex: /interface\s+(\w+)/ },
+    { kind: 'function', regex: /(?:private\s+|public\s+)?(?:suspend\s+)?fun\s+(\w+)/ },
+    { kind: 'import', regex: /import\s+([\w.]+)/ },
+    { kind: 'variable', regex: /(?:private\s+|public\s+)?(?:val|var)\s+(\w+)/ },
+  ],
+  scala: [
+    { kind: 'class', regex: /(?:case\s+)?class\s+(\w+)/ },
+    { kind: 'interface', regex: /trait\s+(\w+)/ },
+    { kind: 'function', regex: /def\s+(\w+)/ },
+    { kind: 'import', regex: /import\s+([\w.]+)/ },
+    { kind: 'variable', regex: /(?:val|var|lazy\s+val)\s+(\w+)/ },
+  ],
+  haskell: [
+    { kind: 'class', regex: /^(?:data|newtype)\s+(\w+)/ },
+    { kind: 'interface', regex: /^class\s+(\w+)/ },
+    { kind: 'function', regex: /^(\w+)\s+::/ },
+    { kind: 'import', regex: /^import\s+(?:qualified\s+)?([\w.]+)/ },
+    { kind: 'variable', regex: /^(\w+)\s+=/ },
+  ],
+  lua: [
+    { kind: 'function', regex: /(?:local\s+)?function\s+(?:(\w[\w.:]*))\s*\(/ },
+    { kind: 'import', regex: /(?:local\s+\w+\s*=\s*)?require\s*\(?['"](.[^'"]+)['"]\)?/ },
+    { kind: 'variable', regex: /local\s+(\w+)\s*=/ },
+  ],
+};
+
+// Copy typescript patterns for javascript
+LANGUAGE_PATTERNS['javascript'] = LANGUAGE_PATTERNS['typescript'];
 
 export class ASTParser {
   parse(source: string, language: SupportedLanguage): ASTNode[] {
-    if (!JS_TS_LANGUAGES.has(language)) {
+    const patterns = LANGUAGE_PATTERNS[language];
+    if (!patterns) {
       return [];
     }
-    return this.parseTypeScript(source);
+    return this.parseWithPatterns(source, patterns);
   }
 
   getSupportedLanguages(): SupportedLanguage[] {
@@ -131,32 +240,25 @@ export class ASTParser {
 
   // -- private --------------------------------------------------------------
 
-  private parseTypeScript(source: string): ASTNode[] {
+  private parseWithPatterns(source: string, patterns: LanguagePatterns): ASTNode[] {
     const lines = source.split('\n');
     const nodes: ASTNode[] = [];
-
-    const patterns: { kind: CodeNodeKind; regex: RegExp }[] = [
-      { kind: 'class', regex: /(?:export\s+)?class\s+(\w+)/ },
-      { kind: 'interface', regex: /(?:export\s+)?interface\s+(\w+)/ },
-      { kind: 'function', regex: /(?:export\s+)?(?:async\s+)?function\s+(\w+)/ },
-      { kind: 'import', regex: /import\s+.*from\s+['"](.[^'"]+)['"]/ },
-      { kind: 'export', regex: /export\s+\{\s*([^}]+)\}/ },
-      { kind: 'variable', regex: /(?:export\s+)?(?:const|let|var)\s+(\w+)/ },
-    ];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       for (const { kind, regex } of patterns) {
         const match = regex.exec(line);
         if (match) {
-          const name = match[1].trim();
-          nodes.push({
-            kind,
-            name,
-            startLine: i + 1,
-            endLine: i + 1,
-            children: [],
-          });
+          const name = (match[1] ?? match[2] ?? '').trim();
+          if (name) {
+            nodes.push({
+              kind,
+              name,
+              startLine: i + 1,
+              endLine: i + 1,
+              children: [],
+            });
+          }
           break; // one match per line
         }
       }

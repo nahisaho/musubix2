@@ -42,6 +42,26 @@ export interface SOLIDReport {
   principleScores: Record<SOLIDPrinciple, number>;
 }
 
+export interface DesignOutput {
+  document: DesignDocument;
+  elementIds: string[];
+}
+
+export interface TraceabilityLink {
+  reqId: string;
+  desId: string;
+}
+
+export interface TraceabilityCoverageResult {
+  coverage: number;
+  gaps: string[];
+}
+
+export interface TraceabilityDesignResult {
+  design: DesignOutput;
+  traceabilityLinks: TraceabilityLink[];
+}
+
 export class DesignGenerator {
   private counter: number = 0;
 
@@ -68,6 +88,48 @@ export class DesignGenerator {
       sections,
       generatedAt: new Date(),
     };
+  }
+
+  generateWithTraceability(
+    requirements: Array<{ id: string; text: string }>,
+  ): TraceabilityDesignResult {
+    const fullReqs: ParsedRequirementInput[] = requirements.map((r) => ({
+      id: r.id,
+      title: r.text,
+      text: r.text,
+      pattern: 'ubiquitous',
+    }));
+
+    const document = this.generate(fullReqs);
+    const elementIds = document.sections.map((s) => s.id);
+
+    const traceabilityLinks: TraceabilityLink[] = [];
+    for (const section of document.sections) {
+      for (const reqId of section.requirementIds) {
+        traceabilityLinks.push({ reqId, desId: section.id });
+      }
+    }
+
+    return {
+      design: { document, elementIds },
+      traceabilityLinks,
+    };
+  }
+
+  validateTraceabilityCoverage(
+    links: Array<{ reqId: string; desId: string }>,
+    totalReqs: number,
+  ): TraceabilityCoverageResult {
+    const coveredReqIds = new Set(links.map((l) => l.reqId));
+    const coverage = totalReqs === 0 ? 1 : coveredReqIds.size / totalReqs;
+    const gaps: string[] = [];
+    for (let i = 1; i <= totalReqs; i++) {
+      const candidate = `REQ-${String(i).padStart(3, '0')}`;
+      if (!coveredReqIds.has(candidate)) {
+        gaps.push(candidate);
+      }
+    }
+    return { coverage, gaps };
   }
 
   private groupRequirements(

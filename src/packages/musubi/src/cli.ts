@@ -361,7 +361,7 @@ export async function handleTasksStats(filePath?: string): Promise<ExitCodeValue
 
 // ── Init handler (REQ-SDD-005) ─────────────────────────────────────────────
 
-import { ProjectInitializer, createProjectInitializer } from '@musubix2/core';
+import { createProjectInitializer } from '@musubix2/core';
 
 export async function handleInit(
   targetPath: string = '.',
