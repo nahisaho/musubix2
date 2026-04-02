@@ -19,7 +19,15 @@
     "@musubix2/policy": "*",
     "@musubix2/ontology-mcp": "*",
     "@musubix2/codegraph": "*",
-    "@musubix2/security": "*"
+    "@musubix2/security": "*",
+    "@musubix2/knowledge": "*",
+    "@musubix2/decisions": "*",
+    "@musubix2/neural-search": "*",
+    "@musubix2/dfg": "*",
+    "@musubix2/agent-orchestrator": "*",
+    "@musubix2/expert-delegation": "*",
+    "@musubix2/skill-harness": "*",
+    "@musubix2/skill-manager": "*"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
