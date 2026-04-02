@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EARSValidator, createEARSValidator } from '../../src/validators/ears-validator.js';
+import { convertToEARS } from '../../src/validators/ears-validator.js';
 
 describe('REQ-REQ-001: EARSValidator', () => {
   const validator = new EARSValidator();
@@ -107,5 +108,64 @@ describe('REQ-REQ-001: EARSValidator', () => {
       const v = createEARSValidator();
       expect(v).toBeInstanceOf(EARSValidator);
     });
+  });
+
+  describe('early termination at high confidence', () => {
+    it('should return immediately for confidence >= 0.85 without checking further patterns', () => {
+      // A well-formed event-driven requirement should hit >= 0.85 and early-terminate
+      const result = validator.analyze(
+        'WHEN the user submits a form, THE system SHALL validate all fields.',
+      );
+      expect(result.confidence).toBeGreaterThanOrEqual(0.85);
+      expect(result.pattern).toBe('event-driven');
+    });
+
+    it('should still classify low-confidence patterns normally', () => {
+      const result = validator.analyze('SHALL log.');
+      expect(result.confidence).toBeLessThan(0.85);
+      expect(result.pattern).toBe('ubiquitous');
+    });
+  });
+});
+
+describe('REQ-REQ-001: convertToEARS', () => {
+  it('should convert natural language with "when" to EARS event-driven format', () => {
+    const result = convertToEARS('when the user clicks submit, the system shall save the form');
+    expect(result).toContain('WHEN');
+    expect(result).toContain('SHALL');
+  });
+
+  it('should convert natural language with "while" to EARS state-driven format', () => {
+    const result = convertToEARS('while the system is in maintenance mode, the system shall reject requests');
+    expect(result).toContain('WHILE');
+    expect(result).toContain('SHALL');
+  });
+
+  it('should convert natural language with "if...then" to EARS complex format', () => {
+    const result = convertToEARS('if the retry count exceeds 3, then the system shall circuit break');
+    expect(result).toContain('IF');
+    expect(result).toContain('THEN');
+    expect(result).toContain('SHALL');
+  });
+
+  it('should convert "shall not" to EARS unwanted format', () => {
+    const result = convertToEARS('the system shall not expose internal errors');
+    expect(result).toContain('SHALL NOT');
+  });
+
+  it('should convert simple "shall" to ubiquitous format', () => {
+    const result = convertToEARS('the system shall display a welcome message');
+    expect(result).toContain('SHALL');
+    expect(result).toMatch(/^THE SYSTEM SHALL/);
+  });
+
+  it('should wrap unknown text into ubiquitous pattern as fallback', () => {
+    const result = convertToEARS('display data on screen');
+    expect(result).toBe('THE system SHALL display data on screen');
+  });
+
+  it('should handle "should" and "must" as SHALL equivalents', () => {
+    const result = convertToEARS('the system should log all events');
+    expect(result).toContain('SHALL');
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Validators barrel export
  */
-export { EARSValidator, createEARSValidator } from './ears-validator.js';
+export { EARSValidator, createEARSValidator, convertToEARS } from './ears-validator.js';
 export {
   MarkdownEARSParser,
   RequirementsValidator,

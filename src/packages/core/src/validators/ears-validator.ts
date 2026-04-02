@@ -88,6 +88,9 @@ export class EARSValidator {
     }
 
     // Try each pattern in priority order (most specific first)
+    // Early termination: return immediately when confidence >= 0.85
+    let bestResult: EARSAnalysisResult | null = null;
+
     for (const rule of PATTERN_RULES) {
       if (rule.regex.test(cleaned)) {
         const confidence = this.computeConfidence(
@@ -98,16 +101,29 @@ export class EARSValidator {
         );
         const patternTriggers = this.extractTriggers(cleaned, rule.pattern);
 
+        const patternSuggestions: string[] = [];
         if (confidence < 0.7) {
-          suggestions.push(this.getSuggestion(rule.pattern));
+          patternSuggestions.push(this.getSuggestion(rule.pattern));
         }
 
-        return {
+        const result: EARSAnalysisResult = {
           pattern: rule.pattern,
           confidence,
           triggers: patternTriggers,
-          suggestions,
+          suggestions: patternSuggestions,
         };
+
+        // Early termination: high confidence match needs no further checks
+        if (confidence >= 0.85) {
+          return result;
+        }
+
+        if (!bestResult || confidence > bestResult.confidence) {
+          bestResult = result;
+        }
+
+        // First match in priority order is authoritative
+        return result;
       }
     }
 
@@ -225,6 +241,63 @@ export class EARSValidator {
     };
     return suggestions[pattern];
   }
+}
+
+/**
+ * Converts natural language to EARS format using keyword heuristics.
+ */
+export function convertToEARS(naturalLanguage: string): string {
+  const text = naturalLanguage.trim();
+
+  // Detect "when ... shall/should/must"
+  const whenMatch = text.match(/^when\s+(.+?),?\s+(the\s+\S+)\s+(shall|should|must)\s+(.+)$/i);
+  if (whenMatch) {
+    const trigger = whenMatch[1].trim();
+    const system = whenMatch[2].trim().toUpperCase();
+    const action = whenMatch[4].trim();
+    return `WHEN ${trigger}, ${system} SHALL ${action}`;
+  }
+
+  // Detect "while ... shall/should/must"
+  const whileMatch = text.match(
+    /^while\s+(.+?),?\s+(the\s+\S+)\s+(shall|should|must)\s+(.+)$/i,
+  );
+  if (whileMatch) {
+    const state = whileMatch[1].trim();
+    const system = whileMatch[2].trim().toUpperCase();
+    const action = whileMatch[4].trim();
+    return `WHILE ${state}, ${system} SHALL ${action}`;
+  }
+
+  // Detect "if ... then ... shall/should/must"
+  const ifMatch = text.match(
+    /^if\s+(.+?),?\s+then\s+(the\s+\S+)\s+(shall|should|must)\s+(.+)$/i,
+  );
+  if (ifMatch) {
+    const condition = ifMatch[1].trim();
+    const system = ifMatch[2].trim().toUpperCase();
+    const action = ifMatch[4].trim();
+    return `IF ${condition}, THEN ${system} SHALL ${action}`;
+  }
+
+  // Detect "shall not" pattern
+  const shallNotMatch = text.match(/^(the\s+\S+)\s+(shall|should|must)\s+not\s+(.+)$/i);
+  if (shallNotMatch) {
+    const system = shallNotMatch[1].trim().toUpperCase();
+    const action = shallNotMatch[3].trim();
+    return `${system} SHALL NOT ${action}`;
+  }
+
+  // Detect simple "shall/should/must" pattern
+  const shallMatch = text.match(/^(the\s+\S+)\s+(shall|should|must)\s+(.+)$/i);
+  if (shallMatch) {
+    const system = shallMatch[1].trim().toUpperCase();
+    const action = shallMatch[3].trim();
+    return `${system} SHALL ${action}`;
+  }
+
+  // Fallback: wrap into ubiquitous pattern
+  return `THE system SHALL ${text}`;
 }
 
 export function createEARSValidator(): EARSValidator {

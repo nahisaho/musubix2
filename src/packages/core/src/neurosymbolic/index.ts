@@ -170,10 +170,52 @@ export class HallucinationDetector {
   }
 }
 
+export interface RejectionResult {
+  accepted: boolean;
+  reason: string;
+}
+
+export class RejectionGate {
+  private threshold: number;
+
+  constructor(threshold: number = 0.7) {
+    this.threshold = threshold;
+  }
+
+  evaluate(result: { confidence: number; symbolicValid: boolean }): RejectionResult {
+    if (!result.symbolicValid) {
+      return {
+        accepted: false,
+        reason: `Rejected: symbolic validation failed (confidence: ${result.confidence.toFixed(2)})`,
+      };
+    }
+
+    if (result.confidence < this.threshold) {
+      return {
+        accepted: false,
+        reason: `Rejected: confidence ${result.confidence.toFixed(2)} is below threshold ${this.threshold.toFixed(2)}`,
+      };
+    }
+
+    return {
+      accepted: true,
+      reason: `Accepted: confidence ${result.confidence.toFixed(2)} meets threshold ${this.threshold.toFixed(2)} and symbolic validation passed`,
+    };
+  }
+
+  getThreshold(): number {
+    return this.threshold;
+  }
+}
+
 export function createSemanticCodeFilterPipeline(): SemanticCodeFilterPipeline {
   return new SemanticCodeFilterPipeline();
 }
 
 export function createHallucinationDetector(): HallucinationDetector {
   return new HallucinationDetector();
+}
+
+export function createRejectionGate(threshold?: number): RejectionGate {
+  return new RejectionGate(threshold);
 }

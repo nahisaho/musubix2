@@ -5,7 +5,7 @@ import {
   CONSTITUTION_ARTICLES,
   DEFAULT_QUALITY_GATE_CONFIG,
 } from '../src/index.js';
-import type { Policy, PolicyContext, PolicyResult } from '../src/index.js';
+import type { Policy, PolicyContext, PolicyResult, PolicyViolation } from '../src/index.js';
 
 describe('REQ-GOV-001: PolicyEngine', () => {
   const context: PolicyContext = { projectPath: '/tmp/test' };
@@ -111,5 +111,64 @@ describe('REQ-GOV-002: QualityGateRunner', () => {
   it('should accept custom config', () => {
     const runner = new QualityGateRunner({ minCoverage: 0.9 });
     expect(runner).toBeDefined();
+  });
+});
+
+describe('REQ-KNW-002: PolicyEngine autoFix', () => {
+  it('should auto-fix CONST-003 test-first violation', () => {
+    const engine = new PolicyEngine();
+    const violation: PolicyViolation = {
+      policyId: 'CONST-003',
+      article: 3,
+      severity: 'blocker',
+      message: 'No test file found',
+      suggestion: 'Write tests first',
+    };
+    const result = engine.autoFix(violation);
+    expect(result.fixed).toBe(true);
+    expect(result.description).toContain('テストファイル');
+    expect(result.appliedFix).toBeDefined();
+  });
+
+  it('should auto-fix CONST-005 traceability violation', () => {
+    const engine = new PolicyEngine();
+    const violation: PolicyViolation = {
+      policyId: 'CONST-005',
+      article: 5,
+      severity: 'critical',
+      message: 'Missing traceability link',
+      suggestion: 'Add REQ->DES link',
+    };
+    const result = engine.autoFix(violation);
+    expect(result.fixed).toBe(true);
+    expect(result.description).toContain('トレーサビリティ');
+  });
+
+  it('should auto-fix CONST-004 EARS format violation', () => {
+    const engine = new PolicyEngine();
+    const violation: PolicyViolation = {
+      policyId: 'CONST-004',
+      article: 4,
+      severity: 'major',
+      message: 'Not in EARS format',
+      suggestion: 'Convert to EARS',
+    };
+    const result = engine.autoFix(violation);
+    expect(result.fixed).toBe(true);
+    expect(result.description).toContain('EARS');
+  });
+
+  it('should return fixed: false for unsupported policies', () => {
+    const engine = new PolicyEngine();
+    const violation: PolicyViolation = {
+      policyId: 'CONST-002',
+      article: 2,
+      severity: 'minor',
+      message: 'No CLI interface',
+      suggestion: 'Add CLI',
+    };
+    const result = engine.autoFix(violation);
+    expect(result.fixed).toBe(false);
+    expect(result.description).toContain('自動修正は未対応');
   });
 });

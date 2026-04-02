@@ -269,11 +269,15 @@ export class PhaseController {
     const missing: MissingPrerequisite[] = [];
 
     if (target === 'implementation') {
-      // DES-SDD-002a/b: requirements, design, task-breakdown must all be approved
+      // DES-SDD-002a/b: requirements, design, task-breakdown must all be approved and have artifacts
       const required: WorkflowPhase[] = ['requirements', 'design', 'task-breakdown'];
       for (const phase of required) {
         if (!this.tracker.isApproved(phase)) {
           missing.push({ phase, reason: 'not_approved' });
+        }
+        const artifacts = this.tracker.getArtifacts(phase);
+        if (artifacts.length === 0) {
+          missing.push({ phase, reason: 'no_artifacts' });
         }
       }
     } else if (targetIdx > 0) {
@@ -299,12 +303,12 @@ export class PhaseController {
     const lines = missing.map((m) => {
       const reason =
         m.reason === 'not_approved'
-          ? `phase '${m.phase}' is not approved`
-          : `phase '${m.phase}' has no artifacts`;
+          ? `フェーズ '${m.phase}' が未承認です`
+          : `フェーズ '${m.phase}' に成果物がありません`;
       return `  - ${reason}`;
     });
 
-    return `Transition blocked:\n${lines.join('\n')}`;
+    return `⛔ 実装を開始できません。以下が不足しています:\n${lines.join('\n')}`;
   }
 }
 
@@ -323,8 +327,11 @@ export {
   ExtendedQualityGateRunner,
   createExtendedQualityGateRunner,
   DEFAULT_EXTENDED_GATE_CONFIG,
+  GATE_CONSTITUTION_MAP,
   type ExtendedGateConfig,
   type GateCheckContext,
+  type ConstitutionMapping,
+  type ViolationEntry,
 } from './quality-gates.js';
 
 export {
@@ -384,6 +391,36 @@ export function createDefaultGates(): PhaseGate[] {
             artifacts.length > 0
               ? 'Task-breakdown phase has artifacts'
               : 'Task-breakdown phase has no artifacts',
+        };
+      },
+    },
+    {
+      name: 'requirements-impl-artifacts',
+      phase: 'implementation',
+      check: (state: WorkflowState): GateResult => {
+        const artifacts = state.artifacts.get('requirements') ?? [];
+        return {
+          gateName: 'requirements-impl-artifacts',
+          passed: artifacts.length > 0,
+          message:
+            artifacts.length > 0
+              ? 'Requirements phase has artifacts for implementation'
+              : 'Requirements phase has no artifacts for implementation',
+        };
+      },
+    },
+    {
+      name: 'design-impl-artifacts',
+      phase: 'implementation',
+      check: (state: WorkflowState): GateResult => {
+        const artifacts = state.artifacts.get('design') ?? [];
+        return {
+          gateName: 'design-impl-artifacts',
+          passed: artifacts.length > 0,
+          message:
+            artifacts.length > 0
+              ? 'Design phase has artifacts for implementation'
+              : 'Design phase has no artifacts for implementation',
         };
       },
     },

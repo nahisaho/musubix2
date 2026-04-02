@@ -103,6 +103,7 @@ export type {
 export {
   EARSValidator,
   createEARSValidator,
+  convertToEARS,
   MarkdownEARSParser,
   RequirementsValidator,
   createMarkdownEARSParser,
@@ -156,10 +157,14 @@ export {
   createSOLIDValidator,
   type DesignDocument,
   type DesignSection,
+  type DesignOutput,
   type SOLIDReport,
   type SOLIDViolation,
   type SOLIDPrinciple,
   type ParsedRequirementInput,
+  type TraceabilityLink as DesignTraceabilityLink,
+  type TraceabilityCoverageResult,
+  type TraceabilityDesignResult,
 } from './design/index.js';
 
 // Project Initializer
@@ -221,13 +226,16 @@ export {
 export {
   SemanticCodeFilterPipeline,
   HallucinationDetector,
+  RejectionGate,
   createSemanticCodeFilterPipeline,
   createHallucinationDetector,
+  createRejectionGate,
   type FilterStage,
   type FilterResult,
   type PipelineResult,
   type SemanticFilter,
   type HallucinationIssue,
+  type RejectionResult,
 } from './neurosymbolic/index.js';
 
 // Learning Engine
@@ -337,3 +345,12 @@ export {
   createRealtimeLearningEngine,
   type LearningDashboard,
 } from './learning/realtime-engine.js';
+
+// Virtual Project Fixtures
+export { VIRTUAL_PROJECTS, type VirtualProject } from './fixtures/virtual-projects.js';
+
+// Application Layer
+export {
+  type ApplicationService,
+  type DTOMapper,
+} from './application/index.js';

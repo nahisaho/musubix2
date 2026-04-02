@@ -379,6 +379,88 @@ export class PreconditionVerifier {
 
     return { consistent: false, conflicts };
   }
+
+  async verifyPostcondition(
+    postcondition: string,
+    context: Record<string, unknown>,
+  ): Promise<VerificationResult> {
+    const actionVar = sanitizeName(postcondition);
+    if (!actionVar) {
+      return {
+        requirementId: 'postcondition',
+        status: 'error',
+        solverResult: { status: 'error', time: 0, error: 'Empty postcondition' },
+        explanation: 'Postcondition string is empty or invalid.',
+      };
+    }
+
+    const variables = extractVariables(postcondition);
+
+    // Build SMT from context: context keys that are true become assertions
+    const contextAssertions: string[] = [];
+    for (const [key, value] of Object.entries(context)) {
+      const varName = sanitizeName(key);
+      if (varName) {
+        if (value === true) {
+          contextAssertions.push(`(assert ${varName})`);
+        } else if (value === false) {
+          contextAssertions.push(`(assert (not ${varName}))`);
+        }
+      }
+    }
+
+    // Assert the postcondition must hold
+    const postconditionAssertion = `(assert ${actionVar})`;
+
+    const allVars = [
+      ...variables,
+      ...Object.keys(context)
+        .map((k) => ({ name: sanitizeName(k), sort: 'Bool' as const }))
+        .filter((v) => v.name),
+    ];
+
+    const formula: SmtFormula = {
+      id: makeFormulaId('postcondition'),
+      requirementId: 'postcondition',
+      smtLib2: [...contextAssertions, postconditionAssertion].join('\n'),
+      variables: allVars,
+      assertions: [...contextAssertions, postconditionAssertion],
+    };
+
+    const converter = new EarsToSmtConverter();
+    const script = converter.generateSmtLib2Script([formula]);
+    const solver = new Z3Adapter();
+    const solverResult = await solver.solve(script);
+
+    let status: VerificationResult['status'];
+    let explanation: string;
+
+    switch (solverResult.status) {
+      case 'sat':
+        status = 'verified';
+        explanation = 'Postcondition is satisfiable in the given context.';
+        break;
+      case 'unsat':
+        status = 'violated';
+        explanation = 'Postcondition cannot be satisfied in the given context.';
+        break;
+      case 'unknown':
+      case 'timeout':
+        status = 'inconclusive';
+        explanation = `Solver returned ${solverResult.status}.`;
+        break;
+      default:
+        status = 'error';
+        explanation = `Solver error: ${solverResult.error ?? 'unknown'}`;
+    }
+
+    return {
+      requirementId: 'postcondition',
+      status,
+      solverResult,
+      explanation,
+    };
+  }
 }
 
 // ── Factory functions ───────────────────────────────────────────

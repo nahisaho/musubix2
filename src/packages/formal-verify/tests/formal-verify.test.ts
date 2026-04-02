@@ -193,4 +193,29 @@ describe('DES-FV-001: PreconditionVerifier', () => {
     expect(result.consistent).toBe(true);
     expect(result.conflicts).toHaveLength(0);
   });
+
+  it('should verify postcondition in valid context', async () => {
+    const result = await verifier.verifyPostcondition('system initialized', {
+      system: true,
+      initialized: true,
+    });
+    expect(result.requirementId).toBe('postcondition');
+    expect(result.status).toBe('verified');
+    expect(result.explanation).toContain('satisfiable');
+  });
+
+  it('should handle empty postcondition gracefully', async () => {
+    const result = await verifier.verifyPostcondition('', {});
+    expect(result.status).toBe('error');
+    expect(result.explanation).toContain('empty');
+  });
+
+  it('should verify postcondition with false context values', async () => {
+    const result = await verifier.verifyPostcondition('data saved', {
+      data: true,
+      saved: false,
+    });
+    expect(result.requirementId).toBe('postcondition');
+    expect(['verified', 'violated', 'inconclusive']).toContain(result.status);
+  });
 });

@@ -4,6 +4,8 @@ import {
   createHallucinationDetector,
   SemanticCodeFilterPipeline,
   HallucinationDetector,
+  RejectionGate,
+  createRejectionGate,
 } from '../../src/neurosymbolic/index.js';
 import type { SemanticFilter, FilterResult } from '../../src/neurosymbolic/index.js';
 
@@ -152,5 +154,59 @@ describe('DES-INT-001: HallucinationDetector', () => {
     const flaggedIds = funcIssues.map(i => i.identifier);
     expect(flaggedIds).not.toContain('parseInt');
     expect(flaggedIds).not.toContain('console');
+  });
+});
+
+describe('DES-INT-001: RejectionGate', () => {
+  it('should create via factory with default threshold', () => {
+    const gate = createRejectionGate();
+    expect(gate).toBeInstanceOf(RejectionGate);
+    expect(gate.getThreshold()).toBe(0.7);
+  });
+
+  it('should create with custom threshold', () => {
+    const gate = new RejectionGate(0.9);
+    expect(gate.getThreshold()).toBe(0.9);
+  });
+
+  it('should accept when confidence >= threshold and symbolicValid is true', () => {
+    const gate = new RejectionGate(0.7);
+    const result = gate.evaluate({ confidence: 0.85, symbolicValid: true });
+    expect(result.accepted).toBe(true);
+    expect(result.reason).toContain('Accepted');
+    expect(result.reason).toContain('0.85');
+  });
+
+  it('should reject when symbolicValid is false regardless of confidence', () => {
+    const gate = new RejectionGate(0.7);
+    const result = gate.evaluate({ confidence: 0.99, symbolicValid: false });
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toContain('symbolic validation failed');
+  });
+
+  it('should reject when confidence < threshold', () => {
+    const gate = new RejectionGate(0.7);
+    const result = gate.evaluate({ confidence: 0.5, symbolicValid: true });
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toContain('below threshold');
+    expect(result.reason).toContain('0.50');
+  });
+
+  it('should accept at exactly threshold boundary', () => {
+    const gate = new RejectionGate(0.7);
+    const result = gate.evaluate({ confidence: 0.7, symbolicValid: true });
+    expect(result.accepted).toBe(true);
+  });
+
+  it('should generate explanation string for all decisions', () => {
+    const gate = new RejectionGate(0.7);
+    const accepted = gate.evaluate({ confidence: 0.8, symbolicValid: true });
+    expect(accepted.reason.length).toBeGreaterThan(0);
+
+    const rejectedSymbolic = gate.evaluate({ confidence: 0.8, symbolicValid: false });
+    expect(rejectedSymbolic.reason.length).toBeGreaterThan(0);
+
+    const rejectedConfidence = gate.evaluate({ confidence: 0.3, symbolicValid: true });
+    expect(rejectedConfidence.reason.length).toBeGreaterThan(0);
   });
 });

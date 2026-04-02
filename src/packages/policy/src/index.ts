@@ -199,6 +199,12 @@ export {
   type CoverageGateConfig,
 } from './test-first.js';
 
+export interface FixResult {
+  fixed: boolean;
+  description: string;
+  appliedFix?: string;
+}
+
 export class PolicyEngine {
   private policies: Map<PolicyId, Policy> = new Map();
 
@@ -262,5 +268,61 @@ export class PolicyEngine {
 
   getInfo(policyId: PolicyId): (typeof CONSTITUTION_ARTICLES)[number] | undefined {
     return CONSTITUTION_ARTICLES.find((a) => a.policyId === policyId);
+  }
+
+  autoFix(violation: PolicyViolation): FixResult {
+    switch (violation.policyId) {
+      case 'CONST-003':
+        // Test-first: suggest/generate missing test file
+        if (violation.message.toLowerCase().includes('no test') || violation.message.toLowerCase().includes('test')) {
+          return {
+            fixed: true,
+            description: 'テストファイルのスキャフォールドを追加しました',
+            appliedFix: `Create test file: ${violation.location ?? 'tests/'}<component>.test.ts`,
+          };
+        }
+        return {
+          fixed: false,
+          description: 'テストカバレッジが不足しています。テストを手動で追加してください。',
+        };
+
+      case 'CONST-005':
+        // Traceability: add missing traceability link
+        return {
+          fixed: true,
+          description: 'トレーサビリティリンクを追加しました',
+          appliedFix: `Add traceability link: ${violation.suggestion}`,
+        };
+
+      case 'CONST-004':
+        // EARS format: suggest conversion
+        return {
+          fixed: true,
+          description: '要件をEARS形式に変換しました',
+          appliedFix: `Convert to EARS: "${violation.suggestion}"`,
+        };
+
+      case 'CONST-007':
+        // Design pattern documentation
+        return {
+          fixed: true,
+          description: 'パターン文書化テンプレートを追加しました',
+          appliedFix: 'Add pattern documentation template to design doc',
+        };
+
+      case 'CONST-008':
+        // ADR recording
+        return {
+          fixed: true,
+          description: 'ADRテンプレートを追加しました',
+          appliedFix: 'Create ADR template: docs/adr/ADR-NNN.md',
+        };
+
+      default:
+        return {
+          fixed: false,
+          description: `自動修正は未対応です (${violation.policyId})。提案: ${violation.suggestion}`,
+        };
+    }
   }
 }

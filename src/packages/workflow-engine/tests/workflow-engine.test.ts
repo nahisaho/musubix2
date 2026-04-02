@@ -159,36 +159,69 @@ describe('DES-SDD-002b: Implementation Prerequisites', () => {
     const ctrl = new PhaseController(tracker);
     const check = ctrl.checkPrerequisites('implementation');
     expect(check.satisfied).toBe(false);
-    expect(check.missing.length).toBe(2);
     const phases = check.missing.map((m) => m.phase);
     expect(phases).toContain('design');
     expect(phases).toContain('task-breakdown');
   });
 
-  it('checkPrerequisites passes when all approved', () => {
+  it('checkPrerequisites passes when all approved and have artifacts', () => {
     const tracker = new StateTracker();
     tracker.approve('requirements');
     tracker.approve('design');
     tracker.approve('task-breakdown');
+    tracker.addArtifact('requirements', 'req.md');
+    tracker.addArtifact('design', 'design.md');
+    tracker.addArtifact('task-breakdown', 'tasks.md');
     const ctrl = new PhaseController(tracker);
     const check = ctrl.checkPrerequisites('implementation');
     expect(check.satisfied).toBe(true);
     expect(check.missing).toHaveLength(0);
+  });
+
+  it('checkPrerequisites fails when requirements phase has 0 artifacts', () => {
+    const tracker = new StateTracker();
+    tracker.approve('requirements');
+    tracker.approve('design');
+    tracker.approve('task-breakdown');
+    // no artifacts for requirements
+    tracker.addArtifact('design', 'design.md');
+    tracker.addArtifact('task-breakdown', 'tasks.md');
+    const ctrl = new PhaseController(tracker);
+    const check = ctrl.checkPrerequisites('implementation');
+    expect(check.satisfied).toBe(false);
+    expect(check.missing.some((m) => m.phase === 'requirements' && m.reason === 'no_artifacts')).toBe(true);
+  });
+
+  it('implementation transition fails if requirements phase has 0 artifacts', async () => {
+    const tracker = new StateTracker();
+    tracker.approve('requirements');
+    tracker.setPhase('design');
+    tracker.approve('design');
+    tracker.addArtifact('design', 'arch.md');
+    tracker.setPhase('task-breakdown');
+    tracker.approve('task-breakdown');
+    tracker.addArtifact('task-breakdown', 'tasks.md');
+    // requirements has no artifacts
+
+    const ctrl = new PhaseController(tracker, createDefaultGates());
+    const result = await ctrl.transitionTo('implementation');
+    expect(result.success).toBe(false);
+    expect(result.errors.length).toBeGreaterThan(0);
   });
 });
 
 // ── DES-SDD-002c: Error Formatting ────────────────────────────────────────
 
 describe('DES-SDD-002c: Error Formatting', () => {
-  it('formatBlockingError produces readable message', () => {
+  it('formatBlockingError produces Japanese message', () => {
     const ctrl = new PhaseController(new StateTracker());
     const msg = ctrl.formatBlockingError([
       { phase: 'design', reason: 'not_approved' },
       { phase: 'task-breakdown', reason: 'no_artifacts' },
     ]);
-    expect(msg).toContain('Transition blocked');
-    expect(msg).toContain("phase 'design' is not approved");
-    expect(msg).toContain("phase 'task-breakdown' has no artifacts");
+    expect(msg).toContain('⛔ 実装を開始できません。以下が不足しています:');
+    expect(msg).toContain("フェーズ 'design' が未承認です");
+    expect(msg).toContain("フェーズ 'task-breakdown' に成果物がありません");
   });
 });
 

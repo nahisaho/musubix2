@@ -3,6 +3,7 @@ import {
   ExtendedQualityGateRunner,
   createExtendedQualityGateRunner,
   DEFAULT_EXTENDED_GATE_CONFIG,
+  GATE_CONSTITUTION_MAP,
   type GateCheckContext,
 } from '../src/index.js';
 
@@ -109,5 +110,59 @@ describe('DES-SDD-003: ExtendedQualityGateRunner', () => {
     expect(DEFAULT_EXTENDED_GATE_CONFIG.lintErrorsAllowed).toBe(0);
     expect(DEFAULT_EXTENDED_GATE_CONFIG.testPassRate).toBe(100);
     expect(DEFAULT_EXTENDED_GATE_CONFIG.docCoverageThreshold).toBe(60);
+  });
+});
+
+describe('DES-SDD-003: Constitution Mapping', () => {
+  it('should map gates to constitution articles', () => {
+    const runner = new ExtendedQualityGateRunner();
+    const map = runner.getConstitutionMap();
+    expect(map.length).toBeGreaterThan(0);
+    const coverageMapping = map.find((m) => m.gateName === 'coverage');
+    expect(coverageMapping).toBeDefined();
+    expect(coverageMapping!.articles).toContain('CONST-003');
+  });
+
+  it('should return articles for a specific gate', () => {
+    const runner = new ExtendedQualityGateRunner();
+    const articles = runner.getArticlesForGate('tests');
+    expect(articles).toContain('CONST-003');
+    expect(articles).toContain('CONST-009');
+  });
+
+  it('GATE_CONSTITUTION_MAP covers all 4 gates', () => {
+    const gateNames = GATE_CONSTITUTION_MAP.map((m) => m.gateName);
+    expect(gateNames).toContain('coverage');
+    expect(gateNames).toContain('lint');
+    expect(gateNames).toContain('tests');
+    expect(gateNames).toContain('documentation');
+  });
+});
+
+describe('DES-SDD-003: Violation Report', () => {
+  it('should generate clean report when all pass', () => {
+    const runner = new ExtendedQualityGateRunner();
+    runner.runAll(makeContext());
+    const report = runner.generateViolationReport();
+    expect(report).toContain('All gates passed');
+  });
+
+  it('should generate detailed markdown report with violations', () => {
+    const runner = new ExtendedQualityGateRunner();
+    runner.runAll(makeContext({ coveragePercent: 10, lintErrors: 5 }));
+    const report = runner.generateViolationReport();
+    expect(report).toContain('# Quality Gate Violation Report');
+    expect(report).toContain('❌ Gate: coverage');
+    expect(report).toContain('❌ Gate: lint');
+    expect(report).toContain('CONST-003');
+    expect(report).toContain('CONST-001');
+    expect(report).toContain('blocks phase progression');
+  });
+
+  it('gate failure blocks progression', () => {
+    const runner = new ExtendedQualityGateRunner();
+    const { allPassed } = runner.runAll(makeContext({ coveragePercent: 10 }));
+    expect(allPassed).toBe(false);
+    expect(runner.getViolations().length).toBeGreaterThan(0);
   });
 });
