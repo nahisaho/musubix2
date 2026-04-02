@@ -142,3 +142,11 @@ export function createSkillManager(): SkillManager {
   const registry = createSkillRegistry();
   return new SkillManager(registry);
 }
+
+export {
+  SkillExecutor,
+  createSkillExecutor,
+  type SkillContext,
+  type SkillResult,
+  type SkillExecutionOptions,
+} from './executor.js';

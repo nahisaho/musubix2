@@ -17,6 +17,11 @@
     { "path": "packages/agent-orchestrator" },
     { "path": "packages/expert-delegation" },
     { "path": "packages/skill-manager" },
-    { "path": "packages/assistant-axis" }
+    { "path": "packages/assistant-axis" },
+    { "path": "packages/mcp-server" },
+    { "path": "packages/neural-search" },
+    { "path": "packages/wake-sleep" },
+    { "path": "packages/library-learner" },
+    { "path": "packages/pattern-mcp" }
   ]
 }

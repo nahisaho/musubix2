@@ -98,3 +98,11 @@ export class SemanticRouter {
 export function createSemanticRouter(): SemanticRouter {
   return new SemanticRouter();
 }
+
+export {
+  DelegationEngine,
+  createDelegationEngine,
+  type DelegationStrategy,
+  type DelegationRequest,
+  type DelegationResponse,
+} from './delegation-engine.js';

@@ -312,6 +312,12 @@ export {
   type TaskBreakdown,
 } from './task-breakdown.js';
 
+export {
+  SkillWorkflowBridge,
+  createSkillWorkflowBridge,
+  type SkillPhaseMapping,
+} from './skill-bridge.js';
+
 export function createDefaultGates(): PhaseGate[] {
   return [
     {

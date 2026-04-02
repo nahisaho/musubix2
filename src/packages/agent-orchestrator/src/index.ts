@@ -113,3 +113,14 @@ export class SubagentDispatcher {
 export function createSubagentDispatcher(): SubagentDispatcher {
   return new SubagentDispatcher();
 }
+
+export {
+  WorkstreamManager,
+  ParallelExecutor,
+  ResultAggregator,
+  createWorkstreamManager,
+  createParallelExecutor,
+  createResultAggregator,
+  type WorkstreamStatus,
+  type Workstream,
+} from './workstream.js';

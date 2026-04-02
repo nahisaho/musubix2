@@ -156,6 +156,17 @@ export const CONSTITUTION_ARTICLES: Array<{
   { article: 9, policyId: 'CONST-009', name: '品質ゲート', description: 'Phase遷移時にゲート通過' },
 ];
 
+export {
+  TestFirstTracker,
+  CoverageGate,
+  createTestFirstTracker,
+  createCoverageGate,
+  DEFAULT_TEST_FIRST_CONFIG,
+  type TestFirstConfig,
+  type TestPhase,
+  type CoverageGateConfig,
+} from './test-first.js';
+
 export class PolicyEngine {
   private policies: Map<PolicyId, Policy> = new Map();
 

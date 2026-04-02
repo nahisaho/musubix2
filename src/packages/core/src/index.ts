@@ -196,3 +196,62 @@ export {
   createPatternExtractor, createLearningEngine,
   type PatternCategory, type LearnedPattern, type LearningEvent,
 } from './learning/index.js';
+
+// Scaffold Generator
+export {
+  ScaffoldGenerator, createScaffoldGenerator,
+  type ScaffoldMode, type ScaffoldConfig, type ScaffoldFile,
+} from './codegen/scaffold-generator.js';
+
+// Unit Test Generator
+export {
+  UnitTestGenerator, CoverageReporter,
+  createUnitTestGenerator, createCoverageReporter,
+  type TestStyle, type TestCase, type GeneratedTestSuite,
+} from './codegen/test-generator.js';
+
+// Status Transition Generator
+export {
+  StatusTransitionGenerator, createStatusTransitionGenerator,
+  type StatusDefinition, type TransitionRule, type StateMachineSpec,
+} from './codegen/status-transition.js';
+
+// Matrix Generator
+export {
+  MatrixGenerator, createMatrixGenerator,
+  type MatrixCell, type GapInfo, type TraceabilityMatrixReport,
+} from './traceability/matrix-generator.js';
+
+// Impact Analyzer
+export {
+  ImpactAnalyzer, TraceSyncService,
+  createImpactAnalyzer, createTraceSyncService,
+  type ImpactLevel, type ImpactResult, type TraceSyncStatus,
+} from './traceability/impact-analyzer.js';
+
+// Domain Detector
+export {
+  DomainDetector, createDomainDetector,
+  type DomainType, type DomainDetectionResult,
+} from './domain/index.js';
+
+// Performance
+export {
+  LazyLoader, MemoryMonitor,
+  createLazyLoader, createMemoryMonitor,
+  type LazyModule, type MemoryUsage,
+} from './performance/index.js';
+
+// File Watcher & Task Scheduler
+export {
+  FileWatcher, TaskScheduler,
+  createFileWatcher, createTaskScheduler,
+  type FileChangeType, type FileChangeEvent, type WatcherConfig, DEFAULT_WATCHER_CONFIG,
+  type TaskSchedulerConfig, type ScheduledTask,
+} from './monitoring/file-watcher.js';
+
+// Quality Gate Reporter
+export {
+  QualityGateReporter, createQualityGateReporter,
+  type GateStatus, type GateReportEntry, type QualityReport,
+} from './monitoring/quality-reporter.js';
