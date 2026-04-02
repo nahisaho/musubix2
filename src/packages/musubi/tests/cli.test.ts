@@ -115,12 +115,14 @@ describe('CLIDispatcher', () => {
 
   it('default command stubs log expected messages', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const dispatcher = createCLIDispatcher();
     await dispatcher.dispatch('init');
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Initialized project'));
     await dispatcher.dispatch('req');
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('EARSValidator'));
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: musubix req'));
     logSpy.mockRestore();
+    errSpy.mockRestore();
   });
 
   it('dispatch passes args correctly to action', async () => {

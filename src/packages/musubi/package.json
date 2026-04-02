@@ -15,7 +15,11 @@
   },
   "dependencies": {
     "@musubix2/core": "*",
-    "@musubix2/workflow-engine": "*"
+    "@musubix2/workflow-engine": "*",
+    "@musubix2/policy": "*",
+    "@musubix2/ontology-mcp": "*",
+    "@musubix2/codegraph": "*",
+    "@musubix2/security": "*"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

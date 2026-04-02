@@ -9,6 +9,34 @@
  */
 
 import { ExitCode, type ExitCodeValue } from '@musubix2/core';
+import {
+  createTraceabilityManager,
+  createMatrixGenerator,
+  createImpactAnalyzer,
+  createTraceabilityValidator,
+} from '@musubix2/core';
+import {
+  PolicyEngine,
+  CONSTITUTION_ARTICLES,
+  type PolicyContext,
+} from '@musubix2/policy';
+import {
+  createOntologyStore,
+  createConsistencyValidator,
+} from '@musubix2/ontology-mcp';
+import {
+  createGraphEngine,
+  createASTParser,
+  GraphRAGSearch,
+  type SupportedLanguage,
+} from '@musubix2/codegraph';
+import {
+  createSecretDetector,
+  TaintAnalyzer,
+  DependencyScanner,
+  type SecurityFinding,
+  type Severity,
+} from '@musubix2/security';
 
 // ── Argument parsing ───────────────────────────────────────────────────────
 
@@ -101,20 +129,36 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'タスク管理',
   },
   trace: {
-    usage: 'musubix trace [--verify]',
+    usage: 'musubix trace <matrix|validate|impact> [args]',
     description: 'トレーサビリティ',
   },
+  'trace:verify': {
+    usage: 'musubix trace:verify',
+    description: 'トレーサビリティ検証',
+  },
   policy: {
-    usage: 'musubix policy [options]',
+    usage: 'musubix policy <validate|list|info> [args]',
     description: 'ポリシー検証',
   },
   workflow: {
-    usage: 'musubix workflow [options]',
+    usage: 'musubix workflow <status|approve|transition> [phase]',
     description: 'ワークフロー管理',
   },
   status: {
     usage: 'musubix status',
     description: 'プロジェクト状況',
+  },
+  ontology: {
+    usage: 'musubix ontology <validate|stats>',
+    description: 'オントロジー管理',
+  },
+  cg: {
+    usage: 'musubix cg <index|search|stats|languages> [args]',
+    description: 'コードグラフ分析',
+  },
+  security: {
+    usage: 'musubix security <path>',
+    description: 'セキュリティスキャン',
   },
 };
 
@@ -269,8 +313,12 @@ import {
   TaskBreakdownManager,
   createTaskBreakdownManager,
   type TaskInfo,
+  createPhaseController,
+  createStateTracker,
+  type WorkflowPhase,
+  PHASE_ORDER,
 } from '@musubix2/workflow-engine';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 /**
  * Parse a simple markdown task file into TaskInfo objects.
@@ -391,6 +439,528 @@ export async function handleInit(
   return ExitCode.SUCCESS;
 }
 
+// ── Trace handler ──────────────────────────────────────────────────────────
+
+export async function handleTrace(
+  sub: string | undefined,
+  args: string[],
+): Promise<ExitCodeValue> {
+  switch (sub) {
+    case 'matrix': {
+      const generator = createMatrixGenerator();
+      const report = generator.generate([], [], []);
+      console.log(generator.toMarkdown(report));
+      return ExitCode.SUCCESS;
+    }
+    case 'validate': {
+      const manager = createTraceabilityManager();
+      console.log(manager.toMarkdown());
+      return ExitCode.SUCCESS;
+    }
+    case 'impact': {
+      const targetId = args[0];
+      if (!targetId) {
+        console.error('❌ Usage: musubix trace impact <target-id>');
+        return ExitCode.GENERAL_ERROR;
+      }
+      const analyzer = createImpactAnalyzer();
+      const result = analyzer.analyze(targetId, []);
+      console.log(`Impact analysis for ${targetId}:`);
+      console.log(`  Level: ${result.level}`);
+      console.log(`  Affected: ${result.affectedIds.length} items`);
+      for (const id of result.affectedIds) {
+        console.log(`    - ${id}`);
+      }
+      return ExitCode.SUCCESS;
+    }
+    default:
+      console.log(showHelp('trace'));
+      return ExitCode.SUCCESS;
+  }
+}
+
+// ── Trace:verify handler ───────────────────────────────────────────────────
+
+export async function handleTraceVerify(): Promise<ExitCodeValue> {
+  const validator = createTraceabilityValidator();
+  const report = validator.validateCoverage([], [], [], []);
+  console.log(`Coverage: ${report.coveragePercent}%`);
+  console.log(`Requirements: ${report.coveredRequirements}/${report.totalRequirements}`);
+  if (report.gaps.length > 0) {
+    console.log('Gaps:');
+    for (const gap of report.gaps) {
+      console.log(`  - ${JSON.stringify(gap)}`);
+    }
+  } else {
+    console.log('No gaps found');
+  }
+  return ExitCode.SUCCESS;
+}
+
+// ── Policy handler ─────────────────────────────────────────────────────────
+
+export async function handlePolicy(
+  sub: string | undefined,
+  args: string[],
+): Promise<ExitCodeValue> {
+  switch (sub) {
+    case 'validate': {
+      const engine = new PolicyEngine();
+      const context: PolicyContext = { projectPath: process.cwd() };
+      const report = await engine.validateAll(context);
+      console.log(`Overall: ${report.overallPass ? '✅ PASS' : '❌ FAIL'}`);
+      for (const art of report.articles) {
+        const icon = art.pass ? '✅' : '❌';
+        console.log(`  ${icon} Article ${art.article}: ${art.name} — ${art.details}`);
+      }
+      if (report.violations.length > 0) {
+        console.log(`Violations: ${report.violations.length}`);
+      }
+      return ExitCode.SUCCESS;
+    }
+    case 'list': {
+      console.log('Constitution Articles:');
+      for (const art of CONSTITUTION_ARTICLES) {
+        console.log(`  Article ${art.article}: ${art.name} — ${art.description}`);
+      }
+      return ExitCode.SUCCESS;
+    }
+    case 'info': {
+      const articleNum = parseInt(args[0], 10);
+      if (isNaN(articleNum)) {
+        console.error('❌ Usage: musubix policy info <article-number>');
+        return ExitCode.GENERAL_ERROR;
+      }
+      const article = CONSTITUTION_ARTICLES.find((a) => a.article === articleNum);
+      if (!article) {
+        console.error(`❌ Unknown article: ${articleNum}`);
+        return ExitCode.GENERAL_ERROR;
+      }
+      console.log(`Article ${article.article}: ${article.name}`);
+      console.log(`  Policy ID: ${article.policyId}`);
+      console.log(`  ${article.description}`);
+      return ExitCode.SUCCESS;
+    }
+    default:
+      console.log(showHelp('policy'));
+      return ExitCode.SUCCESS;
+  }
+}
+
+// ── Ontology handler ───────────────────────────────────────────────────────
+
+export async function handleOntology(sub: string | undefined): Promise<ExitCodeValue> {
+  switch (sub) {
+    case 'validate': {
+      const store = createOntologyStore();
+      const validator = createConsistencyValidator();
+      const result = validator.validate(store);
+      console.log(`Consistent: ${result.consistent ? '✅' : '❌'}`);
+      if (result.violations.length > 0) {
+        console.log('Violations:');
+        for (const v of result.violations) {
+          console.log(`  - ${JSON.stringify(v)}`);
+        }
+      }
+      return ExitCode.SUCCESS;
+    }
+    case 'stats': {
+      const store = createOntologyStore();
+      console.log(`Triples: ${store.size()}`);
+      return ExitCode.SUCCESS;
+    }
+    default:
+      console.log(showHelp('ontology'));
+      return ExitCode.SUCCESS;
+  }
+}
+
+// ── Codegraph handler ──────────────────────────────────────────────────────
+
+const EXT_TO_LANG: Record<string, SupportedLanguage> = {
+  ts: 'typescript', js: 'javascript', py: 'python',
+  java: 'java', go: 'go', rs: 'rust',
+  c: 'c', cpp: 'cpp', cs: 'csharp',
+  rb: 'ruby', php: 'php', swift: 'swift',
+  kt: 'kotlin', scala: 'scala', hs: 'haskell', lua: 'lua',
+};
+
+export async function handleCodegraph(
+  sub: string | undefined,
+  args: string[],
+): Promise<ExitCodeValue> {
+  switch (sub) {
+    case 'index': {
+      const targetPath = args[0];
+      if (!targetPath) {
+        console.error('❌ Usage: musubix cg index <path>');
+        return ExitCode.GENERAL_ERROR;
+      }
+      try {
+        const parser = createASTParser();
+        const content = readFileSync(targetPath, 'utf-8');
+        const ext = targetPath.split('.').pop() ?? '';
+        const lang = EXT_TO_LANG[ext];
+        if (!lang) {
+          console.error(`❌ Unsupported file extension: .${ext}`);
+          return ExitCode.GENERAL_ERROR;
+        }
+        const nodes = parser.parse(content, lang);
+        const engine = createGraphEngine();
+        for (const node of nodes) {
+          engine.addNode({
+            id: `${targetPath}:${node.name}`,
+            name: node.name,
+            kind: node.kind,
+            filePath: targetPath,
+            language: lang,
+            startLine: 0,
+            endLine: 0,
+          });
+        }
+        const stats = engine.getStats();
+        console.log(`✅ Indexed ${targetPath}: ${stats.nodeCount} nodes, ${stats.edgeCount} edges`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`❌ ${msg}`);
+        return ExitCode.GENERAL_ERROR;
+      }
+      return ExitCode.SUCCESS;
+    }
+    case 'search': {
+      const query = args[0];
+      if (!query) {
+        console.error('❌ Usage: musubix cg search <query>');
+        return ExitCode.GENERAL_ERROR;
+      }
+      const engine = createGraphEngine();
+      const search = new GraphRAGSearch(engine);
+      const results = search.globalSearch(query);
+      console.log(`Results for "${query}": ${results.length} found`);
+      return ExitCode.SUCCESS;
+    }
+    case 'stats': {
+      const engine = createGraphEngine();
+      const stats = engine.getStats();
+      console.log(`Nodes: ${stats.nodeCount}`);
+      console.log(`Edges: ${stats.edgeCount}`);
+      console.log(`Languages: ${[...stats.languages].join(', ') || 'none'}`);
+      return ExitCode.SUCCESS;
+    }
+    case 'languages': {
+      const parser = createASTParser();
+      const langs = parser.getSupportedLanguages();
+      console.log('Supported languages:');
+      for (const lang of langs) {
+        console.log(`  - ${lang}`);
+      }
+      return ExitCode.SUCCESS;
+    }
+    default:
+      console.log(showHelp('cg'));
+      return ExitCode.SUCCESS;
+  }
+}
+
+// ── Security handler ───────────────────────────────────────────────────────
+
+export async function handleSecurity(filePath: string): Promise<ExitCodeValue> {
+  try {
+    if (!existsSync(filePath)) {
+      console.error(`❌ File not found: ${filePath}`);
+      return ExitCode.GENERAL_ERROR;
+    }
+    const code = readFileSync(filePath, 'utf-8');
+    const secrets = createSecretDetector();
+    const taint = new TaintAnalyzer();
+    const deps = new DependencyScanner();
+
+    const findings: SecurityFinding[] = [
+      ...secrets.scan(code, filePath),
+      ...taint.analyze(code, filePath),
+      ...deps.scan(code, filePath),
+    ];
+
+    const bySeverity = new Map<Severity, SecurityFinding[]>();
+    for (const f of findings) {
+      const list = bySeverity.get(f.severity) ?? [];
+      list.push(f);
+      bySeverity.set(f.severity, list);
+    }
+
+    console.log(`Security scan: ${filePath}`);
+    console.log(`Total findings: ${findings.length}`);
+
+    const severityOrder: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
+    for (const sev of severityOrder) {
+      const items = bySeverity.get(sev);
+      if (items && items.length > 0) {
+        console.log(`\n  ${sev.toUpperCase()} (${items.length}):`);
+        for (const f of items) {
+          console.log(`    - ${f.description}`);
+        }
+      }
+    }
+
+    return ExitCode.SUCCESS;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ${msg}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+// ── Workflow handler ───────────────────────────────────────────────────────
+
+export async function handleWorkflow(
+  sub: string | undefined,
+  args: string[],
+): Promise<ExitCodeValue> {
+  const tracker = createStateTracker();
+  const controller = createPhaseController(tracker);
+
+  switch (sub) {
+    case 'status': {
+      const state = tracker.getState();
+      console.log(`Current phase: ${state.currentPhase}`);
+      console.log('Phase approvals:');
+      for (const phase of PHASE_ORDER) {
+        const approved = tracker.isApproved(phase);
+        const icon = approved ? '✅' : '⬜';
+        console.log(`  ${icon} ${phase}`);
+      }
+      return ExitCode.SUCCESS;
+    }
+    case 'approve': {
+      const phase = args[0] as WorkflowPhase;
+      if (!phase) {
+        console.error('❌ Usage: musubix workflow approve <phase>');
+        return ExitCode.GENERAL_ERROR;
+      }
+      tracker.approve(phase);
+      console.log(`✅ Approved: ${phase}`);
+      return ExitCode.SUCCESS;
+    }
+    case 'transition': {
+      const phase = args[0] as WorkflowPhase;
+      if (!phase) {
+        console.error('❌ Usage: musubix workflow transition <phase>');
+        return ExitCode.GENERAL_ERROR;
+      }
+      const result = await controller.transitionTo(phase);
+      if (result.success) {
+        console.log(`✅ Transitioned: ${result.fromPhase} → ${result.toPhase}`);
+      } else {
+        console.error(`❌ Transition failed: ${result.errors.join(', ')}`);
+        return ExitCode.PHASE_BLOCKED;
+      }
+      return ExitCode.SUCCESS;
+    }
+    default:
+      console.log(showHelp('workflow'));
+      return ExitCode.SUCCESS;
+  }
+}
+
+// ── Status handler ─────────────────────────────────────────────────────────
+
+export async function handleStatus(): Promise<ExitCodeValue> {
+  const tracker = createStateTracker();
+  const controller = createPhaseController(tracker);
+
+  console.log('=== MUSUBIX2 Project Status ===\n');
+
+  const currentPhase = controller.getCurrentPhase();
+  const nextPhase = controller.getNextPhase();
+  console.log(`Workflow: ${currentPhase}${nextPhase ? ` → next: ${nextPhase}` : ' (final)'}`);
+
+  console.log(`\nConstitution: ${CONSTITUTION_ARTICLES.length} articles`);
+  for (const art of CONSTITUTION_ARTICLES) {
+    console.log(`  Article ${art.article}: ${art.name}`);
+  }
+
+  return ExitCode.SUCCESS;
+}
+
+// ── Requirements / Design / Codegen handlers (Group A) ─────────────────────
+
+import {
+  createEARSValidator,
+  MarkdownEARSParser,
+  createRequirementWizard,
+  createDesignGenerator,
+  createC4ModelGenerator,
+  createSOLIDValidator,
+  createCodeGenerator,
+  createUnitTestGenerator,
+} from '@musubix2/core';
+
+export async function handleReqValidate(filePath: string): Promise<ExitCodeValue> {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const parser = new MarkdownEARSParser();
+    const requirements = parser.parse(content);
+    const validator = createEARSValidator();
+
+    let hasIssues = false;
+    for (const req of requirements) {
+      const analysis = validator.analyze(req.text);
+      const validation = validator.validate(req.text);
+      console.log(`${req.id}: pattern=${analysis.pattern}, confidence=${analysis.confidence}`);
+      if (!validation.valid) {
+        hasIssues = true;
+        for (const issue of validation.issues) {
+          console.log(`  ⚠ ${issue}`);
+        }
+      }
+    }
+
+    if (requirements.length === 0) {
+      console.log('No requirements found in file');
+    }
+    return hasIssues ? ExitCode.VALIDATION_ERROR : ExitCode.SUCCESS;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ${msg}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+export async function handleReqWizard(): Promise<ExitCodeValue> {
+  try {
+    const wizard = createRequirementWizard();
+    const steps = wizard.getSteps();
+    console.log('🧙 Requirements Creation Wizard');
+    console.log('Interactive mode — follow these steps to create a requirement:\n');
+    for (let i = 0; i < steps.length; i++) {
+      console.log(`  ${i + 1}. ${steps[i].prompt}`);
+    }
+    return ExitCode.SUCCESS;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ${msg}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+export async function handleDesignGenerate(filePath: string): Promise<ExitCodeValue> {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const parser = new MarkdownEARSParser();
+    const requirements = parser.parse(content);
+    const generator = createDesignGenerator();
+    const mapped = requirements.map((r) => ({
+      id: r.id,
+      title: r.title,
+      text: r.text,
+      pattern: r.pattern ?? 'ubiquitous',
+    }));
+    const design = generator.generate(mapped);
+    console.log(`Design: ${design.title} (v${design.version})`);
+    for (const section of design.sections) {
+      console.log(`\n## ${section.title}`);
+      console.log(section.description);
+    }
+    return ExitCode.SUCCESS;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ${msg}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+export async function handleDesignC4(
+  filePath: string,
+  level: string = 'context',
+): Promise<ExitCodeValue> {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const data = JSON.parse(content) as {
+      title?: string;
+      elements?: Array<Record<string, unknown>>;
+      relationships?: Array<Record<string, unknown>>;
+    };
+    const generator = createC4ModelGenerator();
+
+    for (const el of data.elements ?? []) {
+      generator.addElement(el as unknown as Parameters<typeof generator.addElement>[0]);
+    }
+    for (const rel of data.relationships ?? []) {
+      generator.addRelationship(rel as unknown as Parameters<typeof generator.addRelationship>[0]);
+    }
+
+    const c4Level = level as 'context' | 'container' | 'component' | 'code';
+    const diagram = generator.generateDiagram(c4Level, data.title ?? 'System');
+    const mermaid = generator.toMermaid(diagram);
+    console.log(mermaid);
+    return ExitCode.SUCCESS;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ${msg}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+export async function handleDesignVerify(filePath: string): Promise<ExitCodeValue> {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const design = JSON.parse(content) as Parameters<
+      ReturnType<typeof createSOLIDValidator>['validate']
+    >[0];
+    const validator = createSOLIDValidator();
+    const report = validator.validate(design);
+
+    if (report.violations.length === 0) {
+      console.log('✅ All SOLID principles satisfied');
+      console.log(`Score: ${report.score}/100`);
+      return ExitCode.SUCCESS;
+    }
+
+    console.log(`SOLID score: ${report.score}/100`);
+    for (const v of report.violations) {
+      console.log(`  ⚠ [${v.principle}] ${v.message}`);
+    }
+    return ExitCode.VALIDATION_ERROR;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ${msg}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+export async function handleCodegen(
+  name: string,
+  type: string = 'class',
+): Promise<ExitCodeValue> {
+  try {
+    const generator = createCodeGenerator();
+    const result = generator.generate({
+      templateType: type as Parameters<typeof generator.generate>[0]['templateType'],
+      name,
+    });
+    console.log(result.code);
+    return ExitCode.SUCCESS;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ${msg}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+export async function handleTestGen(filePath: string): Promise<ExitCodeValue> {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const generator = createUnitTestGenerator();
+    const suite = generator.generate(content, 'unit');
+    console.log(suite.code);
+    return ExitCode.SUCCESS;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ${msg}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
 // ── Default commands ───────────────────────────────────────────────────────
 
 export function getDefaultCommands(): CLICommand[] {
@@ -449,106 +1019,229 @@ export function getDefaultCommands(): CLICommand[] {
     {
       name: 'req',
       description: 'Analyze requirements (EARS validation)',
-      action: async () => {
-        console.log('musubix req — use EARSValidator');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('requirements'));
+          return;
+        }
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        const filePath = (args['file'] as string | undefined)
+          ?? (args['subcommand'] as string | undefined)
+          ?? positionalArgs[0];
+        if (!filePath) {
+          console.error('❌ Usage: musubix req <file>');
+          return;
+        }
+        await handleReqValidate(filePath);
       },
     },
     {
       name: 'req:wizard',
       description: 'Interactive requirements creation wizard',
-      action: async () => {
-        console.log('musubix req:wizard — use RequirementWizard');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('requirements'));
+          return;
+        }
+        await handleReqWizard();
       },
     },
     {
       name: 'design',
       description: 'Generate design documents',
-      action: async () => {
-        console.log('musubix design — use DesignGenerator');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('design'));
+          return;
+        }
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        const filePath = (args['file'] as string | undefined)
+          ?? (args['subcommand'] as string | undefined)
+          ?? positionalArgs[0];
+        if (!filePath) {
+          console.error('❌ Usage: musubix design <requirements-file>');
+          return;
+        }
+        await handleDesignGenerate(filePath);
       },
     },
     {
       name: 'design:c4',
       description: 'Generate C4 architecture diagrams',
-      action: async () => {
-        console.log('musubix design:c4 — use C4ModelGenerator');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('design'));
+          return;
+        }
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        const filePath = (args['file'] as string | undefined)
+          ?? (args['subcommand'] as string | undefined)
+          ?? positionalArgs[0];
+        if (!filePath) {
+          console.error('❌ Usage: musubix design:c4 <file> [--level context|container|component]');
+          return;
+        }
+        const level = (args['level'] as string | undefined) ?? 'context';
+        await handleDesignC4(filePath, level);
       },
     },
     {
       name: 'design:verify',
       description: 'Verify design with SOLID analysis',
-      action: async () => {
-        console.log('musubix design:verify — use SOLIDValidator');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('design'));
+          return;
+        }
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        const filePath = (args['file'] as string | undefined)
+          ?? (args['subcommand'] as string | undefined)
+          ?? positionalArgs[0];
+        if (!filePath) {
+          console.error('❌ Usage: musubix design:verify <design-file>');
+          return;
+        }
+        await handleDesignVerify(filePath);
       },
     },
     {
       name: 'codegen',
       description: 'Generate code from design',
-      action: async () => {
-        console.log('musubix codegen — use CodeGenerator');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('codegen'));
+          return;
+        }
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        const name = (args['subcommand'] as string | undefined) ?? positionalArgs[0];
+        if (!name) {
+          console.error('❌ Usage: musubix codegen <name> [--type class|interface|function|...]');
+          return;
+        }
+        const type = (args['type'] as string | undefined) ?? 'class';
+        await handleCodegen(name, type);
       },
     },
     {
       name: 'test:gen',
       description: 'Generate test skeletons',
-      action: async () => {
-        console.log('musubix test:gen — use UnitTestGenerator');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('codegen'));
+          return;
+        }
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        const filePath = (args['file'] as string | undefined)
+          ?? (args['subcommand'] as string | undefined)
+          ?? positionalArgs[0];
+        if (!filePath) {
+          console.error('❌ Usage: musubix test:gen <source-file>');
+          return;
+        }
+        await handleTestGen(filePath);
       },
     },
     {
       name: 'trace',
       description: 'Show traceability matrix',
-      action: async () => {
-        console.log('musubix trace — use TraceabilityManager');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('trace'));
+          return;
+        }
+        const sub = args['subcommand'] as string | undefined;
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        await handleTrace(sub, positionalArgs);
       },
     },
     {
       name: 'trace:verify',
       description: 'Verify traceability coverage',
-      action: async () => {
-        console.log('musubix trace:verify — use TraceabilityValidator');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('trace:verify'));
+          return;
+        }
+        await handleTraceVerify();
       },
     },
     {
       name: 'policy',
       description: 'Run constitution policy checks',
-      action: async () => {
-        console.log('musubix policy — use PolicyEngine');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('policy'));
+          return;
+        }
+        const sub = args['subcommand'] as string | undefined;
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        await handlePolicy(sub, positionalArgs);
       },
     },
     {
       name: 'ontology',
       description: 'Manage SDD ontology',
-      action: async () => {
-        console.log('musubix ontology — use N3Store');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('ontology'));
+          return;
+        }
+        const sub = args['subcommand'] as string | undefined;
+        await handleOntology(sub);
       },
     },
     {
       name: 'cg',
       description: 'Code graph analysis',
-      action: async () => {
-        console.log('musubix cg — use GraphEngine');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('cg'));
+          return;
+        }
+        const sub = args['subcommand'] as string | undefined;
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        await handleCodegraph(sub, positionalArgs);
       },
     },
     {
       name: 'security',
       description: 'Run security scan',
-      action: async () => {
-        console.log('musubix security — use SecurityScanner');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('security'));
+          return;
+        }
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        const filePath = (args['subcommand'] as string) ?? positionalArgs[0];
+        if (!filePath) {
+          console.error('❌ Usage: musubix security <path>');
+          return;
+        }
+        await handleSecurity(filePath);
       },
     },
     {
       name: 'workflow',
       description: 'Show workflow phase status',
-      action: async () => {
-        console.log('musubix workflow — use PhaseController');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('workflow'));
+          return;
+        }
+        const sub = args['subcommand'] as string | undefined;
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        await handleWorkflow(sub, positionalArgs);
       },
     },
     {
       name: 'status',
       description: 'Show project status dashboard',
-      action: async () => {
-        console.log('musubix status — project overview');
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('status'));
+          return;
+        }
+        await handleStatus();
       },
     },
   ];

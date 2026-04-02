@@ -183,9 +183,9 @@ describe('REQ-ARC-003: CLIDispatcher.run', () => {
 
   it('dispatches valid command and returns SUCCESS', async () => {
     const dispatcher = createCLIDispatcher();
-    const code = await dispatcher.run(['req']);
+    const code = await dispatcher.run(['req:wizard']);
     expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('EARSValidator'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Requirements Creation Wizard'));
   });
 
   it('unknown command returns GENERAL_ERROR', async () => {
