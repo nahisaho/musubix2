@@ -38,7 +38,7 @@ export interface SOLIDViolation {
 
 export interface SOLIDReport {
   violations: SOLIDViolation[];
-  score: number;  // 0-100, higher is better
+  score: number; // 0-100, higher is better
   principleScores: Record<SOLIDPrinciple, number>;
 }
 
@@ -48,14 +48,14 @@ export class DesignGenerator {
   generate(requirements: ParsedRequirementInput[]): DesignDocument {
     this.counter++;
     const docId = `DES-DOC-${String(this.counter).padStart(3, '0')}`;
-    
+
     // Group requirements by common prefixes/categories
     const groups = this.groupRequirements(requirements);
-    
+
     const sections: DesignSection[] = groups.map((group, idx) => ({
       id: `${docId}-SEC-${String(idx + 1).padStart(3, '0')}`,
       title: group.title,
-      requirementIds: group.requirements.map(r => r.id),
+      requirementIds: group.requirements.map((r) => r.id),
       description: this.generateDescription(group.requirements),
       interfaces: this.suggestInterfaces(group.requirements),
       patterns: this.suggestPatterns(group.requirements),
@@ -70,7 +70,9 @@ export class DesignGenerator {
     };
   }
 
-  private groupRequirements(reqs: ParsedRequirementInput[]): Array<{ title: string; requirements: ParsedRequirementInput[] }> {
+  private groupRequirements(
+    reqs: ParsedRequirementInput[],
+  ): Array<{ title: string; requirements: ParsedRequirementInput[] }> {
     // Group by requirement ID prefix (e.g., REQ-AUTH, REQ-DATA)
     const groups = new Map<string, ParsedRequirementInput[]>();
     for (const req of reqs) {
@@ -79,7 +81,7 @@ export class DesignGenerator {
       list.push(req);
       groups.set(prefix, list);
     }
-    
+
     return Array.from(groups.entries()).map(([prefix, requirements]) => ({
       title: `${prefix} Design Section`,
       requirements,
@@ -87,16 +89,18 @@ export class DesignGenerator {
   }
 
   private generateDescription(reqs: ParsedRequirementInput[]): string {
-    return `This section covers ${reqs.length} requirement(s): ${reqs.map(r => r.id).join(', ')}.`;
+    return `This section covers ${reqs.length} requirement(s): ${reqs.map((r) => r.id).join(', ')}.`;
   }
 
   private suggestInterfaces(reqs: ParsedRequirementInput[]): string[] {
     const interfaces: string[] = [];
     for (const req of reqs) {
       // Extract potential interface names from requirement titles
-      const words = req.title.split(/\s+/).filter(w => w.length > 3);
+      const words = req.title.split(/\s+/).filter((w) => w.length > 3);
       if (words.length > 0) {
-        const name = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+        const name = words
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join('');
         interfaces.push(`I${name}`);
       }
     }
@@ -106,12 +110,22 @@ export class DesignGenerator {
   private suggestPatterns(reqs: ParsedRequirementInput[]): string[] {
     const patterns = new Set<string>();
     for (const req of reqs) {
-      if (req.text.includes('WHEN')) patterns.add('Observer');
-      if (req.text.includes('WHILE')) patterns.add('State');
-      if (req.text.includes('IF')) patterns.add('Strategy');
-      if (req.pattern === 'complex') patterns.add('Chain of Responsibility');
+      if (req.text.includes('WHEN')) {
+        patterns.add('Observer');
+      }
+      if (req.text.includes('WHILE')) {
+        patterns.add('State');
+      }
+      if (req.text.includes('IF')) {
+        patterns.add('Strategy');
+      }
+      if (req.pattern === 'complex') {
+        patterns.add('Chain of Responsibility');
+      }
     }
-    if (patterns.size === 0) patterns.add('Simple Implementation');
+    if (patterns.size === 0) {
+      patterns.add('Simple Implementation');
+    }
     return [...patterns];
   }
 }
@@ -120,7 +134,11 @@ export class SOLIDValidator {
   validate(design: DesignDocument): SOLIDReport {
     const violations: SOLIDViolation[] = [];
     const principleScores: Record<SOLIDPrinciple, number> = {
-      SRP: 100, OCP: 100, LSP: 100, ISP: 100, DIP: 100,
+      SRP: 100,
+      OCP: 100,
+      LSP: 100,
+      ISP: 100,
+      DIP: 100,
     };
 
     for (const section of design.sections) {
@@ -158,9 +176,7 @@ export class SOLIDValidator {
       }
     }
 
-    const score = Math.round(
-      Object.values(principleScores).reduce((a, b) => a + b, 0) / 5
-    );
+    const score = Math.round(Object.values(principleScores).reduce((a, b) => a + b, 0) / 5);
 
     return { violations, score, principleScores };
   }

@@ -274,16 +274,19 @@ export class DataFlowAnalyzer {
           const thenEdge = edges.find(
             (e) => e.from === branchNode.id && !e.label && thenTails.length > 0,
           );
-          if (thenEdge) thenEdge.label = 'true';
+          if (thenEdge) {
+            thenEdge.label = 'true';
+          }
 
           const elseTails = stmt.elseBranch
             ? this.walkCFG(stmt.elseBranch, nodes, edges, [branchNode.id])
             : [branchNode.id];
           const elseEdge = edges.find(
-            (e) =>
-              e.from === branchNode.id && !e.label && e !== thenEdge,
+            (e) => e.from === branchNode.id && !e.label && e !== thenEdge,
           );
-          if (elseEdge) elseEdge.label = 'false';
+          if (elseEdge) {
+            elseEdge.label = 'false';
+          }
 
           // merge
           const mergeNode: CFGNode = { id: this.nextCFGId(), type: 'merge', line: stmt.line };
@@ -312,7 +315,9 @@ export class DataFlowAnalyzer {
             const bodyTails = this.walkCFG(stmt.body, nodes, edges, [loopNode.id]);
             // label the edge from loop into body as 'true'
             const bodyEdge = edges.find((e) => e.from === loopNode.id && !e.label);
-            if (bodyEdge) bodyEdge.label = 'true';
+            if (bodyEdge) {
+              bodyEdge.label = 'true';
+            }
 
             // back-edge
             for (const t of bodyTails) {
@@ -349,7 +354,9 @@ export class DataFlowAnalyzer {
 
     while (queue.length > 0) {
       const current = queue.shift()!;
-      if (visited.has(current)) continue;
+      if (visited.has(current)) {
+        continue;
+      }
       visited.add(current);
 
       // follow use-def and data-dependency edges backwards (edge.from === current)
@@ -371,7 +378,9 @@ export class DataFlowAnalyzer {
 
     // collect definition nodes (variable / parameter) that aren't the start
     for (const id of visited) {
-      if (id === nodeId) continue;
+      if (id === nodeId) {
+        continue;
+      }
       const node = dfg.nodes.find((n) => n.id === id);
       if (node && (node.type === 'variable' || node.type === 'parameter')) {
         result.push(node);
@@ -383,12 +392,7 @@ export class DataFlowAnalyzer {
 
   // -- Helpers --------------------------------------------------------------
 
-  private makeDFGNode(
-    type: DFGNodeType,
-    name: string,
-    scope: string,
-    line?: number,
-  ): DFGNode {
+  private makeDFGNode(type: DFGNodeType, name: string, scope: string, line?: number): DFGNode {
     return { id: `dfg-${this.dfgCounter++}`, type, name, scope, line };
   }
 

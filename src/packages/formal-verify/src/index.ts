@@ -76,9 +76,34 @@ export interface PreconditionCheckResult {
 // ── Helpers ─────────────────────────────────────────────────────
 
 const KEYWORDS = new Set([
-  'the', 'shall', 'when', 'while', 'if', 'then', 'and', 'or', 'not',
-  'is', 'are', 'a', 'an', 'it', 'be', 'to', 'of', 'in', 'that',
-  'for', 'on', 'with', 'as', 'at', 'by', 'from', 'has', 'have',
+  'the',
+  'shall',
+  'when',
+  'while',
+  'if',
+  'then',
+  'and',
+  'or',
+  'not',
+  'is',
+  'are',
+  'a',
+  'an',
+  'it',
+  'be',
+  'to',
+  'of',
+  'in',
+  'that',
+  'for',
+  'on',
+  'with',
+  'as',
+  'at',
+  'by',
+  'from',
+  'has',
+  'have',
 ]);
 
 function sanitizeName(raw: string): string {
@@ -135,9 +160,7 @@ export class EarsToSmtConverter {
         break;
 
       case 'event-driven': {
-        const triggerVar = requirement.trigger
-          ? sanitizeName(requirement.trigger)
-          : 'trigger';
+        const triggerVar = requirement.trigger ? sanitizeName(requirement.trigger) : 'trigger';
         assertions = [`(assert (=> ${triggerVar} ${actionVar}))`];
         if (!requirement.trigger) {
           warnings.push('No trigger specified; using default "trigger"');
@@ -146,9 +169,7 @@ export class EarsToSmtConverter {
       }
 
       case 'state-driven': {
-        const condVar = requirement.condition
-          ? sanitizeName(requirement.condition)
-          : 'condition';
+        const condVar = requirement.condition ? sanitizeName(requirement.condition) : 'condition';
         assertions = [`(assert (=> ${condVar} ${actionVar}))`];
         if (!requirement.condition) {
           warnings.push('No condition specified; using default "condition"');
@@ -166,23 +187,15 @@ export class EarsToSmtConverter {
           : 'feature_enabled';
         assertions = [`(assert (=> ${featureVar} ${actionVar}))`];
         if (!requirement.trigger) {
-          warnings.push(
-            'No feature trigger specified; using default "feature_enabled"',
-          );
+          warnings.push('No feature trigger specified; using default "feature_enabled"');
         }
         break;
       }
 
       case 'complex': {
-        const condVar = requirement.condition
-          ? sanitizeName(requirement.condition)
-          : 'condition';
-        const triggerVar = requirement.trigger
-          ? sanitizeName(requirement.trigger)
-          : 'trigger';
-        assertions = [
-          `(assert (=> (and ${condVar} ${triggerVar}) ${actionVar}))`,
-        ];
+        const condVar = requirement.condition ? sanitizeName(requirement.condition) : 'condition';
+        const triggerVar = requirement.trigger ? sanitizeName(requirement.trigger) : 'trigger';
+        assertions = [`(assert (=> (and ${condVar} ${triggerVar}) ${actionVar}))`];
         if (!requirement.condition) {
           warnings.push('No condition specified; using default "condition"');
         }
@@ -316,13 +329,11 @@ export class PreconditionVerifier {
     switch (solverResult.status) {
       case 'sat':
         status = 'verified';
-        explanation =
-          'Requirement is satisfiable — a valid model exists.';
+        explanation = 'Requirement is satisfiable — a valid model exists.';
         break;
       case 'unsat':
         status = 'violated';
-        explanation =
-          'Requirement is unsatisfiable — no valid model exists.';
+        explanation = 'Requirement is unsatisfiable — no valid model exists.';
         break;
       case 'unknown':
       case 'timeout':
@@ -361,8 +372,7 @@ export class PreconditionVerifier {
             {
               formula1: formulas[0].id,
               formula2: formulas[1].id,
-              explanation:
-                'Combined assertions are unsatisfiable — potential conflict detected.',
+              explanation: 'Combined assertions are unsatisfiable — potential conflict detected.',
             },
           ]
         : [];

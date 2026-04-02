@@ -35,10 +35,13 @@ export class TestFirstTracker {
   transitionTo(phase: TestPhase): { success: boolean; error?: string } {
     const expected = VALID_TRANSITIONS[this.phase];
     if (expected === null) {
-      return { success: false, error: `Cycle complete — call reset() before starting a new cycle` };
+      return { success: false, error: 'Cycle complete — call reset() before starting a new cycle' };
     }
     if (phase !== expected) {
-      return { success: false, error: `Cannot transition from '${this.phase}' to '${phase}': expected '${expected}'` };
+      return {
+        success: false,
+        error: `Cannot transition from '${this.phase}' to '${phase}': expected '${expected}'`,
+      };
     }
     this.phase = phase;
     return { success: true };

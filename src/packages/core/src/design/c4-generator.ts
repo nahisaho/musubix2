@@ -46,10 +46,10 @@ export class C4ModelGenerator {
     return {
       level,
       title,
-      elements: this.elements.filter(e => levelFilter.includes(e.type)),
-      relationships: this.relationships.filter(r => {
-        const fromEl = this.elements.find(e => e.id === r.from);
-        const toEl = this.elements.find(e => e.id === r.to);
+      elements: this.elements.filter((e) => levelFilter.includes(e.type)),
+      relationships: this.relationships.filter((r) => {
+        const fromEl = this.elements.find((e) => e.id === r.from);
+        const toEl = this.elements.find((e) => e.id === r.to);
         return (
           (fromEl !== undefined && levelFilter.includes(fromEl.type)) ||
           (toEl !== undefined && levelFilter.includes(toEl.type))
@@ -84,7 +84,7 @@ export class C4ModelGenerator {
   toPlantUML(diagram: C4Diagram): string {
     const lines: string[] = [];
     lines.push('@startuml');
-    lines.push("!include <C4/C4_Context>");
+    lines.push('!include <C4/C4_Context>');
     lines.push('');
     lines.push(`title ${diagram.title}`);
     lines.push('');
@@ -123,19 +123,27 @@ export class C4ModelGenerator {
 
   private toMermaidType(type: C4Element['type']): string {
     switch (type) {
-      case 'person': return 'Person';
-      case 'system': return 'System';
-      case 'container': return 'Container';
-      case 'component': return 'Component';
+      case 'person':
+        return 'Person';
+      case 'system':
+        return 'System';
+      case 'container':
+        return 'Container';
+      case 'component':
+        return 'Component';
     }
   }
 
   private toPlantUMLType(type: C4Element['type']): string {
     switch (type) {
-      case 'person': return 'Person';
-      case 'system': return 'System';
-      case 'container': return 'Container';
-      case 'component': return 'Component';
+      case 'person':
+        return 'Person';
+      case 'system':
+        return 'System';
+      case 'container':
+        return 'Container';
+      case 'component':
+        return 'Component';
     }
   }
 }

@@ -62,9 +62,7 @@ export class ExtendedQualityGateRunner {
   }
 
   checkTests(context: GateCheckContext): GateResult {
-    const rate = context.testsTotal > 0
-      ? (context.testsPassed / context.testsTotal) * 100
-      : 0;
+    const rate = context.testsTotal > 0 ? (context.testsPassed / context.testsTotal) * 100 : 0;
     const passed = rate >= this.config.testPassRate;
     return {
       gateName: 'tests',
@@ -76,9 +74,8 @@ export class ExtendedQualityGateRunner {
   }
 
   checkDocumentation(context: GateCheckContext): GateResult {
-    const rate = context.totalExports > 0
-      ? (context.documentedExports / context.totalExports) * 100
-      : 0;
+    const rate =
+      context.totalExports > 0 ? (context.documentedExports / context.totalExports) * 100 : 0;
     const passed = rate >= this.config.docCoverageThreshold;
     return {
       gateName: 'documentation',

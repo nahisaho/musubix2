@@ -14,7 +14,10 @@ export interface LazyModule<T> {
 }
 
 export class LazyLoader {
-  private modules = new Map<string, { loader: () => Promise<unknown>; value?: unknown; loaded: boolean }>();
+  private modules = new Map<
+    string,
+    { loader: () => Promise<unknown>; value?: unknown; loaded: boolean }
+  >();
 
   register<T>(key: string, loader: () => Promise<T>): void {
     this.modules.set(key, { loader, loaded: false });

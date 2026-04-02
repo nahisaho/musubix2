@@ -42,57 +42,77 @@ export class SkillVersionManager {
     // ^major.minor.patch — compatible with version (same major)
     if (trimmed.startsWith('^')) {
       const required = this._parseVersion(trimmed.slice(1));
-      if (!required) return false;
-      if (actual.major !== required.major) return false;
+      if (!required) {
+        return false;
+      }
+      if (actual.major !== required.major) {
+        return false;
+      }
       return this._compare(actual, required) >= 0;
     }
 
     // ~major.minor.patch — approximately equivalent (same major.minor)
     if (trimmed.startsWith('~')) {
       const required = this._parseVersion(trimmed.slice(1));
-      if (!required) return false;
-      if (actual.major !== required.major || actual.minor !== required.minor) return false;
+      if (!required) {
+        return false;
+      }
+      if (actual.major !== required.major || actual.minor !== required.minor) {
+        return false;
+      }
       return actual.patch >= required.patch;
     }
 
     // >=major.minor.patch
     if (trimmed.startsWith('>=')) {
       const required = this._parseVersion(trimmed.slice(2));
-      if (!required) return false;
+      if (!required) {
+        return false;
+      }
       return this._compare(actual, required) >= 0;
     }
 
     // <=major.minor.patch
     if (trimmed.startsWith('<=')) {
       const required = this._parseVersion(trimmed.slice(2));
-      if (!required) return false;
+      if (!required) {
+        return false;
+      }
       return this._compare(actual, required) <= 0;
     }
 
     // >major.minor.patch
     if (trimmed.startsWith('>') && !trimmed.startsWith('>=')) {
       const required = this._parseVersion(trimmed.slice(1));
-      if (!required) return false;
+      if (!required) {
+        return false;
+      }
       return this._compare(actual, required) > 0;
     }
 
     // <major.minor.patch
     if (trimmed.startsWith('<') && !trimmed.startsWith('<=')) {
       const required = this._parseVersion(trimmed.slice(1));
-      if (!required) return false;
+      if (!required) {
+        return false;
+      }
       return this._compare(actual, required) < 0;
     }
 
     // Exact match
     const required = this._parseVersion(trimmed);
-    if (!required) return false;
+    if (!required) {
+      return false;
+    }
     return this._compare(actual, required) === 0;
   }
 
   private _parseVersion(str: string): SkillVersion | null {
     const trimmed = str.trim();
     const match = trimmed.match(/^(\d+)\.(\d+)\.(\d+)$/);
-    if (!match) return null;
+    if (!match) {
+      return null;
+    }
     return {
       major: parseInt(match[1], 10),
       minor: parseInt(match[2], 10),
@@ -101,8 +121,12 @@ export class SkillVersionManager {
   }
 
   private _compare(a: SkillVersion, b: SkillVersion): number {
-    if (a.major !== b.major) return a.major - b.major;
-    if (a.minor !== b.minor) return a.minor - b.minor;
+    if (a.major !== b.major) {
+      return a.major - b.major;
+    }
+    if (a.minor !== b.minor) {
+      return a.minor - b.minor;
+    }
     return a.patch - b.patch;
   }
 }
@@ -140,10 +164,14 @@ export class SkillDependencyResolver {
     }
 
     for (const [skillId, deps] of bySkill) {
-      if (deps.length < 2) continue;
+      if (deps.length < 2) {
+        continue;
+      }
       // Check if the version ranges can be simultaneously satisfied
       const version = this.versionManager.getVersion(skillId);
-      if (!version) continue;
+      if (!version) {
+        continue;
+      }
 
       for (let i = 0; i < deps.length; i++) {
         for (let j = i + 1; j < deps.length; j++) {

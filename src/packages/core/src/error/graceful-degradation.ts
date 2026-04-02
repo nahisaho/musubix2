@@ -285,8 +285,7 @@ export class GracefulDegradation {
     }
 
     throw new Error(
-      `All fallback strategies failed for ${serviceName}. ` +
-        `Warnings: ${warnings.join('; ')}`,
+      `All fallback strategies failed for ${serviceName}. ` + `Warnings: ${warnings.join('; ')}`,
     );
   }
 
@@ -387,10 +386,7 @@ export class GracefulDegradation {
     }
   }
 
-  private handleServiceDegradation(
-    service: ServiceConfig,
-    result: HealthCheckResult,
-  ): void {
+  private handleServiceDegradation(service: ServiceConfig, result: HealthCheckResult): void {
     const previousLevel = this.currentLevel;
 
     const event: DegradationEvent = {
@@ -467,9 +463,7 @@ export class GracefulDegradation {
   }
 
   getEvents(limit?: number): DegradationEvent[] {
-    const events = [...this.events].sort(
-      (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
-    );
+    const events = [...this.events].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     return limit ? events.slice(0, limit) : events;
   }
 

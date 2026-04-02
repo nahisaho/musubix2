@@ -48,30 +48,32 @@ export class TraceabilityManager {
   }
 
   removeLink(id: string): boolean {
-    const index = this.links.findIndex(l => l.id === id);
-    if (index === -1) return false;
+    const index = this.links.findIndex((l) => l.id === id);
+    if (index === -1) {
+      return false;
+    }
     this.links.splice(index, 1);
     return true;
   }
 
   getLinksFrom(sourceId: string): TraceabilityLink[] {
-    return this.links.filter(l => l.sourceId === sourceId);
+    return this.links.filter((l) => l.sourceId === sourceId);
   }
 
   getLinksTo(targetId: string): TraceabilityLink[] {
-    return this.links.filter(l => l.targetId === targetId);
+    return this.links.filter((l) => l.targetId === targetId);
   }
 
   verifyLink(id: string): void {
-    const link = this.links.find(l => l.id === id);
+    const link = this.links.find((l) => l.id === id);
     if (link) {
       link.verified = true;
     }
   }
 
   getMatrix(sourceIds: string[]): TraceabilityMatrix {
-    const coveredIds = new Set(this.links.map(l => l.sourceId));
-    const covered = sourceIds.filter(id => coveredIds.has(id)).length;
+    const coveredIds = new Set(this.links.map((l) => l.sourceId));
+    const covered = sourceIds.filter((id) => coveredIds.has(id)).length;
     const total = sourceIds.length;
     return {
       links: [...this.links],
@@ -85,17 +87,17 @@ export class TraceabilityManager {
 
   findUnlinked(allIds: string[]): string[] {
     const linkedIds = new Set([
-      ...this.links.map(l => l.sourceId),
-      ...this.links.map(l => l.targetId),
+      ...this.links.map((l) => l.sourceId),
+      ...this.links.map((l) => l.targetId),
     ]);
-    return allIds.filter(id => !linkedIds.has(id));
+    return allIds.filter((id) => !linkedIds.has(id));
   }
 
   toMarkdown(): string {
     const header = '| ID | Source | Target | Type | Verified |';
     const separator = '|------|----------|----------|------|----------|';
     const rows = this.links.map(
-      l => `| ${l.id} | ${l.sourceId} | ${l.targetId} | ${l.type} | ${l.verified ? '✓' : '✗'} |`
+      (l) => `| ${l.id} | ${l.sourceId} | ${l.targetId} | ${l.type} | ${l.verified ? '✓' : '✗'} |`,
     );
     return [header, separator, ...rows].join('\n');
   }

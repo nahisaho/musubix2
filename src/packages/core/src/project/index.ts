@@ -26,11 +26,7 @@ interface TemplateInfo {
 const PROJECT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/;
 
 const TEMPLATES: Record<InitOptions['template'], string[]> = {
-  minimal: [
-    'steering/product.ja.md',
-    'steering/project.yml',
-    'musubix.config.json',
-  ],
+  minimal: ['steering/product.ja.md', 'steering/project.yml', 'musubix.config.json'],
   default: [
     'steering/product.ja.md',
     'steering/structure.ja.md',
@@ -65,14 +61,16 @@ export class ProjectInitializer {
 
     const templateFiles = TEMPLATES[options.template];
     if (!templateFiles) {
-      return { success: false, createdFiles: [], errors: [`Unknown template: ${options.template}`] };
+      return {
+        success: false,
+        createdFiles: [],
+        errors: [`Unknown template: ${options.template}`],
+      };
     }
 
-    const base = options.outputDir.endsWith('/')
-      ? options.outputDir
-      : `${options.outputDir}/`;
+    const base = options.outputDir.endsWith('/') ? options.outputDir : `${options.outputDir}/`;
 
-    const createdFiles = templateFiles.map(f => `${base}${f}`);
+    const createdFiles = templateFiles.map((f) => `${base}${f}`);
 
     return {
       success: errors.length === 0,
@@ -96,7 +94,8 @@ export class ProjectInitializer {
     if (!PROJECT_NAME_PATTERN.test(name)) {
       return {
         valid: false,
-        error: 'Project name must start with a letter and contain only alphanumeric characters, hyphens, or underscores (max 64 chars)',
+        error:
+          'Project name must start with a letter and contain only alphanumeric characters, hyphens, or underscores (max 64 chars)',
       };
     }
     return { valid: true };

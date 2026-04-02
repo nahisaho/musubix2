@@ -19,9 +19,7 @@ export class SkillWorkflowBridge {
   }
 
   getSkillsForPhase(phase: string): SkillPhaseMapping[] {
-    return Array.from(this.mappings.values()).filter((m) =>
-      m.phases.includes(phase),
-    );
+    return Array.from(this.mappings.values()).filter((m) => m.phases.includes(phase));
   }
 
   getMappings(): SkillPhaseMapping[] {
@@ -30,7 +28,9 @@ export class SkillWorkflowBridge {
 
   shouldAutoTrigger(skillName: string, currentPhase: string): boolean {
     const mapping = this.mappings.get(skillName);
-    if (!mapping) return false;
+    if (!mapping) {
+      return false;
+    }
     return mapping.autoTrigger && mapping.phases.includes(currentPhase);
   }
 }

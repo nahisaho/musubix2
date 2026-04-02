@@ -56,10 +56,7 @@ export function formatInfo(message: string): string {
 /**
  * CLI table formatter (simple text table)
  */
-export function formatTable(
-  headers: string[],
-  rows: string[][],
-): string {
+export function formatTable(headers: string[], rows: string[][]): string {
   const widths = headers.map((h, i) => {
     const maxRow = Math.max(...rows.map((r) => (r[i] ?? '').length));
     return Math.max(h.length, maxRow);

@@ -3,15 +3,33 @@
  * @see DES-SDD-001 — 5フェーズワークフロー管理
  */
 
-export type SDDPhase = 'requirements' | 'design' | 'task-breakdown' | 'implementation' | 'completion';
+export type SDDPhase =
+  | 'requirements'
+  | 'design'
+  | 'task-breakdown'
+  | 'implementation'
+  | 'completion';
 
 export type SDDConceptType =
-  | 'requirement' | 'design-spec' | 'task' | 'source-code'
-  | 'test-case' | 'decision' | 'pattern' | 'constraint' | 'policy';
+  | 'requirement'
+  | 'design-spec'
+  | 'task'
+  | 'source-code'
+  | 'test-case'
+  | 'decision'
+  | 'pattern'
+  | 'constraint'
+  | 'policy';
 
 export type SDDRelationType =
-  | 'traces_to' | 'implements' | 'tests' | 'depends_on'
-  | 'derives_from' | 'conflicts_with' | 'supersedes' | 'validates';
+  | 'traces_to'
+  | 'implements'
+  | 'tests'
+  | 'depends_on'
+  | 'derives_from'
+  | 'conflicts_with'
+  | 'supersedes'
+  | 'validates';
 
 export interface SDDConcept {
   id: string;
@@ -49,18 +67,78 @@ export interface OntologyValidationResult {
 }
 
 export const CONCEPT_DEFINITIONS: ConceptDefinition[] = [
-  { type: 'requirement', phase: 'requirements', description: 'EARS format requirement', requiredProperties: ['earsPattern', 'priority'], allowedRelations: ['traces_to', 'depends_on', 'conflicts_with'] },
-  { type: 'design-spec', phase: 'design', description: 'Design specification', requiredProperties: ['traceability'], allowedRelations: ['implements', 'traces_to', 'depends_on', 'derives_from'] },
-  { type: 'task', phase: 'task-breakdown', description: 'Implementation task', requiredProperties: ['desRef'], allowedRelations: ['implements', 'depends_on'] },
-  { type: 'source-code', phase: 'implementation', description: 'Source code artifact', requiredProperties: ['filePath'], allowedRelations: ['implements', 'depends_on'] },
-  { type: 'test-case', phase: 'implementation', description: 'Test case', requiredProperties: ['reqId'], allowedRelations: ['tests', 'validates'] },
-  { type: 'decision', phase: 'design', description: 'Architecture Decision Record', requiredProperties: ['status'], allowedRelations: ['supersedes', 'derives_from'] },
-  { type: 'pattern', phase: 'design', description: 'Design pattern usage', requiredProperties: ['patternName'], allowedRelations: ['implements'] },
-  { type: 'constraint', phase: 'requirements', description: 'Non-functional constraint', requiredProperties: ['constraintType'], allowedRelations: ['depends_on', 'conflicts_with'] },
-  { type: 'policy', phase: 'requirements', description: 'Constitution policy', requiredProperties: ['articleNumber'], allowedRelations: ['validates'] },
+  {
+    type: 'requirement',
+    phase: 'requirements',
+    description: 'EARS format requirement',
+    requiredProperties: ['earsPattern', 'priority'],
+    allowedRelations: ['traces_to', 'depends_on', 'conflicts_with'],
+  },
+  {
+    type: 'design-spec',
+    phase: 'design',
+    description: 'Design specification',
+    requiredProperties: ['traceability'],
+    allowedRelations: ['implements', 'traces_to', 'depends_on', 'derives_from'],
+  },
+  {
+    type: 'task',
+    phase: 'task-breakdown',
+    description: 'Implementation task',
+    requiredProperties: ['desRef'],
+    allowedRelations: ['implements', 'depends_on'],
+  },
+  {
+    type: 'source-code',
+    phase: 'implementation',
+    description: 'Source code artifact',
+    requiredProperties: ['filePath'],
+    allowedRelations: ['implements', 'depends_on'],
+  },
+  {
+    type: 'test-case',
+    phase: 'implementation',
+    description: 'Test case',
+    requiredProperties: ['reqId'],
+    allowedRelations: ['tests', 'validates'],
+  },
+  {
+    type: 'decision',
+    phase: 'design',
+    description: 'Architecture Decision Record',
+    requiredProperties: ['status'],
+    allowedRelations: ['supersedes', 'derives_from'],
+  },
+  {
+    type: 'pattern',
+    phase: 'design',
+    description: 'Design pattern usage',
+    requiredProperties: ['patternName'],
+    allowedRelations: ['implements'],
+  },
+  {
+    type: 'constraint',
+    phase: 'requirements',
+    description: 'Non-functional constraint',
+    requiredProperties: ['constraintType'],
+    allowedRelations: ['depends_on', 'conflicts_with'],
+  },
+  {
+    type: 'policy',
+    phase: 'requirements',
+    description: 'Constitution policy',
+    requiredProperties: ['articleNumber'],
+    allowedRelations: ['validates'],
+  },
 ];
 
-export const PHASE_ORDER: SDDPhase[] = ['requirements', 'design', 'task-breakdown', 'implementation', 'completion'];
+export const PHASE_ORDER: SDDPhase[] = [
+  'requirements',
+  'design',
+  'task-breakdown',
+  'implementation',
+  'completion',
+];
 
 export class OntologyModule {
   private definitions: Map<SDDConceptType, ConceptDefinition> = new Map();
@@ -168,7 +246,12 @@ export class OntologyModule {
     return toIdx === fromIdx + 1;
   }
 
-  getStats(): { concepts: number; relations: number; byType: Record<string, number>; byPhase: Record<string, number> } {
+  getStats(): {
+    concepts: number;
+    relations: number;
+    byType: Record<string, number>;
+    byPhase: Record<string, number>;
+  } {
     const byType: Record<string, number> = {};
     const byPhase: Record<string, number> = {};
     for (const c of this.concepts.values()) {

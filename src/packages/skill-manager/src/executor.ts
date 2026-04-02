@@ -94,7 +94,9 @@ export class SkillExecutor {
     fn: () => Promise<Record<string, unknown>>,
     timeout?: number,
   ): Promise<Record<string, unknown>> {
-    if (!timeout) return fn();
+    if (!timeout) {
+      return fn();
+    }
 
     return Promise.race([
       fn(),

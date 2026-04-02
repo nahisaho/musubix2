@@ -69,17 +69,19 @@ export class N3Store {
   }
 
   addTriples(triples: Triple[]): void {
-    for (const t of triples) this.addTriple(t);
+    for (const t of triples) {
+      this.addTriple(t);
+    }
   }
 
   deleteTriple(pattern: TriplePattern): number {
     const before = this.triples.length;
-    this.triples = this.triples.filter(t => !this.matchesPattern(t, pattern));
+    this.triples = this.triples.filter((t) => !this.matchesPattern(t, pattern));
     return before - this.triples.length;
   }
 
   query(pattern: TriplePattern): Triple[] {
-    return this.triples.filter(t => this.matchesPattern(t, pattern));
+    return this.triples.filter((t) => this.matchesPattern(t, pattern));
   }
 
   getAll(): Triple[] {
@@ -95,19 +97,28 @@ export class N3Store {
   }
 
   private hasTriple(triple: Triple): boolean {
-    return this.triples.some(t =>
-      t.subject === triple.subject &&
-      t.predicate === triple.predicate &&
-      t.object === triple.object &&
-      (t.graph ?? '') === (triple.graph ?? '')
+    return this.triples.some(
+      (t) =>
+        t.subject === triple.subject &&
+        t.predicate === triple.predicate &&
+        t.object === triple.object &&
+        (t.graph ?? '') === (triple.graph ?? ''),
     );
   }
 
   private matchesPattern(triple: Triple, pattern: TriplePattern): boolean {
-    if (pattern.subject !== undefined && triple.subject !== pattern.subject) return false;
-    if (pattern.predicate !== undefined && triple.predicate !== pattern.predicate) return false;
-    if (pattern.object !== undefined && triple.object !== pattern.object) return false;
-    if (pattern.graph !== undefined && (triple.graph ?? '') !== pattern.graph) return false;
+    if (pattern.subject !== undefined && triple.subject !== pattern.subject) {
+      return false;
+    }
+    if (pattern.predicate !== undefined && triple.predicate !== pattern.predicate) {
+      return false;
+    }
+    if (pattern.object !== undefined && triple.object !== pattern.object) {
+      return false;
+    }
+    if (pattern.graph !== undefined && (triple.graph ?? '') !== pattern.graph) {
+      return false;
+    }
     return true;
   }
 }
@@ -196,7 +207,9 @@ export class RuleEngine {
       }
 
       totalInferred += newInThisIteration;
-      if (newInThisIteration === 0) break;
+      if (newInThisIteration === 0) {
+        break;
+      }
     }
 
     return {
@@ -277,15 +290,19 @@ export class ConsistencyValidator {
           violations.push({
             type: 'circular',
             message: `Circular subClassOf chain detected involving ${startNode}`,
-            triples: subClassTriples.filter(t => visited.has(t.subject)),
+            triples: subClassTriples.filter((t) => visited.has(t.subject)),
           });
           break;
         }
-        if (visited.has(current)) continue;
+        if (visited.has(current)) {
+          continue;
+        }
         visited.add(current);
         const neighbors = graph.get(current);
         if (neighbors) {
-          for (const n of neighbors) stack.push(n);
+          for (const n of neighbors) {
+            stack.push(n);
+          }
         }
       }
     }
@@ -301,7 +318,7 @@ export class ConsistencyValidator {
 
 export class PrivacyGuard {
   redactSensitiveTriples(triples: Triple[], policy: PrivacyPolicy): Triple[] {
-    return triples.map(t => {
+    return triples.map((t) => {
       if (policy.sensitivePredicates.includes(t.predicate)) {
         return { ...t, object: policy.redactValue };
       }
@@ -310,8 +327,8 @@ export class PrivacyGuard {
   }
 
   validateExport(triples: Triple[], policy: PrivacyPolicy): PrivacyValidationResult {
-    const sensitiveTriples = triples.filter(t =>
-      policy.sensitivePredicates.includes(t.predicate)
+    const sensitiveTriples = triples.filter((t) =>
+      policy.sensitivePredicates.includes(t.predicate),
     );
     return {
       valid: sensitiveTriples.length === 0,
@@ -332,12 +349,20 @@ export class SparqlLikeQueryEngine {
    */
   search(query: string): Triple[] {
     const parts = query.trim().split(/\s+/);
-    if (parts.length < 2) return [];
+    if (parts.length < 2) {
+      return [];
+    }
 
     const pattern: TriplePattern = {};
-    if (parts[0] && !parts[0].startsWith('?')) pattern.subject = parts[0];
-    if (parts[1] && !parts[1].startsWith('?')) pattern.predicate = parts[1];
-    if (parts[2] && !parts[2].startsWith('?')) pattern.object = parts.slice(2).join(' ');
+    if (parts[0] && !parts[0].startsWith('?')) {
+      pattern.subject = parts[0];
+    }
+    if (parts[1] && !parts[1].startsWith('?')) {
+      pattern.predicate = parts[1];
+    }
+    if (parts[2] && !parts[2].startsWith('?')) {
+      pattern.object = parts.slice(2).join(' ');
+    }
 
     return this.store.query(pattern);
   }
@@ -351,7 +376,9 @@ export function createOntologyStore(): N3Store {
 
 export function createRuleEngine(withDefaults: boolean = true): RuleEngine {
   const engine = new RuleEngine();
-  if (withDefaults) engine.addDefaultRules();
+  if (withDefaults) {
+    engine.addDefaultRules();
+  }
   return engine;
 }
 

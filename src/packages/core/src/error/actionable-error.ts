@@ -298,8 +298,7 @@ export const CommonErrors = {
       suggestions: [
         {
           action: 'Review EARS format',
-          description:
-            'Ensure requirements follow EARS patterns (Ubiquitous, Event-driven, etc.)',
+          description: 'Ensure requirements follow EARS patterns (Ubiquitous, Event-driven, etc.)',
         },
         {
           action: 'Run validation',

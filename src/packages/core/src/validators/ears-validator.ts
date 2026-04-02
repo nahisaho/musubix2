@@ -21,26 +21,26 @@ const PATTERN_RULES: PatternRule[] = [
   {
     pattern: 'event-driven',
     regex: /\bWHEN\b.*\b(THE\s+.+\s+)?SHALL\b/i,
-    baseConfidence: 0.60,
+    baseConfidence: 0.6,
     bonus: 0.25,
   },
   {
     pattern: 'state-driven',
     regex: /\bWHILE\b.*\b(THE\s+.+\s+)?SHALL\b/i,
-    baseConfidence: 0.60,
+    baseConfidence: 0.6,
     bonus: 0.25,
   },
   {
     pattern: 'unwanted',
     regex: /\bSHALL\s+NOT\b/i,
-    baseConfidence: 0.60,
-    bonus: 0.20,
+    baseConfidence: 0.6,
+    bonus: 0.2,
   },
   {
     pattern: 'optional',
     regex: /\bWHERE\b.*\b(THE\s+.+\s+)?SHALL\b/i,
-    baseConfidence: 0.60,
-    bonus: 0.20,
+    baseConfidence: 0.6,
+    bonus: 0.2,
   },
   {
     pattern: 'complex',
@@ -51,8 +51,8 @@ const PATTERN_RULES: PatternRule[] = [
   {
     pattern: 'ubiquitous',
     regex: /\b(THE\s+.+\s+)?SHALL\b/i,
-    baseConfidence: 0.50,
-    bonus: 0.00,
+    baseConfidence: 0.5,
+    bonus: 0.0,
   },
 ];
 
@@ -79,9 +79,10 @@ export class EARSValidator {
           pattern: 'complex',
           confidence,
           triggers: this.extractTriggers(cleaned, 'complex'),
-          suggestions: confidence < 0.70
-            ? ['Consider splitting this complex requirement into simpler EARS patterns']
-            : [],
+          suggestions:
+            confidence < 0.7
+              ? ['Consider splitting this complex requirement into simpler EARS patterns']
+              : [],
         };
       }
     }
@@ -89,10 +90,15 @@ export class EARSValidator {
     // Try each pattern in priority order (most specific first)
     for (const rule of PATTERN_RULES) {
       if (rule.regex.test(cleaned)) {
-        const confidence = this.computeConfidence(cleaned, rule.pattern, rule.baseConfidence, rule.bonus);
+        const confidence = this.computeConfidence(
+          cleaned,
+          rule.pattern,
+          rule.baseConfidence,
+          rule.bonus,
+        );
         const patternTriggers = this.extractTriggers(cleaned, rule.pattern);
 
-        if (confidence < 0.70) {
+        if (confidence < 0.7) {
           suggestions.push(this.getSuggestion(rule.pattern));
         }
 
@@ -108,7 +114,7 @@ export class EARSValidator {
     // No pattern matched
     return {
       pattern: 'ubiquitous',
-      confidence: 0.30,
+      confidence: 0.3,
       triggers: [],
       suggestions: [
         'Requirement does not match any EARS pattern. Use "THE <system> SHALL <action>" as minimum.',
@@ -120,11 +126,13 @@ export class EARSValidator {
     const result = this.analyze(requirement);
     const issues: string[] = [];
 
-    if (result.confidence < 0.50) {
-      issues.push(`Low confidence (${result.confidence.toFixed(2)}): does not clearly match EARS pattern`);
+    if (result.confidence < 0.5) {
+      issues.push(
+        `Low confidence (${result.confidence.toFixed(2)}): does not clearly match EARS pattern`,
+      );
     }
 
-    if (!(/\bSHALL\b/i.test(requirement))) {
+    if (!/\bSHALL\b/i.test(requirement)) {
       issues.push('Missing mandatory keyword "SHALL"');
     }
 
@@ -152,7 +160,7 @@ export class EARSValidator {
 
     // Boost for explicit "THE <system> SHALL"
     if (/\bTHE\s+\S+\s+SHALL\b/i.test(text)) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // Boost for punctuation and completeness

@@ -42,7 +42,7 @@ export class CapabilityMatcher {
         const domTokens = this._tokenize(domain);
         const overlap = domTokens.filter((t) => queryTokens.includes(t));
         if (overlap.length > 0) {
-          score += overlap.length / Math.max(domTokens.length, 1) * 0.5;
+          score += (overlap.length / Math.max(domTokens.length, 1)) * 0.5;
         }
       }
 

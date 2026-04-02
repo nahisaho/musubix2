@@ -8,9 +8,17 @@
  */
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-export type VulnerabilityType = 'injection' | 'xss' | 'secret-leak' | 'insecure-dependency'
-  | 'prompt-injection' | 'path-traversal' | 'insecure-crypto' | 'hardcoded-credential'
-  | 'taint-flow' | 'compliance-violation';
+export type VulnerabilityType =
+  | 'injection'
+  | 'xss'
+  | 'secret-leak'
+  | 'insecure-dependency'
+  | 'prompt-injection'
+  | 'path-traversal'
+  | 'insecure-crypto'
+  | 'hardcoded-credential'
+  | 'taint-flow'
+  | 'compliance-violation';
 
 export interface CodeLocation {
   file: string;
@@ -27,7 +35,7 @@ export interface SecurityFinding {
   description: string;
   suggestion: string;
   cweId?: string;
-  confidence: number;  // 0.0 - 1.0
+  confidence: number; // 0.0 - 1.0
 }
 
 export interface SecurityPolicy {
@@ -39,7 +47,7 @@ export interface SecurityPolicy {
 export interface SecurityRule {
   id: string;
   name: string;
-  pattern: string;  // regex pattern to detect
+  pattern: string; // regex pattern to detect
   severity: Severity;
   type: VulnerabilityType;
   description: string;
@@ -187,7 +195,8 @@ export class TaintAnalyzer {
       severity: 'critical',
       type: 'injection',
       description: 'Use of eval() detected — potential code injection',
-      suggestion: 'Replace eval() with a safer alternative such as JSON.parse() or a sandboxed interpreter',
+      suggestion:
+        'Replace eval() with a safer alternative such as JSON.parse() or a sandboxed interpreter',
       cweId: 'CWE-95',
       confidence: 0.9,
     },
@@ -281,7 +290,8 @@ export class DependencyScanner {
       severity: 'medium',
       type: 'path-traversal',
       description: 'Synchronous fs operation without apparent validation',
-      suggestion: 'Validate file paths against a whitelist and use path.resolve() to prevent traversal',
+      suggestion:
+        'Validate file paths against a whitelist and use path.resolve() to prevent traversal',
       cweId: 'CWE-22',
       confidence: 0.5,
     },

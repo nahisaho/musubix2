@@ -2,7 +2,12 @@
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-export type WorkflowPhase = 'requirements' | 'design' | 'task-breakdown' | 'implementation' | 'completion';
+export type WorkflowPhase =
+  | 'requirements'
+  | 'design'
+  | 'task-breakdown'
+  | 'implementation'
+  | 'completion';
 
 export interface GateResult {
   gateName: string;
@@ -65,7 +70,11 @@ export interface PhaseGate {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 export const PHASE_ORDER: readonly WorkflowPhase[] = [
-  'requirements', 'design', 'task-breakdown', 'implementation', 'completion',
+  'requirements',
+  'design',
+  'task-breakdown',
+  'implementation',
+  'completion',
 ] as const;
 
 // ── StateTracker ───────────────────────────────────────────────────────────
@@ -96,7 +105,9 @@ export class StateTracker {
 
     const approvedPhases: WorkflowPhase[] = [];
     for (const [phase, approved] of this.state.approvals.entries()) {
-      if (approved) approvedPhases.push(phase);
+      if (approved) {
+        approvedPhases.push(phase);
+      }
     }
 
     return {
@@ -173,31 +184,41 @@ export class PhaseController {
   getNextPhase(): WorkflowPhase | null {
     const current = this.getCurrentPhase();
     const idx = PHASE_ORDER.indexOf(current);
-    if (idx < 0 || idx >= PHASE_ORDER.length - 1) return null;
+    if (idx < 0 || idx >= PHASE_ORDER.length - 1) {
+      return null;
+    }
     return PHASE_ORDER[idx + 1];
   }
 
   getPreviousPhase(): WorkflowPhase | null {
     const current = this.getCurrentPhase();
     const idx = PHASE_ORDER.indexOf(current);
-    if (idx <= 0) return null;
+    if (idx <= 0) {
+      return null;
+    }
     return PHASE_ORDER[idx - 1];
   }
 
   async canTransition(target: WorkflowPhase): Promise<boolean> {
     // Target must be the immediate next phase
     const next = this.getNextPhase();
-    if (target !== next) return false;
+    if (target !== next) {
+      return false;
+    }
 
     const prereqs = this.checkPrerequisites(target);
-    if (!prereqs.satisfied) return false;
+    if (!prereqs.satisfied) {
+      return false;
+    }
 
     // Run gates
     const state = this.tracker.getState();
     for (const gate of this.gates) {
       if (gate.phase === target) {
         const result = gate.check(state);
-        if (!result.passed) return false;
+        if (!result.passed) {
+          return false;
+        }
       }
     }
 
@@ -271,12 +292,15 @@ export class PhaseController {
   }
 
   formatBlockingError(missing: MissingPrerequisite[]): string {
-    if (missing.length === 0) return 'No blocking issues found.';
+    if (missing.length === 0) {
+      return 'No blocking issues found.';
+    }
 
     const lines = missing.map((m) => {
-      const reason = m.reason === 'not_approved'
-        ? `phase '${m.phase}' is not approved`
-        : `phase '${m.phase}' has no artifacts`;
+      const reason =
+        m.reason === 'not_approved'
+          ? `phase '${m.phase}' is not approved`
+          : `phase '${m.phase}' has no artifacts`;
       return `  - ${reason}`;
     });
 
@@ -328,9 +352,10 @@ export function createDefaultGates(): PhaseGate[] {
         return {
           gateName: 'requirements-artifacts',
           passed: artifacts.length > 0,
-          message: artifacts.length > 0
-            ? 'Requirements phase has artifacts'
-            : 'Requirements phase has no artifacts',
+          message:
+            artifacts.length > 0
+              ? 'Requirements phase has artifacts'
+              : 'Requirements phase has no artifacts',
         };
       },
     },
@@ -342,9 +367,8 @@ export function createDefaultGates(): PhaseGate[] {
         return {
           gateName: 'design-artifacts',
           passed: artifacts.length > 0,
-          message: artifacts.length > 0
-            ? 'Design phase has artifacts'
-            : 'Design phase has no artifacts',
+          message:
+            artifacts.length > 0 ? 'Design phase has artifacts' : 'Design phase has no artifacts',
         };
       },
     },
@@ -356,9 +380,10 @@ export function createDefaultGates(): PhaseGate[] {
         return {
           gateName: 'task-breakdown-artifacts',
           passed: artifacts.length > 0,
-          message: artifacts.length > 0
-            ? 'Task-breakdown phase has artifacts'
-            : 'Task-breakdown phase has no artifacts',
+          message:
+            artifacts.length > 0
+              ? 'Task-breakdown phase has artifacts'
+              : 'Task-breakdown phase has no artifacts',
         };
       },
     },
@@ -370,9 +395,10 @@ export function createDefaultGates(): PhaseGate[] {
         return {
           gateName: 'implementation-artifacts',
           passed: artifacts.length > 0,
-          message: artifacts.length > 0
-            ? 'Implementation phase has artifacts'
-            : 'Implementation phase has no artifacts',
+          message:
+            artifacts.length > 0
+              ? 'Implementation phase has artifacts'
+              : 'Implementation phase has no artifacts',
         };
       },
     },

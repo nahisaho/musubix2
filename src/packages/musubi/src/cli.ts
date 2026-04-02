@@ -34,7 +34,9 @@ export class CLIDispatcher {
   }
 
   registerBatch(commands: CLICommand[]): void {
-    for (const cmd of commands) this.register(cmd);
+    for (const cmd of commands) {
+      this.register(cmd);
+    }
   }
 
   getCommand(name: string): CLICommand | undefined {
@@ -48,7 +50,9 @@ export class CLIDispatcher {
   async dispatch(commandName: string, args: Record<string, unknown> = {}): Promise<void> {
     const command = this.commands.get(commandName);
     if (!command) {
-      throw new Error(`Unknown command: ${commandName}. Available: ${[...this.commands.keys()].join(', ')}`);
+      throw new Error(
+        `Unknown command: ${commandName}. Available: ${[...this.commands.keys()].join(', ')}`,
+      );
     }
     await command.action(args);
   }
@@ -74,22 +78,118 @@ export class CLIDispatcher {
 // Default MUSUBIX2 commands (stubs that delegate to the actual packages)
 export function getDefaultCommands(): CLICommand[] {
   return [
-    { name: 'init', description: 'Initialize a new MUSUBIX2 project', action: async () => { console.log('musubix init — use ProjectInitializer'); } },
-    { name: 'req', description: 'Analyze requirements (EARS validation)', action: async () => { console.log('musubix req — use EARSValidator'); } },
-    { name: 'req:wizard', description: 'Interactive requirements creation wizard', action: async () => { console.log('musubix req:wizard — use RequirementWizard'); } },
-    { name: 'design', description: 'Generate design documents', action: async () => { console.log('musubix design — use DesignGenerator'); } },
-    { name: 'design:c4', description: 'Generate C4 architecture diagrams', action: async () => { console.log('musubix design:c4 — use C4ModelGenerator'); } },
-    { name: 'design:verify', description: 'Verify design with SOLID analysis', action: async () => { console.log('musubix design:verify — use SOLIDValidator'); } },
-    { name: 'codegen', description: 'Generate code from design', action: async () => { console.log('musubix codegen — use CodeGenerator'); } },
-    { name: 'test:gen', description: 'Generate test skeletons', action: async () => { console.log('musubix test:gen — use UnitTestGenerator'); } },
-    { name: 'trace', description: 'Show traceability matrix', action: async () => { console.log('musubix trace — use TraceabilityManager'); } },
-    { name: 'trace:verify', description: 'Verify traceability coverage', action: async () => { console.log('musubix trace:verify — use TraceabilityValidator'); } },
-    { name: 'policy', description: 'Run constitution policy checks', action: async () => { console.log('musubix policy — use PolicyEngine'); } },
-    { name: 'ontology', description: 'Manage SDD ontology', action: async () => { console.log('musubix ontology — use N3Store'); } },
-    { name: 'cg', description: 'Code graph analysis', action: async () => { console.log('musubix cg — use GraphEngine'); } },
-    { name: 'security', description: 'Run security scan', action: async () => { console.log('musubix security — use SecurityScanner'); } },
-    { name: 'workflow', description: 'Show workflow phase status', action: async () => { console.log('musubix workflow — use PhaseController'); } },
-    { name: 'status', description: 'Show project status dashboard', action: async () => { console.log('musubix status — project overview'); } },
+    {
+      name: 'init',
+      description: 'Initialize a new MUSUBIX2 project',
+      action: async () => {
+        console.log('musubix init — use ProjectInitializer');
+      },
+    },
+    {
+      name: 'req',
+      description: 'Analyze requirements (EARS validation)',
+      action: async () => {
+        console.log('musubix req — use EARSValidator');
+      },
+    },
+    {
+      name: 'req:wizard',
+      description: 'Interactive requirements creation wizard',
+      action: async () => {
+        console.log('musubix req:wizard — use RequirementWizard');
+      },
+    },
+    {
+      name: 'design',
+      description: 'Generate design documents',
+      action: async () => {
+        console.log('musubix design — use DesignGenerator');
+      },
+    },
+    {
+      name: 'design:c4',
+      description: 'Generate C4 architecture diagrams',
+      action: async () => {
+        console.log('musubix design:c4 — use C4ModelGenerator');
+      },
+    },
+    {
+      name: 'design:verify',
+      description: 'Verify design with SOLID analysis',
+      action: async () => {
+        console.log('musubix design:verify — use SOLIDValidator');
+      },
+    },
+    {
+      name: 'codegen',
+      description: 'Generate code from design',
+      action: async () => {
+        console.log('musubix codegen — use CodeGenerator');
+      },
+    },
+    {
+      name: 'test:gen',
+      description: 'Generate test skeletons',
+      action: async () => {
+        console.log('musubix test:gen — use UnitTestGenerator');
+      },
+    },
+    {
+      name: 'trace',
+      description: 'Show traceability matrix',
+      action: async () => {
+        console.log('musubix trace — use TraceabilityManager');
+      },
+    },
+    {
+      name: 'trace:verify',
+      description: 'Verify traceability coverage',
+      action: async () => {
+        console.log('musubix trace:verify — use TraceabilityValidator');
+      },
+    },
+    {
+      name: 'policy',
+      description: 'Run constitution policy checks',
+      action: async () => {
+        console.log('musubix policy — use PolicyEngine');
+      },
+    },
+    {
+      name: 'ontology',
+      description: 'Manage SDD ontology',
+      action: async () => {
+        console.log('musubix ontology — use N3Store');
+      },
+    },
+    {
+      name: 'cg',
+      description: 'Code graph analysis',
+      action: async () => {
+        console.log('musubix cg — use GraphEngine');
+      },
+    },
+    {
+      name: 'security',
+      description: 'Run security scan',
+      action: async () => {
+        console.log('musubix security — use SecurityScanner');
+      },
+    },
+    {
+      name: 'workflow',
+      description: 'Show workflow phase status',
+      action: async () => {
+        console.log('musubix workflow — use PhaseController');
+      },
+    },
+    {
+      name: 'status',
+      description: 'Show project status dashboard',
+      action: async () => {
+        console.log('musubix status — project overview');
+      },
+    },
   ];
 }
 

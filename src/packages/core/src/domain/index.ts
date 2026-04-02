@@ -49,10 +49,31 @@ export interface DomainDetectionResult {
 }
 
 const DOMAIN_KEYWORDS: Record<DomainType, string[]> = {
-  web: ['react', 'vue', 'angular', 'next', 'nuxt', 'svelte', 'html', 'css', 'webpack', 'vite', 'tailwind'],
+  web: [
+    'react',
+    'vue',
+    'angular',
+    'next',
+    'nuxt',
+    'svelte',
+    'html',
+    'css',
+    'webpack',
+    'vite',
+    'tailwind',
+  ],
   mobile: ['react-native', 'expo', 'flutter', 'ionic', 'capacitor', 'cordova', 'swift', 'kotlin'],
   embedded: ['arduino', 'raspberry', 'stm32', 'esp32', 'firmware', 'rtos', 'hal'],
-  ai: ['tensorflow', 'pytorch', 'keras', 'scikit-learn', 'transformers', 'openai', 'langchain', 'huggingface'],
+  ai: [
+    'tensorflow',
+    'pytorch',
+    'keras',
+    'scikit-learn',
+    'transformers',
+    'openai',
+    'langchain',
+    'huggingface',
+  ],
   data: ['pandas', 'numpy', 'spark', 'hadoop', 'airflow', 'dbt', 'kafka', 'bigquery'],
   cloud: ['aws-sdk', 'azure', 'gcloud', 'serverless', 'lambda', 'cloudformation', 'terraform'],
   security: ['helmet', 'cors', 'bcrypt', 'jsonwebtoken', 'passport', 'oauth', 'crypto'],
@@ -67,13 +88,30 @@ const DOMAIN_KEYWORDS: Record<DomainType, string[]> = {
   media: ['ffmpeg', 'video', 'audio', 'streaming', 'transcoding', 'player', 'codec'],
   backend: ['express', 'fastify', 'nestjs', 'koa', 'hapi', 'graphql', 'trpc', 'prisma'],
   desktop: ['electron', 'tauri', 'qt', 'gtk', 'wxwidgets', 'winforms', 'wpf'],
-  blockchain: ['ethers', 'web3', 'solidity', 'hardhat', 'truffle', 'solana', 'nft', 'smart-contract'],
+  blockchain: [
+    'ethers',
+    'web3',
+    'solidity',
+    'hardhat',
+    'truffle',
+    'solana',
+    'nft',
+    'smart-contract',
+  ],
   robotics: ['ros', 'gazebo', 'moveit', 'lidar', 'slam', 'navigation', 'actuator'],
   'ar-vr': ['arkit', 'arcore', 'oculus', 'webxr', 'aframe', 'vuforia', 'spatial'],
   automotive: ['autosar', 'can', 'obd', 'vehicle', 'carplay', 'adas', 'v2x'],
   telecom: ['sip', 'voip', 'twilio', 'asterisk', '5g', 'lte', 'spectrum'],
   logistics: ['route', 'fleet', 'warehouse', 'shipping', 'tracking', 'supply-chain', 'delivery'],
-  agriculture: ['crop', 'irrigation', 'soil', 'precision-agriculture', 'drone', 'harvest', 'greenhouse'],
+  agriculture: [
+    'crop',
+    'irrigation',
+    'soil',
+    'precision-agriculture',
+    'drone',
+    'harvest',
+    'greenhouse',
+  ],
   energy: ['solar', 'wind', 'battery', 'grid', 'smart-meter', 'renewable', 'power'],
   legal: ['contract', 'compliance', 'regulation', 'case-management', 'legal-tech', 'clause'],
   travel: ['booking', 'reservation', 'hotel', 'flight', 'itinerary', 'tourism', 'hospitality'],
@@ -110,13 +148,13 @@ const FILE_EXTENSION_SIGNALS: Record<string, DomainType[]> = {
 };
 
 const FILENAME_SIGNALS: Record<string, DomainType[]> = {
-  'Dockerfile': ['devops', 'cloud'],
+  Dockerfile: ['devops', 'cloud'],
   'docker-compose': ['devops', 'cloud'],
-  'Jenkinsfile': ['devops'],
-  'Makefile': ['embedded', 'devops'],
+  Jenkinsfile: ['devops'],
+  Makefile: ['embedded', 'devops'],
   'CMakeLists.txt': ['embedded', 'desktop'],
   'serverless.yml': ['cloud'],
-  'terraform': ['devops', 'cloud'],
+  terraform: ['devops', 'cloud'],
   '.github': ['devops'],
 };
 
@@ -152,7 +190,10 @@ export class DomainDetector {
       const allDeps = this.extractDependencies(packageJson);
       for (const dep of allDeps) {
         const depLower = dep.toLowerCase();
-        for (const [domain, keywords] of Object.entries(DOMAIN_KEYWORDS) as [DomainType, string[]][]) {
+        for (const [domain, keywords] of Object.entries(DOMAIN_KEYWORDS) as [
+          DomainType,
+          string[],
+        ][]) {
           for (const keyword of keywords) {
             if (depLower.includes(keyword)) {
               addScore(domain, 0.5, `dependency: ${dep} matches keyword "${keyword}"`);
@@ -186,7 +227,9 @@ export class DomainDetector {
 
   private getExtension(filePath: string): string | undefined {
     const lastDot = filePath.lastIndexOf('.');
-    if (lastDot === -1) return undefined;
+    if (lastDot === -1) {
+      return undefined;
+    }
     return filePath.slice(lastDot);
   }
 

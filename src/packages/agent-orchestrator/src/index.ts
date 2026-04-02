@@ -49,15 +49,13 @@ export class SubagentDispatcher {
 
   listAgents(role?: AgentRole): SubagentSpec[] {
     const all = Array.from(this.agents.values());
-    if (role === undefined) return all;
+    if (role === undefined) {
+      return all;
+    }
     return all.filter((a) => a.role === role);
   }
 
-  dispatch(
-    agentId: string,
-    description: string,
-    input: Record<string, unknown>,
-  ): AgentTask {
+  dispatch(agentId: string, description: string, input: Record<string, unknown>): AgentTask {
     const agent = this.agents.get(agentId);
     if (!agent) {
       throw new Error(`Agent not found: ${agentId}`);

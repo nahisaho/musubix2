@@ -52,37 +52,42 @@ export class CodeGenerator {
     const desc = options.description ? `\n * ${options.description}` : '';
     const impl = options.implements ? ` implements ${options.implements}` : '';
     const methods = (options.methods ?? [])
-      .map(m => `  ${m.name}(${m.params}): ${m.returnType} {\n    throw new Error('Not implemented');\n  }`)
+      .map(
+        (m) =>
+          `  ${m.name}(${m.params}): ${m.returnType} {\n    throw new Error('Not implemented');\n  }`,
+      )
       .join('\n\n');
 
     return [
-      `/**`,
+      '/**',
       ` * ${options.name}${desc}`,
-      ` */`,
+      ' */',
       `export class ${options.name}${impl} {`,
-      `  constructor() {`,
-      `    // TODO: implement`,
-      `  }`,
+      '  constructor() {',
+      '    // TODO: implement',
+      '  }',
       methods ? '' : '',
       methods,
-      `}`,
-    ].filter((line, i) => !(line === '' && i === 7 && !methods)).join('\n');
+      '}',
+    ]
+      .filter((line, i) => !(line === '' && i === 7 && !methods))
+      .join('\n');
   }
 
   private renderInterface(options: CodeGenOptions): string {
     const desc = options.description ? `\n * ${options.description}` : '';
     const ext = options.implements ? ` extends ${options.implements}` : '';
     const members = (options.methods ?? [])
-      .map(m => `  ${m.name}(${m.params}): ${m.returnType};`)
+      .map((m) => `  ${m.name}(${m.params}): ${m.returnType};`)
       .join('\n');
 
     return [
-      `/**`,
+      '/**',
       ` * ${options.name}${desc}`,
-      ` */`,
+      ' */',
       `export interface ${options.name}${ext} {`,
       members || '  // TODO: define members',
-      `}`,
+      '}',
     ].join('\n');
   }
 
@@ -93,44 +98,46 @@ export class CodeGenerator {
     const returnType = methods.length > 0 ? methods[0].returnType : 'void';
 
     return [
-      `/**`,
+      '/**',
       ` * ${options.name}${desc}`,
-      ` */`,
+      ' */',
       `export function ${options.name}(${params}): ${returnType} {`,
-      `  throw new Error('Not implemented');`,
-      `}`,
+      "  throw new Error('Not implemented');",
+      '}',
     ].join('\n');
   }
 
   private renderTest(options: CodeGenOptions): string {
     const methods = options.methods ?? [{ name: 'default behavior', params: '', returnType: '' }];
     const itBlocks = methods
-      .map(m => [
-        `  it('should handle ${m.name}', () => {`,
-        `    // TODO: implement test`,
-        `    expect(true).toBe(true);`,
-        `  });`,
-      ].join('\n'))
+      .map((m) =>
+        [
+          `  it('should handle ${m.name}', () => {`,
+          '    // TODO: implement test',
+          '    expect(true).toBe(true);',
+          '  });',
+        ].join('\n'),
+      )
       .join('\n\n');
 
     return [
-      `import { describe, it, expect } from 'vitest';`,
-      ``,
+      "import { describe, it, expect } from 'vitest';",
+      '',
       `describe('${options.name}', () => {`,
       itBlocks,
-      `});`,
+      '});',
     ].join('\n');
   }
 
   private renderModule(options: CodeGenOptions): string {
     const desc = options.description ? ` — ${options.description}` : '';
     return [
-      `/**`,
+      '/**',
       ` * ${options.name}${desc}`,
-      ` */`,
-      ``,
-      `// Export public API here`,
-      `export {};`,
+      ' */',
+      '',
+      '// Export public API here',
+      'export {};',
     ].join('\n');
   }
 
@@ -139,21 +146,19 @@ export class CodeGenerator {
     const cmdName = options.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
     return [
-      `import { Command } from 'commander';`,
-      ``,
+      "import { Command } from 'commander';",
+      '',
       `export const ${options.name}Command = new Command('${cmdName}')`,
       `  .description('${desc}')`,
-      `  .action(async () => {`,
-      `    // TODO: implement command logic`,
+      '  .action(async () => {',
+      '    // TODO: implement command logic',
       `    console.log('${options.name} executed');`,
-      `  });`,
+      '  });',
     ].join('\n');
   }
 
   private resolveFilePath(options: CodeGenOptions): string {
-    const kebab = options.name
-      .replace(/([a-z])([A-Z])/g, '$1-$2')
-      .toLowerCase();
+    const kebab = options.name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 
     switch (options.templateType) {
       case 'test':

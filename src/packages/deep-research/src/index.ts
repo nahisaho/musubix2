@@ -143,9 +143,7 @@ export class ResearchEngine {
 
     // Compute confidence from source relevance
     const confidence =
-      selected.length > 0
-        ? selected.reduce((sum, s) => sum + s.relevance, 0) / selected.length
-        : 0;
+      selected.length > 0 ? selected.reduce((sum, s) => sum + s.relevance, 0) / selected.length : 0;
 
     // Build summary
     const summary = this.buildSummary(query, selected);

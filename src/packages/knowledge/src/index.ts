@@ -142,11 +142,11 @@ export class FileKnowledgeStore implements KnowledgeStore {
   }
 
   async deleteEntity(id: string): Promise<boolean> {
-    if (!this.graph.entities[id]) return false;
+    if (!this.graph.entities[id]) {
+      return false;
+    }
     delete this.graph.entities[id];
-    this.graph.relations = this.graph.relations.filter(
-      (r) => r.source !== id && r.target !== id,
-    );
+    this.graph.relations = this.graph.relations.filter((r) => r.source !== id && r.target !== id);
     return true;
   }
 
@@ -165,8 +165,12 @@ export class FileKnowledgeStore implements KnowledgeStore {
     direction: 'in' | 'out' | 'both' = 'both',
   ): Promise<Relation[]> {
     return this.graph.relations.filter((r) => {
-      if (direction === 'out') return r.source === entityId;
-      if (direction === 'in') return r.target === entityId;
+      if (direction === 'out') {
+        return r.source === entityId;
+      }
+      if (direction === 'in') {
+        return r.target === entityId;
+      }
       return r.source === entityId || r.target === entityId;
     });
   }
@@ -180,9 +184,7 @@ export class FileKnowledgeStore implements KnowledgeStore {
     }
 
     if (filter.tags?.length) {
-      results = results.filter((e) =>
-        filter.tags!.some((tag) => e.tags.includes(tag)),
-      );
+      results = results.filter((e) => filter.tags!.some((tag) => e.tags.includes(tag)));
     }
 
     if (filter.text) {
@@ -196,9 +198,7 @@ export class FileKnowledgeStore implements KnowledgeStore {
 
     if (filter.properties) {
       results = results.filter((e) =>
-        Object.entries(filter.properties!).every(
-          ([key, val]) => e.properties[key] === val,
-        ),
+        Object.entries(filter.properties!).every(([key, val]) => e.properties[key] === val),
       );
     }
 
@@ -221,16 +221,22 @@ export class FileKnowledgeStore implements KnowledgeStore {
       for (const field of fields) {
         if (field === 'name') {
           const val = caseSensitive ? e.name : e.name.toLowerCase();
-          if (val.includes(searchText)) return true;
+          if (val.includes(searchText)) {
+            return true;
+          }
         }
         if (field === 'description' && e.description) {
           const val = caseSensitive ? e.description : e.description.toLowerCase();
-          if (val.includes(searchText)) return true;
+          if (val.includes(searchText)) {
+            return true;
+          }
         }
         if (field === 'tags') {
           for (const tag of e.tags) {
             const val = caseSensitive ? tag : tag.toLowerCase();
-            if (val.includes(searchText)) return true;
+            if (val.includes(searchText)) {
+              return true;
+            }
           }
         }
       }
@@ -252,11 +258,15 @@ export class FileKnowledgeStore implements KnowledgeStore {
 
     while (queue.length > 0) {
       const current = queue.shift()!;
-      if (visited.has(current.id) || current.d > depth) continue;
+      if (visited.has(current.id) || current.d > depth) {
+        continue;
+      }
       visited.add(current.id);
 
       const entity = this.graph.entities[current.id];
-      if (entity) subEntities[current.id] = entity;
+      if (entity) {
+        subEntities[current.id] = entity;
+      }
 
       if (current.d < depth) {
         const rels = await this.getRelations(current.id);
@@ -292,11 +302,15 @@ export class FileKnowledgeStore implements KnowledgeStore {
 
     while (queue.length > 0) {
       const current = queue.shift()!;
-      if (visited.has(current.id) || current.d > depth) continue;
+      if (visited.has(current.id) || current.d > depth) {
+        continue;
+      }
       visited.add(current.id);
 
       const entity = this.graph.entities[current.id];
-      if (entity) result.push(entity);
+      if (entity) {
+        result.push(entity);
+      }
 
       if (current.d < depth) {
         let rels = await this.getRelations(current.id, direction);

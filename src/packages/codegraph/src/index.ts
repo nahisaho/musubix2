@@ -12,16 +12,34 @@
 // ---------------------------------------------------------------------------
 
 export type SupportedLanguage =
-  | 'typescript' | 'javascript' | 'python' | 'java' | 'go'
-  | 'rust' | 'c' | 'cpp' | 'csharp' | 'ruby'
-  | 'php' | 'swift' | 'kotlin' | 'scala' | 'haskell' | 'lua';
+  | 'typescript'
+  | 'javascript'
+  | 'python'
+  | 'java'
+  | 'go'
+  | 'rust'
+  | 'c'
+  | 'cpp'
+  | 'csharp'
+  | 'ruby'
+  | 'php'
+  | 'swift'
+  | 'kotlin'
+  | 'scala'
+  | 'haskell'
+  | 'lua';
 
 export type CodeNodeKind =
-  | 'class' | 'function' | 'method' | 'interface'
-  | 'import' | 'export' | 'variable' | 'module';
+  | 'class'
+  | 'function'
+  | 'method'
+  | 'interface'
+  | 'import'
+  | 'export'
+  | 'variable'
+  | 'module';
 
-export type EdgeKind =
-  | 'calls' | 'imports' | 'extends' | 'implements' | 'uses' | 'contains';
+export type EdgeKind = 'calls' | 'imports' | 'extends' | 'implements' | 'uses' | 'contains';
 
 export interface ASTNode {
   kind: CodeNodeKind;
@@ -79,14 +97,25 @@ export interface StorageAdapter {
 // ---------------------------------------------------------------------------
 
 const ALL_LANGUAGES: SupportedLanguage[] = [
-  'typescript', 'javascript', 'python', 'java', 'go',
-  'rust', 'c', 'cpp', 'csharp', 'ruby',
-  'php', 'swift', 'kotlin', 'scala', 'haskell', 'lua',
+  'typescript',
+  'javascript',
+  'python',
+  'java',
+  'go',
+  'rust',
+  'c',
+  'cpp',
+  'csharp',
+  'ruby',
+  'php',
+  'swift',
+  'kotlin',
+  'scala',
+  'haskell',
+  'lua',
 ];
 
-const JS_TS_LANGUAGES: Set<SupportedLanguage> = new Set([
-  'typescript', 'javascript',
-]);
+const JS_TS_LANGUAGES: Set<SupportedLanguage> = new Set(['typescript', 'javascript']);
 
 export class ASTParser {
   parse(source: string, language: SupportedLanguage): ASTNode[] {
@@ -107,12 +136,12 @@ export class ASTParser {
     const nodes: ASTNode[] = [];
 
     const patterns: { kind: CodeNodeKind; regex: RegExp }[] = [
-      { kind: 'class',     regex: /(?:export\s+)?class\s+(\w+)/ },
+      { kind: 'class', regex: /(?:export\s+)?class\s+(\w+)/ },
       { kind: 'interface', regex: /(?:export\s+)?interface\s+(\w+)/ },
-      { kind: 'function',  regex: /(?:export\s+)?(?:async\s+)?function\s+(\w+)/ },
-      { kind: 'import',    regex: /import\s+.*from\s+['"](.[^'"]+)['"]/ },
-      { kind: 'export',    regex: /export\s+\{\s*([^}]+)\}/ },
-      { kind: 'variable',  regex: /(?:export\s+)?(?:const|let|var)\s+(\w+)/ },
+      { kind: 'function', regex: /(?:export\s+)?(?:async\s+)?function\s+(\w+)/ },
+      { kind: 'import', regex: /import\s+.*from\s+['"](.[^'"]+)['"]/ },
+      { kind: 'export', regex: /export\s+\{\s*([^}]+)\}/ },
+      { kind: 'variable', regex: /(?:export\s+)?(?:const|let|var)\s+(\w+)/ },
     ];
 
     for (let i = 0; i < lines.length; i++) {
@@ -158,18 +187,14 @@ export class GraphEngine {
   }
 
   getDependencies(id: string): CodeNode[] {
-    const targetIds = this.edges
-      .filter((e) => e.from === id)
-      .map((e) => e.to);
+    const targetIds = this.edges.filter((e) => e.from === id).map((e) => e.to);
     return targetIds
       .map((tid) => this.nodes.get(tid))
       .filter((n): n is CodeNode => n !== undefined);
   }
 
   getCallers(id: string): CodeNode[] {
-    const sourceIds = this.edges
-      .filter((e) => e.to === id)
-      .map((e) => e.from);
+    const sourceIds = this.edges.filter((e) => e.to === id).map((e) => e.from);
     return sourceIds
       .map((sid) => this.nodes.get(sid))
       .filter((n): n is CodeNode => n !== undefined);
@@ -182,18 +207,20 @@ export class GraphEngine {
 
     while (queue.length > 0) {
       const item = queue.shift()!;
-      if (visited.has(item.nodeId) || item.depth > maxDepth) continue;
+      if (visited.has(item.nodeId) || item.depth > maxDepth) {
+        continue;
+      }
       visited.add(item.nodeId);
 
       if (item.nodeId !== id) {
         const node = this.nodes.get(item.nodeId);
-        if (node) result.push(node);
+        if (node) {
+          result.push(node);
+        }
       }
 
       if (item.depth < maxDepth) {
-        const deps = this.edges
-          .filter((e) => e.from === item.nodeId)
-          .map((e) => e.to);
+        const deps = this.edges.filter((e) => e.from === item.nodeId).map((e) => e.to);
         for (const dep of deps) {
           if (!visited.has(dep)) {
             queue.push({ nodeId: dep, depth: item.depth + 1 });
@@ -242,10 +269,18 @@ export class MemoryStorage implements StorageAdapter {
 
   async query(filter: GraphQuery): Promise<CodeNode[]> {
     return this.graph.nodes.filter((node) => {
-      if (filter.kind && node.kind !== filter.kind) return false;
-      if (filter.name && !node.name.includes(filter.name)) return false;
-      if (filter.filePath && !node.filePath.includes(filter.filePath)) return false;
-      if (filter.language && node.language !== filter.language) return false;
+      if (filter.kind && node.kind !== filter.kind) {
+        return false;
+      }
+      if (filter.name && !node.name.includes(filter.name)) {
+        return false;
+      }
+      if (filter.filePath && !node.filePath.includes(filter.filePath)) {
+        return false;
+      }
+      if (filter.language && node.language !== filter.language) {
+        return false;
+      }
       return true;
     });
   }
@@ -303,12 +338,18 @@ export class GraphRAGSearch {
   }
 
   private scoreMatch(text: string, query: string): number {
-    if (text === query) return 1.0;
-    if (text.includes(query)) return 0.7;
+    if (text === query) {
+      return 1.0;
+    }
+    if (text.includes(query)) {
+      return 0.7;
+    }
 
     const words = query.split(/\s+/);
     const matchCount = words.filter((w) => text.includes(w)).length;
-    if (matchCount > 0) return (matchCount / words.length) * 0.5;
+    if (matchCount > 0) {
+      return (matchCount / words.length) * 0.5;
+    }
 
     return 0;
   }

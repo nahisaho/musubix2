@@ -51,29 +51,29 @@ export class StaticAnalyzer {
       });
     }
 
-    const errorCount = issues.filter(i => i.severity === 'error').length;
-    const warningCount = issues.filter(i => i.severity === 'warning').length;
+    const errorCount = issues.filter((i) => i.severity === 'error').length;
+    const warningCount = issues.filter((i) => i.severity === 'warning').length;
     const score = Math.max(0, 100 - errorCount * 20 - warningCount * 5);
 
     const lengthMetric: QualityMetric = {
       name: 'function_length',
       value: this.maxFunctionLength(code),
       threshold: FUNCTION_LENGTH_THRESHOLD,
-      passed: !issues.some(i => i.type === 'length'),
+      passed: !issues.some((i) => i.type === 'length'),
     };
 
     const namingMetric: QualityMetric = {
       name: 'naming_conventions',
-      value: issues.filter(i => i.type === 'naming').length,
+      value: issues.filter((i) => i.type === 'naming').length,
       threshold: 0,
-      passed: !issues.some(i => i.type === 'naming'),
+      passed: !issues.some((i) => i.type === 'naming'),
     };
 
     const duplicationMetric: QualityMetric = {
       name: 'duplication',
-      value: issues.filter(i => i.type === 'duplication').length,
+      value: issues.filter((i) => i.type === 'duplication').length,
       threshold: 0,
-      passed: !issues.some(i => i.type === 'duplication'),
+      passed: !issues.some((i) => i.type === 'duplication'),
     };
 
     return {
@@ -116,7 +116,12 @@ export class StaticAnalyzer {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      if (!inFunction && /^\s*(export\s+)?(async\s+)?function\s+|^\s*(public|private|protected)?\s*(async\s+)?\w+\s*\(/.test(line)) {
+      if (
+        !inFunction &&
+        /^\s*(export\s+)?(async\s+)?function\s+|^\s*(public|private|protected)?\s*(async\s+)?\w+\s*\(/.test(
+          line,
+        )
+      ) {
         funcStartLine = i + 1;
         inFunction = true;
         braceDepth = 0;
@@ -124,8 +129,12 @@ export class StaticAnalyzer {
 
       if (inFunction) {
         for (const ch of line) {
-          if (ch === '{') braceDepth++;
-          if (ch === '}') braceDepth--;
+          if (ch === '{') {
+            braceDepth++;
+          }
+          if (ch === '}') {
+            braceDepth--;
+          }
         }
 
         if (braceDepth <= 0 && funcStartLine > 0) {
@@ -157,9 +166,13 @@ export class StaticAnalyzer {
       while ((match = varPattern.exec(line)) !== null) {
         const varName = match[1];
         // Skip UPPER_SNAKE_CASE constants and single-char vars
-        if (/^[A-Z_]+$/.test(varName) || varName.length <= 1) continue;
+        if (/^[A-Z_]+$/.test(varName) || varName.length <= 1) {
+          continue;
+        }
         // Skip if starts with underscore (private convention)
-        if (varName.startsWith('_')) continue;
+        if (varName.startsWith('_')) {
+          continue;
+        }
 
         // Detect snake_case (contains underscore but not ALL_CAPS)
         if (varName.includes('_') && !/^[A-Z_]+$/.test(varName)) {
@@ -175,7 +188,10 @@ export class StaticAnalyzer {
   }
 
   private detectDuplication(code: string, issues: AnalysisIssue[]): void {
-    const lines = code.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('//') && !l.startsWith('*'));
+    const lines = code
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('*'));
     const seen = new Map<string, number>();
 
     // Check for consecutive duplicate blocks (3+ lines)
@@ -205,7 +221,12 @@ export class StaticAnalyzer {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      if (!inFunction && /^\s*(export\s+)?(async\s+)?function\s+|^\s*(public|private|protected)?\s*(async\s+)?\w+\s*\(/.test(line)) {
+      if (
+        !inFunction &&
+        /^\s*(export\s+)?(async\s+)?function\s+|^\s*(public|private|protected)?\s*(async\s+)?\w+\s*\(/.test(
+          line,
+        )
+      ) {
         funcStartLine = i;
         inFunction = true;
         braceDepth = 0;
@@ -213,8 +234,12 @@ export class StaticAnalyzer {
 
       if (inFunction) {
         for (const ch of line) {
-          if (ch === '{') braceDepth++;
-          if (ch === '}') braceDepth--;
+          if (ch === '{') {
+            braceDepth++;
+          }
+          if (ch === '}') {
+            braceDepth--;
+          }
         }
 
         if (braceDepth <= 0 && funcStartLine >= 0) {
@@ -230,7 +255,11 @@ export class StaticAnalyzer {
 }
 
 export class QualityMetricsCalculator {
-  calculate(analysisResults: AnalysisResult[]): { averageScore: number; worstFile: string; totalIssues: number } {
+  calculate(analysisResults: AnalysisResult[]): {
+    averageScore: number;
+    worstFile: string;
+    totalIssues: number;
+  } {
     if (analysisResults.length === 0) {
       return { averageScore: 100, worstFile: 'none', totalIssues: 0 };
     }

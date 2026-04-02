@@ -178,9 +178,9 @@ export class ReplEngine {
       description: 'Show available commands',
       aliases: ['?'],
       execute: async () => {
-        const uniqueCommands = [...new Map(
-          [...this.commands.entries()].map(([_, cmd]) => [cmd.name, cmd]),
-        ).values()];
+        const uniqueCommands = [
+          ...new Map([...this.commands.entries()].map(([_, cmd]) => [cmd.name, cmd])).values(),
+        ];
         return this.formatter.formatHelp(uniqueCommands);
       },
     });
@@ -189,9 +189,7 @@ export class ReplEngine {
       name: 'history',
       description: 'Show command history',
       execute: async () => {
-        return this.session.history
-          .map((h, i) => `  ${i + 1}  ${h}`)
-          .join('\n');
+        return this.session.history.map((h, i) => `  ${i + 1}  ${h}`).join('\n');
       },
     });
 

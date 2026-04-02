@@ -42,7 +42,9 @@ export class SkillRegistry {
 
   list(status?: SkillStatus): Skill[] {
     const all = Array.from(this.skills.values());
-    if (status === undefined) return all;
+    if (status === undefined) {
+      return all;
+    }
     return all.filter((s) => s.status === status);
   }
 
@@ -90,10 +92,7 @@ export class SkillManager {
     this.registry = registry;
   }
 
-  loadFromMetadata(
-    metadata: SkillMetadata,
-    executor: Skill['execute'],
-  ): Skill {
+  loadFromMetadata(metadata: SkillMetadata, executor: Skill['execute']): Skill {
     const skill: Skill = {
       id: randomUUID(),
       metadata,
@@ -114,7 +113,9 @@ export class SkillManager {
     let bestScore = 0;
 
     for (const skill of this.registry.list()) {
-      if (skill.status !== 'available') continue;
+      if (skill.status !== 'available') {
+        continue;
+      }
 
       let score = 0;
       for (const trigger of skill.metadata.triggers) {

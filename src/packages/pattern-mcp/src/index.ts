@@ -40,9 +40,7 @@ export class PatternLibrary {
   }
 
   getMostFrequent(limit: number): ExtractedPattern[] {
-    return [...this.patterns]
-      .sort((a, b) => b.frequency - a.frequency)
-      .slice(0, limit);
+    return [...this.patterns].sort((a, b) => b.frequency - a.frequency).slice(0, limit);
   }
 
   search(query: string): ExtractedPattern[] {

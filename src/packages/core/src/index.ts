@@ -163,101 +163,177 @@ export {
 } from './design/index.js';
 
 // Project Initializer
-export { ProjectInitializer, createProjectInitializer, type InitOptions, type InitResult } from './project/index.js';
+export {
+  ProjectInitializer,
+  createProjectInitializer,
+  type InitOptions,
+  type InitResult,
+} from './project/index.js';
 
 // C4 Diagram Generator
-export { C4ModelGenerator, createC4ModelGenerator, type C4Element, type C4Relationship, type C4Diagram, type C4Level } from './design/c4-generator.js';
+export {
+  C4ModelGenerator,
+  createC4ModelGenerator,
+  type C4Element,
+  type C4Relationship,
+  type C4Diagram,
+  type C4Level,
+} from './design/c4-generator.js';
 
 // Pattern Detector
-export { PatternDetector, createPatternDetector, type PatternDetection, type DesignPatternType } from './design/pattern-detector.js';
+export {
+  PatternDetector,
+  createPatternDetector,
+  type PatternDetection,
+  type DesignPatternType,
+} from './design/pattern-detector.js';
 
 // Code Generator
-export { CodeGenerator, createCodeGenerator, type CodeGenOptions, type GeneratedCode, type TemplateType } from './codegen/index.js';
+export {
+  CodeGenerator,
+  createCodeGenerator,
+  type CodeGenOptions,
+  type GeneratedCode,
+  type TemplateType,
+} from './codegen/index.js';
 
 // Static Analyzer
-export { StaticAnalyzer, QualityMetricsCalculator, createStaticAnalyzer, createQualityMetricsCalculator, type AnalysisResult, type QualityMetric, type AnalysisIssue } from './codegen/static-analyzer.js';
+export {
+  StaticAnalyzer,
+  QualityMetricsCalculator,
+  createStaticAnalyzer,
+  createQualityMetricsCalculator,
+  type AnalysisResult,
+  type QualityMetric,
+  type AnalysisIssue,
+} from './codegen/static-analyzer.js';
 
 // Traceability Manager
 export {
-  TraceabilityManager, createTraceabilityManager,
-  type TraceLinkType, type TraceabilityLink, type TraceabilityMatrix,
+  TraceabilityManager,
+  createTraceabilityManager,
+  type TraceLinkType,
+  type TraceabilityLink,
+  type TraceabilityMatrix,
 } from './traceability/index.js';
 
 // NeuroSymbolic Integration
 export {
-  SemanticCodeFilterPipeline, HallucinationDetector,
-  createSemanticCodeFilterPipeline, createHallucinationDetector,
-  type FilterStage, type FilterResult, type PipelineResult, type SemanticFilter, type HallucinationIssue,
+  SemanticCodeFilterPipeline,
+  HallucinationDetector,
+  createSemanticCodeFilterPipeline,
+  createHallucinationDetector,
+  type FilterStage,
+  type FilterResult,
+  type PipelineResult,
+  type SemanticFilter,
+  type HallucinationIssue,
 } from './neurosymbolic/index.js';
 
 // Learning Engine
 export {
-  PatternExtractor, LearningEngine,
-  createPatternExtractor, createLearningEngine,
-  type PatternCategory, type LearnedPattern, type LearningEvent,
+  PatternExtractor,
+  LearningEngine,
+  createPatternExtractor,
+  createLearningEngine,
+  type PatternCategory,
+  type LearnedPattern,
+  type LearningEvent,
 } from './learning/index.js';
 
 // Scaffold Generator
 export {
-  ScaffoldGenerator, createScaffoldGenerator,
-  type ScaffoldMode, type ScaffoldConfig, type ScaffoldFile,
+  ScaffoldGenerator,
+  createScaffoldGenerator,
+  type ScaffoldMode,
+  type ScaffoldConfig,
+  type ScaffoldFile,
 } from './codegen/scaffold-generator.js';
 
 // Unit Test Generator
 export {
-  UnitTestGenerator, CoverageReporter,
-  createUnitTestGenerator, createCoverageReporter,
-  type TestStyle, type TestCase, type GeneratedTestSuite,
+  UnitTestGenerator,
+  CoverageReporter,
+  createUnitTestGenerator,
+  createCoverageReporter,
+  type TestStyle,
+  type TestCase,
+  type GeneratedTestSuite,
 } from './codegen/test-generator.js';
 
 // Status Transition Generator
 export {
-  StatusTransitionGenerator, createStatusTransitionGenerator,
-  type StatusDefinition, type TransitionRule, type StateMachineSpec,
+  StatusTransitionGenerator,
+  createStatusTransitionGenerator,
+  type StatusDefinition,
+  type TransitionRule,
+  type StateMachineSpec,
 } from './codegen/status-transition.js';
 
 // Matrix Generator
 export {
-  MatrixGenerator, createMatrixGenerator,
-  type MatrixCell, type GapInfo, type TraceabilityMatrixReport,
+  MatrixGenerator,
+  createMatrixGenerator,
+  type MatrixCell,
+  type GapInfo,
+  type TraceabilityMatrixReport,
 } from './traceability/matrix-generator.js';
 
 // Impact Analyzer
 export {
-  ImpactAnalyzer, TraceSyncService,
-  createImpactAnalyzer, createTraceSyncService,
-  type ImpactLevel, type ImpactResult, type TraceSyncStatus,
+  ImpactAnalyzer,
+  TraceSyncService,
+  createImpactAnalyzer,
+  createTraceSyncService,
+  type ImpactLevel,
+  type ImpactResult,
+  type TraceSyncStatus,
 } from './traceability/impact-analyzer.js';
 
 // Domain Detector
 export {
-  DomainDetector, createDomainDetector,
-  type DomainType, type DomainDetectionResult,
+  DomainDetector,
+  createDomainDetector,
+  type DomainType,
+  type DomainDetectionResult,
 } from './domain/index.js';
 
 // Performance
 export {
-  LazyLoader, MemoryMonitor,
-  createLazyLoader, createMemoryMonitor,
-  type LazyModule, type MemoryUsage,
+  LazyLoader,
+  MemoryMonitor,
+  createLazyLoader,
+  createMemoryMonitor,
+  type LazyModule,
+  type MemoryUsage,
 } from './performance/index.js';
 
 // File Watcher & Task Scheduler
 export {
-  FileWatcher, TaskScheduler,
-  createFileWatcher, createTaskScheduler,
-  type FileChangeType, type FileChangeEvent, type WatcherConfig, DEFAULT_WATCHER_CONFIG,
-  type TaskSchedulerConfig, type ScheduledTask,
+  FileWatcher,
+  TaskScheduler,
+  createFileWatcher,
+  createTaskScheduler,
+  type FileChangeType,
+  type FileChangeEvent,
+  type WatcherConfig,
+  DEFAULT_WATCHER_CONFIG,
+  type TaskSchedulerConfig,
+  type ScheduledTask,
 } from './monitoring/file-watcher.js';
 
 // Quality Gate Reporter
 export {
-  QualityGateReporter, createQualityGateReporter,
-  type GateStatus, type GateReportEntry, type QualityReport,
+  QualityGateReporter,
+  createQualityGateReporter,
+  type GateStatus,
+  type GateReportEntry,
+  type QualityReport,
 } from './monitoring/quality-reporter.js';
 
 // Realtime Learning Engine
 export {
-  RealtimeLearningEngine, createRealtimeLearningEngine,
+  RealtimeLearningEngine,
+  createRealtimeLearningEngine,
   type LearningDashboard,
 } from './learning/realtime-engine.js';

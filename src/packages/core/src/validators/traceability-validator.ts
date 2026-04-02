@@ -4,8 +4,8 @@
  */
 
 export interface TraceLink {
-  sourceId: string;     // e.g., REQ-001
-  targetId: string;     // e.g., DES-001
+  sourceId: string; // e.g., REQ-001
+  targetId: string; // e.g., DES-001
   type: 'requirement-to-design' | 'design-to-test' | 'requirement-to-test';
 }
 
@@ -35,13 +35,13 @@ export class TraceabilityValidator {
     requirementIds: string[],
     designIds: string[],
     testIds: string[],
-    links: TraceLink[]
+    links: TraceLink[],
   ): TraceabilityCoverageReport {
     const gaps: CoverageGap[] = [];
-    
+
     // Check requirements with no design link
     const reqsWithDesign = new Set(
-      links.filter(l => l.type === 'requirement-to-design').map(l => l.sourceId)
+      links.filter((l) => l.type === 'requirement-to-design').map((l) => l.sourceId),
     );
     for (const reqId of requirementIds) {
       if (!reqsWithDesign.has(reqId)) {
@@ -55,18 +55,18 @@ export class TraceabilityValidator {
 
     // Check requirements with no test link (direct or through design)
     const reqsWithTest = new Set(
-      links.filter(l => l.type === 'requirement-to-test').map(l => l.sourceId)
+      links.filter((l) => l.type === 'requirement-to-test').map((l) => l.sourceId),
     );
     const designsWithTest = new Set(
-      links.filter(l => l.type === 'design-to-test').map(l => l.sourceId)
+      links.filter((l) => l.type === 'design-to-test').map((l) => l.sourceId),
     );
     // Requirements covered through design chain
     const reqsWithDesignThatHasTest = new Set(
       links
-        .filter(l => l.type === 'requirement-to-design' && designsWithTest.has(l.targetId))
-        .map(l => l.sourceId)
+        .filter((l) => l.type === 'requirement-to-design' && designsWithTest.has(l.targetId))
+        .map((l) => l.sourceId),
     );
-    
+
     for (const reqId of requirementIds) {
       if (!reqsWithTest.has(reqId) && !reqsWithDesignThatHasTest.has(reqId)) {
         gaps.push({
@@ -79,7 +79,9 @@ export class TraceabilityValidator {
 
     // Check orphaned tests (test IDs not linked to any requirement or design)
     const linkedTestTargets = new Set(
-      links.filter(l => l.type === 'requirement-to-test' || l.type === 'design-to-test').map(l => l.targetId)
+      links
+        .filter((l) => l.type === 'requirement-to-test' || l.type === 'design-to-test')
+        .map((l) => l.targetId),
     );
     for (const testId of testIds) {
       if (!linkedTestTargets.has(testId)) {
@@ -93,7 +95,7 @@ export class TraceabilityValidator {
 
     // Check orphaned designs
     const linkedDesignTargets = new Set(
-      links.filter(l => l.type === 'requirement-to-design').map(l => l.targetId)
+      links.filter((l) => l.type === 'requirement-to-design').map((l) => l.targetId),
     );
     for (const desId of designIds) {
       if (!linkedDesignTargets.has(desId)) {
@@ -106,15 +108,16 @@ export class TraceabilityValidator {
     }
 
     const coveredRequirements = requirementIds.filter(
-      r => reqsWithDesign.has(r) && (reqsWithTest.has(r) || reqsWithDesignThatHasTest.has(r))
+      (r) => reqsWithDesign.has(r) && (reqsWithTest.has(r) || reqsWithDesignThatHasTest.has(r)),
     ).length;
 
     return {
       totalRequirements: requirementIds.length,
       coveredRequirements,
-      coveragePercent: requirementIds.length > 0
-        ? Math.round((coveredRequirements / requirementIds.length) * 100)
-        : 100,
+      coveragePercent:
+        requirementIds.length > 0
+          ? Math.round((coveredRequirements / requirementIds.length) * 100)
+          : 100,
       gaps,
       links,
     };

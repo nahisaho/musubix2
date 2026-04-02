@@ -34,11 +34,7 @@ export {
   SkillRouter,
 } from './skill-router.js';
 
-export {
-  type MCPToolSpec,
-  SkillToolConverter,
-  SkillToMCPBridge,
-} from './mcp-bridge.js';
+export { type MCPToolSpec, SkillToolConverter, SkillToMCPBridge } from './mcp-bridge.js';
 
 export {
   type SkillVersion,

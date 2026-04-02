@@ -16,8 +16,15 @@ export {
 } from './balance-rule.js';
 
 export type PolicyId =
-  | 'CONST-001' | 'CONST-002' | 'CONST-003' | 'CONST-004' | 'CONST-005'
-  | 'CONST-006' | 'CONST-007' | 'CONST-008' | 'CONST-009';
+  | 'CONST-001'
+  | 'CONST-002'
+  | 'CONST-003'
+  | 'CONST-004'
+  | 'CONST-005'
+  | 'CONST-006'
+  | 'CONST-007'
+  | 'CONST-008'
+  | 'CONST-009';
 
 export type PolicySeverity = 'blocker' | 'critical' | 'major' | 'minor';
 
@@ -145,13 +152,38 @@ export const CONSTITUTION_ARTICLES: Array<{
   name: string;
   description: string;
 }> = [
-  { article: 1, policyId: 'CONST-001', name: 'ライブラリファースト', description: 'パッケージは独立ライブラリとして利用可能' },
-  { article: 2, policyId: 'CONST-002', name: 'CLIインターフェース', description: '全機能にCLI提供' },
-  { article: 3, policyId: 'CONST-003', name: 'テストファースト', description: 'Red→Green→Blue, カバレッジ≥80%' },
+  {
+    article: 1,
+    policyId: 'CONST-001',
+    name: 'ライブラリファースト',
+    description: 'パッケージは独立ライブラリとして利用可能',
+  },
+  {
+    article: 2,
+    policyId: 'CONST-002',
+    name: 'CLIインターフェース',
+    description: '全機能にCLI提供',
+  },
+  {
+    article: 3,
+    policyId: 'CONST-003',
+    name: 'テストファースト',
+    description: 'Red→Green→Blue, カバレッジ≥80%',
+  },
   { article: 4, policyId: 'CONST-004', name: 'EARS形式', description: '全要件がEARS構文に準拠' },
-  { article: 5, policyId: 'CONST-005', name: 'トレーサビリティ', description: 'REQ↔DES↔Code↔Test 100%追跡' },
+  {
+    article: 5,
+    policyId: 'CONST-005',
+    name: 'トレーサビリティ',
+    description: 'REQ↔DES↔Code↔Test 100%追跡',
+  },
   { article: 6, policyId: 'CONST-006', name: 'プロジェクトメモリ', description: 'steering/を参照' },
-  { article: 7, policyId: 'CONST-007', name: 'デザインパターン文書化', description: 'パターン使用時に文書化' },
+  {
+    article: 7,
+    policyId: 'CONST-007',
+    name: 'デザインパターン文書化',
+    description: 'パターン使用時に文書化',
+  },
   { article: 8, policyId: 'CONST-008', name: 'ADR記録', description: '重要な設計決定にADR' },
   { article: 9, policyId: 'CONST-009', name: '品質ゲート', description: 'Phase遷移時にゲート通過' },
 ];
@@ -228,7 +260,7 @@ export class PolicyEngine {
     }));
   }
 
-  getInfo(policyId: PolicyId): typeof CONSTITUTION_ARTICLES[number] | undefined {
+  getInfo(policyId: PolicyId): (typeof CONSTITUTION_ARTICLES)[number] | undefined {
     return CONSTITUTION_ARTICLES.find((a) => a.policyId === policyId);
   }
 }

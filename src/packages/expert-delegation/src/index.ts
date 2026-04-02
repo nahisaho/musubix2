@@ -48,7 +48,9 @@ export class SemanticRouter {
   }
 
   listExperts(domain?: ExpertDomain): Expert[] {
-    if (domain === undefined) return [...this.experts];
+    if (domain === undefined) {
+      return [...this.experts];
+    }
     return this.experts.filter((e) => e.domain === domain);
   }
 

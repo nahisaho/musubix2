@@ -4,8 +4,8 @@
  */
 
 export interface TestPlacementRule {
-  sourcePattern: string;    // glob-like pattern for source files, e.g. "src/**/*.ts"
-  testPattern: string;      // pattern for expected test location, e.g. "tests/{name}.test.ts"
+  sourcePattern: string; // glob-like pattern for source files, e.g. "src/**/*.ts"
+  testPattern: string; // pattern for expected test location, e.g. "tests/{name}.test.ts"
   required: boolean;
 }
 
@@ -30,7 +30,7 @@ export class TestPlacementValidator {
   validate(
     sourceFiles: string[],
     testFiles: string[],
-    rules: TestPlacementRule[]
+    rules: TestPlacementRule[],
   ): TestPlacementReport {
     const missingTests: MissingTest[] = [];
     const matchedTests = new Set<string>();
@@ -38,11 +38,13 @@ export class TestPlacementValidator {
     for (const source of sourceFiles) {
       let hasTest = false;
       for (const rule of rules) {
-        if (!this.matchesPattern(source, rule.sourcePattern)) continue;
+        if (!this.matchesPattern(source, rule.sourcePattern)) {
+          continue;
+        }
 
         const expectedTest = this.deriveTestPath(source, rule);
         // Check if any test file matches
-        const found = testFiles.find(t => this.matchesTestPath(t, expectedTest));
+        const found = testFiles.find((t) => this.matchesTestPath(t, expectedTest));
         if (found) {
           hasTest = true;
           matchedTests.add(found);
@@ -55,7 +57,7 @@ export class TestPlacementValidator {
       }
     }
 
-    const orphanedTests = testFiles.filter(t => !matchedTests.has(t));
+    const orphanedTests = testFiles.filter((t) => !matchedTests.has(t));
     const coveredSources = sourceFiles.length - missingTests.length;
 
     return {
@@ -63,19 +65,18 @@ export class TestPlacementValidator {
       coveredSources,
       missingTests,
       orphanedTests,
-      coveragePercent: sourceFiles.length > 0
-        ? Math.round((coveredSources / sourceFiles.length) * 100)
-        : 100,
+      coveragePercent:
+        sourceFiles.length > 0 ? Math.round((coveredSources / sourceFiles.length) * 100) : 100,
     };
   }
 
   // Simple glob-like matching: supports ** and *
   private matchesPattern(path: string, pattern: string): boolean {
     const regex = pattern
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape regex special chars
-      .replace(/\*\*\//g, '(.*/)?')            // **/ matches zero or more directories
-      .replace(/\*\*/g, '.*')                  // standalone ** matches anything
-      .replace(/\*/g, '[^/]*');                 // * matches within single segment
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex special chars
+      .replace(/\*\*\//g, '(.*/)?') // **/ matches zero or more directories
+      .replace(/\*\*/g, '.*') // standalone ** matches anything
+      .replace(/\*/g, '[^/]*'); // * matches within single segment
     return new RegExp(`^${regex}$`).test(path);
   }
 

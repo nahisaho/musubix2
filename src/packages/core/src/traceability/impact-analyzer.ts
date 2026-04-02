@@ -20,10 +20,7 @@ export interface TraceSyncStatus {
 }
 
 export class ImpactAnalyzer {
-  analyze(
-    changedId: string,
-    links: Array<{ source: string; target: string }>,
-  ): ImpactResult {
+  analyze(changedId: string, links: Array<{ source: string; target: string }>): ImpactResult {
     const affected = new Set<string>();
     const queue = [changedId];
 
@@ -49,17 +46,26 @@ export class ImpactAnalyzer {
       changedId,
       affectedIds,
       level,
-      description: affectedIds.length === 0
-        ? `No items affected by change to '${changedId}'`
-        : `Change to '${changedId}' affects ${affectedIds.length} item(s): ${affectedIds.join(', ')}`,
+      description:
+        affectedIds.length === 0
+          ? `No items affected by change to '${changedId}'`
+          : `Change to '${changedId}' affects ${affectedIds.length} item(s): ${affectedIds.join(', ')}`,
     };
   }
 
   getImpactLevel(affectedCount: number): ImpactLevel {
-    if (affectedCount === 0) return 'none';
-    if (affectedCount <= 2) return 'low';
-    if (affectedCount <= 5) return 'medium';
-    if (affectedCount <= 10) return 'high';
+    if (affectedCount === 0) {
+      return 'none';
+    }
+    if (affectedCount <= 2) {
+      return 'low';
+    }
+    if (affectedCount <= 5) {
+      return 'medium';
+    }
+    if (affectedCount <= 10) {
+      return 'high';
+    }
     return 'critical';
   }
 }
@@ -70,8 +76,8 @@ export class TraceSyncService {
     expectedSources: string[],
     expectedTargets: string[],
   ): TraceSyncStatus {
-    const linkedSources = new Set(currentLinks.map(l => l.source));
-    const linkedTargets = new Set(currentLinks.map(l => l.target));
+    const linkedSources = new Set(currentLinks.map((l) => l.source));
+    const linkedTargets = new Set(currentLinks.map((l) => l.target));
 
     const missingLinks: string[] = [];
     for (const src of expectedSources) {

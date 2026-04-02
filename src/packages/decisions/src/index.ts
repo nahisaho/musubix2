@@ -114,7 +114,9 @@ export class DecisionManager implements IDecisionManager {
 
   async update(id: string, updates: Partial<ADR>): Promise<ADR> {
     const adr = this.adrs.get(id);
-    if (!adr) throw new Error(`ADR not found: ${id}`);
+    if (!adr) {
+      throw new Error(`ADR not found: ${id}`);
+    }
     const updated = { ...adr, ...updates, id: adr.id };
     this.adrs.set(id, updated);
     await this.saveADR(updated);
@@ -123,7 +125,9 @@ export class DecisionManager implements IDecisionManager {
 
   async accept(id: string): Promise<ADR> {
     const adr = this.adrs.get(id);
-    if (!adr) throw new Error(`ADR not found: ${id}`);
+    if (!adr) {
+      throw new Error(`ADR not found: ${id}`);
+    }
     if (adr.status !== 'proposed') {
       throw new Error(`Cannot accept ADR in ${adr.status} status. Must be proposed.`);
     }
@@ -132,7 +136,9 @@ export class DecisionManager implements IDecisionManager {
 
   async deprecate(id: string, supersededBy?: string): Promise<ADR> {
     const adr = this.adrs.get(id);
-    if (!adr) throw new Error(`ADR not found: ${id}`);
+    if (!adr) {
+      throw new Error(`ADR not found: ${id}`);
+    }
     if (adr.status !== 'accepted') {
       throw new Error(`Cannot deprecate ADR in ${adr.status} status. Must be accepted.`);
     }
@@ -149,9 +155,7 @@ export class DecisionManager implements IDecisionManager {
   }
 
   async findByRequirement(reqId: string): Promise<ADR[]> {
-    return [...this.adrs.values()].filter((a) =>
-      a.relatedRequirements.includes(reqId),
-    );
+    return [...this.adrs.values()].filter((a) => a.relatedRequirements.includes(reqId));
   }
 
   async generateIndex(): Promise<string> {
@@ -170,8 +174,7 @@ export class DecisionManager implements IDecisionManager {
 
   private async saveADR(adr: ADR): Promise<void> {
     await mkdir(this.basePath, { recursive: true });
-    const content = ADR_TEMPLATE
-      .replace('{id}', adr.id.replace('ADR-', ''))
+    const content = ADR_TEMPLATE.replace('{id}', adr.id.replace('ADR-', ''))
       .replace('{title}', adr.title)
       .replace('{status}', adr.status)
       .replace('{date}', adr.date)

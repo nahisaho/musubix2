@@ -40,9 +40,11 @@ export class DelegationEngine {
       ? candidates.filter((c) => c.domain === request.requiredDomain)
       : candidates;
 
-    if (filtered.length === 0) return null;
+    if (filtered.length === 0) {
+      return null;
+    }
 
-    let chosen: typeof filtered[number];
+    let chosen: (typeof filtered)[number];
 
     switch (this.strategy) {
       case 'round-robin': {
@@ -78,7 +80,9 @@ export class DelegationEngine {
     const responses: DelegationResponse[] = [];
     for (const req of requests) {
       const result = this.delegate(req);
-      if (result) responses.push(result);
+      if (result) {
+        responses.push(result);
+      }
     }
     return responses;
   }

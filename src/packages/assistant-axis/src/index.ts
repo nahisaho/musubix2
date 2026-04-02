@@ -25,10 +25,54 @@ export interface IdentityProfile {
 // ── Keyword maps ──
 
 const DOMAIN_KEYWORDS: Record<Exclude<DomainCategory, 'unknown'>, string[]> = {
-  technical: ['code', 'deploy', 'api', 'bug', 'test', 'function', 'class', 'module', 'compile', 'debug'],
-  creative: ['design', 'ui', 'ux', 'color', 'layout', 'style', 'theme', 'visual', 'animation', 'graphic'],
-  analytical: ['analyze', 'data', 'metrics', 'report', 'statistics', 'trend', 'insight', 'measure', 'benchmark', 'chart'],
-  operational: ['deploy', 'ci', 'pipeline', 'server', 'infrastructure', 'monitor', 'scale', 'provision', 'container', 'cluster'],
+  technical: [
+    'code',
+    'deploy',
+    'api',
+    'bug',
+    'test',
+    'function',
+    'class',
+    'module',
+    'compile',
+    'debug',
+  ],
+  creative: [
+    'design',
+    'ui',
+    'ux',
+    'color',
+    'layout',
+    'style',
+    'theme',
+    'visual',
+    'animation',
+    'graphic',
+  ],
+  analytical: [
+    'analyze',
+    'data',
+    'metrics',
+    'report',
+    'statistics',
+    'trend',
+    'insight',
+    'measure',
+    'benchmark',
+    'chart',
+  ],
+  operational: [
+    'deploy',
+    'ci',
+    'pipeline',
+    'server',
+    'infrastructure',
+    'monitor',
+    'scale',
+    'provision',
+    'container',
+    'cluster',
+  ],
 };
 
 const RELATED_DOMAINS: Record<DomainCategory, DomainCategory[]> = {
@@ -183,7 +227,9 @@ export class IdentityManager {
 
   createAnalyzer(profileName: string): DriftAnalyzer | null {
     const profile = this.profiles.get(profileName);
-    if (!profile) return null;
+    if (!profile) {
+      return null;
+    }
     return new DriftAnalyzer(profile);
   }
 }

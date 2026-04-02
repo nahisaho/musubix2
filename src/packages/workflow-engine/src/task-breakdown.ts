@@ -49,7 +49,9 @@ export class TaskBreakdownManager {
   getReadyTasks(): TaskInfo[] {
     const ready: TaskInfo[] = [];
     for (const task of this.tasks.values()) {
-      if (task.status !== 'pending') continue;
+      if (task.status !== 'pending') {
+        continue;
+      }
       const allDepsDone = task.dependencies.every((depId) => {
         const dep = this.tasks.get(depId);
         return dep !== undefined && dep.status === 'done';
@@ -77,13 +79,19 @@ export class TaskBreakdownManager {
 
     const collect = (taskId: string): void => {
       const task = this.tasks.get(taskId);
-      if (!task) return;
+      if (!task) {
+        return;
+      }
       for (const depId of task.dependencies) {
-        if (visited.has(depId)) continue;
+        if (visited.has(depId)) {
+          continue;
+        }
         visited.add(depId);
         collect(depId);
         const dep = this.tasks.get(depId);
-        if (dep) chain.push({ ...dep });
+        if (dep) {
+          chain.push({ ...dep });
+        }
       }
     };
 
@@ -93,7 +101,9 @@ export class TaskBreakdownManager {
 
   toMarkdown(): string {
     const rows = [...this.tasks.values()];
-    if (rows.length === 0) return '| ID | Title | Priority | Status | Complexity |\n| -- | ----- | -------- | ------ | ---------- |\n';
+    if (rows.length === 0) {
+      return '| ID | Title | Priority | Status | Complexity |\n| -- | ----- | -------- | ------ | ---------- |\n';
+    }
 
     const lines = [
       '| ID | Title | Priority | Status | Complexity |',

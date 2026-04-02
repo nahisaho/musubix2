@@ -3,7 +3,13 @@
  * RequirementWizard and AcceptanceCriteriaGenerator
  */
 
-export type EARSPattern = 'ubiquitous' | 'event-driven' | 'state-driven' | 'unwanted' | 'optional' | 'complex';
+export type EARSPattern =
+  | 'ubiquitous'
+  | 'event-driven'
+  | 'state-driven'
+  | 'unwanted'
+  | 'optional'
+  | 'complex';
 
 export interface WizardStep {
   id: string;
@@ -37,19 +43,22 @@ const WIZARD_STEPS: WizardStep[] = [
   {
     id: 'pattern',
     prompt: 'EARSパターンを選択 (ubiquitous/event-driven/state-driven/unwanted/optional/complex):',
-    validate: (input) => ['ubiquitous', 'event-driven', 'state-driven', 'unwanted', 'optional', 'complex'].includes(input.trim()),
+    validate: (input) =>
+      ['ubiquitous', 'event-driven', 'state-driven', 'unwanted', 'optional', 'complex'].includes(
+        input.trim(),
+      ),
     transform: (input) => ({ pattern: input.trim() }),
   },
   {
     id: 'trigger',
     prompt: 'トリガー条件 (event-driven/complexの場合):',
-    validate: () => true,  // optional
+    validate: () => true, // optional
     transform: (input) => ({ trigger: input.trim() || undefined }),
   },
   {
     id: 'condition',
     prompt: '前提条件 (state-driven/complexの場合):',
-    validate: () => true,  // optional
+    validate: () => true, // optional
     transform: (input) => ({ condition: input.trim() || undefined }),
   },
   {
@@ -85,16 +94,21 @@ export class RequirementWizard {
 
     this.counter++;
     const id = `REQ-GEN-${String(this.counter).padStart(3, '0')}`;
-    
+
     const earsText = this.buildEARSText(pattern, trigger, condition, action);
     const acceptanceCriteria = this.generateAcceptanceCriteria(pattern, action, trigger, condition);
-    
+
     const markdown = this.formatMarkdown(id, featureName, earsText, pattern, acceptanceCriteria);
 
     return { id, earsText, pattern, acceptanceCriteria, markdown };
   }
 
-  private buildEARSText(pattern: EARSPattern, trigger?: string, condition?: string, action?: string): string {
+  private buildEARSText(
+    pattern: EARSPattern,
+    trigger?: string,
+    condition?: string,
+    action?: string,
+  ): string {
     const act = action ?? 'perform the action';
     switch (pattern) {
       case 'ubiquitous':
@@ -112,16 +126,31 @@ export class RequirementWizard {
     }
   }
 
-  private generateAcceptanceCriteria(_pattern: EARSPattern, action: string, trigger?: string, condition?: string): string[] {
+  private generateAcceptanceCriteria(
+    _pattern: EARSPattern,
+    action: string,
+    trigger?: string,
+    condition?: string,
+  ): string[] {
     const criteria: string[] = [];
     criteria.push(`- [ ] ${action} が正常に実行されること`);
-    if (trigger) criteria.push(`- [ ] ${trigger} の発生時にのみ動作すること`);
-    if (condition) criteria.push(`- [ ] ${condition} の状態でのみ動作すること`);
-    criteria.push(`- [ ] エラー時に適切なメッセージが表示されること`);
+    if (trigger) {
+      criteria.push(`- [ ] ${trigger} の発生時にのみ動作すること`);
+    }
+    if (condition) {
+      criteria.push(`- [ ] ${condition} の状態でのみ動作すること`);
+    }
+    criteria.push('- [ ] エラー時に適切なメッセージが表示されること');
     return criteria;
   }
 
-  private formatMarkdown(id: string, name: string, earsText: string, pattern: EARSPattern, criteria: string[]): string {
+  private formatMarkdown(
+    id: string,
+    name: string,
+    earsText: string,
+    pattern: EARSPattern,
+    criteria: string[],
+  ): string {
     return [
       `### ${id}: ${name}`,
       '',
@@ -138,10 +167,10 @@ export class RequirementWizard {
 export class AcceptanceCriteriaGenerator {
   generate(requirementText: string, context: ProjectContext): string[] {
     const criteria: string[] = [];
-    
+
     // Basic criteria from requirement text
     criteria.push(`- [ ] ${context.projectName}: 要件を満たす動作が実装されていること`);
-    
+
     // Pattern-based criteria
     if (requirementText.includes('SHALL')) {
       criteria.push('- [ ] SHALL句の動作が必ず実行されること');
@@ -155,11 +184,11 @@ export class AcceptanceCriteriaGenerator {
     if (requirementText.includes('IF')) {
       criteria.push('- [ ] 異常系の処理が適切であること');
     }
-    
+
     // Standard criteria
     criteria.push('- [ ] テストが作成されていること');
     criteria.push('- [ ] ドキュメントが更新されていること');
-    
+
     return criteria;
   }
 }

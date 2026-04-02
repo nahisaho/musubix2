@@ -152,7 +152,10 @@ export class PlatformAdapterFactory {
   static create(platform: PlatformAdapter): PlatformConfig {
     switch (platform) {
       case 'claude-code':
-        return { adapter: 'claude-code', capabilities: ['tool_use', 'streaming', 'context_window'] };
+        return {
+          adapter: 'claude-code',
+          capabilities: ['tool_use', 'streaming', 'context_window'],
+        };
       case 'copilot':
         return { adapter: 'copilot', capabilities: ['tool_use', 'multi_turn'] };
       case 'cursor':

@@ -45,7 +45,9 @@ export class EGraphEngine {
     let root = id;
     while (this.parent.get(root) !== root) {
       const p = this.parent.get(root);
-      if (p === undefined) return root;
+      if (p === undefined) {
+        return root;
+      }
       root = p;
     }
     // Path compression
@@ -61,7 +63,9 @@ export class EGraphEngine {
   merge(id1: EClassId, id2: EClassId): EClassId {
     const root1 = this.find(id1);
     const root2 = this.find(id2);
-    if (root1 === root2) return root1;
+    if (root1 === root2) {
+      return root1;
+    }
 
     this.parent.set(root2, root1);
 
@@ -143,9 +147,7 @@ export class LibraryLearner {
   }
 
   suggest(code: string): LibraryPattern[] {
-    return this.patterns.filter(
-      (p) => code.includes(p.name),
-    );
+    return this.patterns.filter((p) => code.includes(p.name));
   }
 }
 

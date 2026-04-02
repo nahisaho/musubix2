@@ -22,7 +22,7 @@ export interface BalanceRuleConfig {
 }
 
 export const DEFAULT_BALANCE_CONFIG: BalanceRuleConfig = {
-  automatedThreshold: 0.90,
+  automatedThreshold: 0.9,
   warningThreshold: 0.85,
 };
 
@@ -50,7 +50,10 @@ export class BalanceRuleEngine {
   }
 
   isWarning(metrics: BalanceMetrics): boolean {
-    return metrics.ratio < this.config.automatedThreshold && metrics.ratio >= this.config.warningThreshold;
+    return (
+      metrics.ratio < this.config.automatedThreshold &&
+      metrics.ratio >= this.config.warningThreshold
+    );
   }
 
   isCritical(metrics: BalanceMetrics): boolean {
@@ -63,7 +66,7 @@ export class BalanceRuleEngine {
     }
     const needed = Math.ceil(
       (this.config.automatedThreshold * metrics.totalItems - metrics.automatedItems) /
-      (1 - this.config.automatedThreshold),
+        (1 - this.config.automatedThreshold),
     );
     return `Add ${needed} more automated items or reduce manual items to achieve ${this.config.automatedThreshold * 100}% automation.`;
   }

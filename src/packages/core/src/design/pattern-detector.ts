@@ -141,7 +141,7 @@ export class PatternDetector {
   }
 
   getSupportedPatterns(): DesignPatternType[] {
-    return PATTERN_RULES.map(r => r.pattern);
+    return PATTERN_RULES.map((r) => r.pattern);
   }
 }
 

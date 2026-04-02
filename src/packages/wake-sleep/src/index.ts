@@ -45,7 +45,10 @@ export class WakePhase {
     const freq = new Map<string, number>();
 
     for (const item of items) {
-      const words = item.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+      const words = item
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 2);
       for (const word of words) {
         freq.set(word, (freq.get(word) ?? 0) + 1);
       }
@@ -76,7 +79,9 @@ export class SleepPhase {
 
     for (const p of patterns) {
       const normalized = p.trim().toLowerCase();
-      if (normalized.length === 0) continue;
+      if (normalized.length === 0) {
+        continue;
+      }
       unique.add(normalized);
       freq.set(normalized, (freq.get(normalized) ?? 0) + 1);
     }

@@ -115,7 +115,7 @@ export class MarkdownEARSParser {
       id: partial.id!,
       title: partial.title ?? '',
       text: reqText,
-      pattern: (typeMatch ? this.normalizePattern(typeMatch[1]) : pattern),
+      pattern: typeMatch ? this.normalizePattern(typeMatch[1]) : pattern,
       confidence,
       priority: priorityMatch ? (priorityMatch[1] as 'P0' | 'P1' | 'P2') : undefined,
       acceptanceCriteria,
@@ -127,14 +127,14 @@ export class MarkdownEARSParser {
 
   private normalizePattern(raw: string): EARSPattern {
     const mapping: Record<string, EARSPattern> = {
-      'UBIQUITOUS': 'ubiquitous',
+      UBIQUITOUS: 'ubiquitous',
       'EVENT-DRIVEN': 'event-driven',
-      'EVENT_DRIVEN': 'event-driven',
+      EVENT_DRIVEN: 'event-driven',
       'STATE-DRIVEN': 'state-driven',
-      'STATE_DRIVEN': 'state-driven',
-      'UNWANTED': 'unwanted',
-      'OPTIONAL': 'optional',
-      'COMPLEX': 'complex',
+      STATE_DRIVEN: 'state-driven',
+      UNWANTED: 'unwanted',
+      OPTIONAL: 'optional',
+      COMPLEX: 'complex',
     };
     return mapping[raw.toUpperCase()] ?? 'ubiquitous';
   }

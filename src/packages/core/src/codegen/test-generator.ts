@@ -45,18 +45,15 @@ export class UnitTestGenerator {
 
     if (describeBlocks.length === 0) {
       describeBlocks.push(
-        `describe('module', () => {\n  it('should be defined', () => {\n    expect(true).toBe(true);\n  });\n});`,
+        "describe('module', () => {\n  it('should be defined', () => {\n    expect(true).toBe(true);\n  });\n});",
       );
     }
 
     const testCount = classes.length + functions.length || 1;
 
-    const code = [
-      `import { describe, it, expect } from 'vitest';`,
-      ``,
-      ...describeBlocks,
-      ``,
-    ].join('\n');
+    const code = ["import { describe, it, expect } from 'vitest';", '', ...describeBlocks, ''].join(
+      '\n',
+    );
 
     return {
       filePath: `tests/${style}.test.ts`,
@@ -72,17 +69,17 @@ export class UnitTestGenerator {
     cases.push({
       name: `${funcName} returns expected value`,
       description: `Test that ${funcName} returns a valid ${returnType}`,
-      arrange: params.map(p => `const ${p} = /* TODO */;`).join('\n    '),
+      arrange: params.map((p) => `const ${p} = /* TODO */;`).join('\n    '),
       act: `const result = ${funcName}(${params.join(', ')});`,
-      assert: `expect(result).toBeDefined();`,
+      assert: 'expect(result).toBeDefined();',
     });
 
     cases.push({
       name: `${funcName} handles edge cases`,
       description: `Test ${funcName} edge case behavior`,
-      arrange: params.map(p => `const ${p} = /* edge case */;`).join('\n    '),
+      arrange: params.map((p) => `const ${p} = /* edge case */;`).join('\n    '),
       act: `const result = ${funcName}(${params.join(', ')});`,
-      assert: `expect(result).toBeDefined();`,
+      assert: 'expect(result).toBeDefined();',
     });
 
     return cases;
@@ -105,8 +102,8 @@ export class CoverageReporter {
     const lines: string[] = [
       '## Coverage Report',
       '',
-      `| Metric | Value |`,
-      `|--------|-------|`,
+      '| Metric | Value |',
+      '|--------|-------|',
       `| Covered | ${covered} |`,
       `| Total | ${total} |`,
       `| Coverage | ${percent}% |`,

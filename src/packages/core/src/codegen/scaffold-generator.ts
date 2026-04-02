@@ -62,22 +62,23 @@ export class ScaffoldGenerator {
       },
       {
         path: 'tsconfig.json',
-        content: JSON.stringify(
-          {
-            compilerOptions: {
-              target: 'ES2022',
-              module: 'Node16',
-              moduleResolution: 'Node16',
-              declaration: true,
-              outDir: './dist',
-              rootDir: './src',
-              strict: true,
+        content:
+          JSON.stringify(
+            {
+              compilerOptions: {
+                target: 'ES2022',
+                module: 'Node16',
+                moduleResolution: 'Node16',
+                declaration: true,
+                outDir: './dist',
+                rootDir: './src',
+                strict: true,
+              },
+              include: ['src'],
             },
-            include: ['src'],
-          },
-          null,
-          2,
-        ) + '\n',
+            null,
+            2,
+          ) + '\n',
       },
       {
         path: 'src/index.ts',
@@ -121,11 +122,12 @@ export class ScaffoldGenerator {
 
     files.push({
       path: '.eslintrc',
-      content: JSON.stringify(
-        { extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'] },
-        null,
-        2,
-      ) + '\n',
+      content:
+        JSON.stringify(
+          { extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'] },
+          null,
+          2,
+        ) + '\n',
     });
 
     return files;

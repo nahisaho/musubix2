@@ -55,9 +55,7 @@ export class InMemorySearchableRepository<T extends Identifiable & Record<string
 
   async findBy(criteria: Partial<T>): Promise<T[]> {
     return [...this.store.values()].filter((entity) => {
-      return Object.entries(criteria).every(
-        ([key, value]) => entity[key] === value,
-      );
+      return Object.entries(criteria).every(([key, value]) => entity[key] === value);
     });
   }
 }
@@ -87,10 +85,14 @@ export function createInMemoryRepository<T extends Identifiable>(): InMemoryRepo
   return new InMemoryRepository<T>();
 }
 
-export function createInMemorySearchableRepository<T extends Identifiable & Record<string, unknown>>(): InMemorySearchableRepository<T> {
+export function createInMemorySearchableRepository<
+  T extends Identifiable & Record<string, unknown>,
+>(): InMemorySearchableRepository<T> {
   return new InMemorySearchableRepository<T>();
 }
 
-export function createInMemoryPaginatedRepository<T extends Identifiable>(): InMemoryPaginatedRepository<T> {
+export function createInMemoryPaginatedRepository<
+  T extends Identifiable,
+>(): InMemoryPaginatedRepository<T> {
   return new InMemoryPaginatedRepository<T>();
 }

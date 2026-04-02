@@ -46,10 +46,18 @@ export class QualityGateReporter {
     const skipped = this.entries.filter((e) => e.status === 'skipped').length;
 
     const parts: string[] = [`${this.entries.length} gates evaluated`];
-    if (passed > 0) parts.push(`${passed} passed`);
-    if (failed > 0) parts.push(`${failed} failed`);
-    if (warnings > 0) parts.push(`${warnings} warnings`);
-    if (skipped > 0) parts.push(`${skipped} skipped`);
+    if (passed > 0) {
+      parts.push(`${passed} passed`);
+    }
+    if (failed > 0) {
+      parts.push(`${failed} failed`);
+    }
+    if (warnings > 0) {
+      parts.push(`${warnings} warnings`);
+    }
+    if (skipped > 0) {
+      parts.push(`${skipped} skipped`);
+    }
 
     return {
       entries: [...this.entries],
@@ -90,10 +98,18 @@ export class QualityGateReporter {
   }
 
   private computeOverallStatus(): GateStatus {
-    if (this.entries.length === 0) return 'skipped';
-    if (this.entries.some((e) => e.status === 'failed')) return 'failed';
-    if (this.entries.some((e) => e.status === 'warning')) return 'warning';
-    if (this.entries.every((e) => e.status === 'skipped')) return 'skipped';
+    if (this.entries.length === 0) {
+      return 'skipped';
+    }
+    if (this.entries.some((e) => e.status === 'failed')) {
+      return 'failed';
+    }
+    if (this.entries.some((e) => e.status === 'warning')) {
+      return 'warning';
+    }
+    if (this.entries.every((e) => e.status === 'skipped')) {
+      return 'skipped';
+    }
     return 'passed';
   }
 }

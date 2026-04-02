@@ -25,13 +25,42 @@ export interface VersionSpace {
 // --- DSLBuilder ---
 
 const KEYWORDS = new Set([
-  'if', 'else', 'while', 'for', 'return', 'let', 'const', 'var',
-  'function', 'class', 'import', 'export', 'from', 'true', 'false',
+  'if',
+  'else',
+  'while',
+  'for',
+  'return',
+  'let',
+  'const',
+  'var',
+  'function',
+  'class',
+  'import',
+  'export',
+  'from',
+  'true',
+  'false',
 ]);
 
 const OPERATORS = new Set([
-  '+', '-', '*', '/', '=', '==', '===', '!=', '!==',
-  '<', '>', '<=', '>=', '&&', '||', '!', '=>', '->',
+  '+',
+  '-',
+  '*',
+  '/',
+  '=',
+  '==',
+  '===',
+  '!=',
+  '!==',
+  '<',
+  '>',
+  '<=',
+  '>=',
+  '&&',
+  '||',
+  '!',
+  '=>',
+  '->',
 ]);
 
 const DELIMITERS = new Set(['(', ')', '{', '}', '[', ']', ',', ';', ':']);
@@ -126,12 +155,12 @@ export class DSLBuilder {
   }
 
   parse(tokens: DSLToken[]): DSLExpression {
-    const source = tokens.map(t => t.value).join(' ');
+    const source = tokens.map((t) => t.value).join(' ');
     return { tokens: [...tokens], source };
   }
 
   build(expression: DSLExpression): string {
-    return expression.tokens.map(t => t.value).join(' ');
+    return expression.tokens.map((t) => t.value).join(' ');
   }
 }
 
@@ -173,7 +202,7 @@ export class VersionSpaceManager {
     if (!space) {
       throw new Error(`Version space "${name}" not found`);
     }
-    return space.hypotheses.filter(h => this.isConsistent(h, space));
+    return space.hypotheses.filter((h) => this.isConsistent(h, space));
   }
 
   getSpaces(): Map<string, VersionSpace> {
@@ -199,12 +228,12 @@ export class VersionSpaceManager {
 
   private isConsistent(hypothesis: string, space: VersionSpace): boolean {
     // Check against positive examples — hypothesis must match all
-    const allPositiveMatch = space.positiveExamples.every(ex =>
+    const allPositiveMatch = space.positiveExamples.every((ex) =>
       this.matchesHypothesis(hypothesis, ex),
     );
     // Check against negative examples — hypothesis must reject all
-    const allNegativeReject = space.negativeExamples.every(ex =>
-      !this.matchesHypothesis(hypothesis, ex),
+    const allNegativeReject = space.negativeExamples.every(
+      (ex) => !this.matchesHypothesis(hypothesis, ex),
     );
     return allPositiveMatch && allNegativeReject;
   }
@@ -226,30 +255,38 @@ export class VersionSpaceManager {
 
 export class SynthesisEngine {
   synthesize(examples: Array<{ input: string; output: string }>): string | null {
-    if (examples.length === 0) return null;
+    if (examples.length === 0) {
+      return null;
+    }
 
     // Try prefix removal rule
     const prefixRule = this.tryPrefixRule(examples);
-    if (prefixRule && this.verify(prefixRule, examples)) return prefixRule;
+    if (prefixRule && this.verify(prefixRule, examples)) {
+      return prefixRule;
+    }
 
     // Try suffix append rule
     const suffixRule = this.trySuffixRule(examples);
-    if (suffixRule && this.verify(suffixRule, examples)) return suffixRule;
+    if (suffixRule && this.verify(suffixRule, examples)) {
+      return suffixRule;
+    }
 
     // Try replace rule
     const replaceRule = this.tryReplaceRule(examples);
-    if (replaceRule && this.verify(replaceRule, examples)) return replaceRule;
+    if (replaceRule && this.verify(replaceRule, examples)) {
+      return replaceRule;
+    }
 
     // Try uppercase/lowercase transformations
-    if (examples.every(e => e.output === e.input.toUpperCase())) {
+    if (examples.every((e) => e.output === e.input.toUpperCase())) {
       return 'uppercase';
     }
-    if (examples.every(e => e.output === e.input.toLowerCase())) {
+    if (examples.every((e) => e.output === e.input.toLowerCase())) {
       return 'lowercase';
     }
 
     // Try reverse
-    if (examples.every(e => e.output === e.input.split('').reverse().join(''))) {
+    if (examples.every((e) => e.output === e.input.split('').reverse().join(''))) {
       return 'reverse';
     }
 
@@ -257,13 +294,19 @@ export class SynthesisEngine {
   }
 
   verify(rule: string, examples: Array<{ input: string; output: string }>): boolean {
-    return examples.every(e => this.applyRule(rule, e.input) === e.output);
+    return examples.every((e) => this.applyRule(rule, e.input) === e.output);
   }
 
   private applyRule(rule: string, input: string): string {
-    if (rule === 'uppercase') return input.toUpperCase();
-    if (rule === 'lowercase') return input.toLowerCase();
-    if (rule === 'reverse') return input.split('').reverse().join('');
+    if (rule === 'uppercase') {
+      return input.toUpperCase();
+    }
+    if (rule === 'lowercase') {
+      return input.toLowerCase();
+    }
+    if (rule === 'reverse') {
+      return input.split('').reverse().join('');
+    }
 
     if (rule.startsWith('removePrefix:')) {
       const prefix = rule.slice('removePrefix:'.length);
@@ -289,7 +332,7 @@ export class SynthesisEngine {
       const prefix = first.input.slice(0, len);
       if (first.input.slice(len) === first.output) {
         const rule = `removePrefix:${prefix}`;
-        if (examples.every(e => e.input.startsWith(prefix) && e.input.slice(len) === e.output)) {
+        if (examples.every((e) => e.input.startsWith(prefix) && e.input.slice(len) === e.output)) {
           return rule;
         }
       }

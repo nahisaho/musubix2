@@ -70,7 +70,7 @@ export class RealtimeLearningEngine {
     const patterns: string[] = [];
     for (const item of data) {
       // Extract word-level patterns (sequences of 2+ word tokens)
-      const words = item.split(/\s+/).filter(w => w.length > 0);
+      const words = item.split(/\s+/).filter((w) => w.length > 0);
       if (words.length >= 2) {
         for (let i = 0; i < words.length - 1; i++) {
           patterns.push(`${words[i]} ${words[i + 1]}`);
@@ -83,10 +83,18 @@ export class RealtimeLearningEngine {
   }
 
   private categorize(pattern: string): string {
-    if (/[A-Z][a-z]/.test(pattern)) return 'naming';
-    if (/error|catch|throw/i.test(pattern)) return 'error-handling';
-    if (/test|describe|expect/i.test(pattern)) return 'testing';
-    if (/import|export|require/i.test(pattern)) return 'module';
+    if (/[A-Z][a-z]/.test(pattern)) {
+      return 'naming';
+    }
+    if (/error|catch|throw/i.test(pattern)) {
+      return 'error-handling';
+    }
+    if (/test|describe|expect/i.test(pattern)) {
+      return 'testing';
+    }
+    if (/import|export|require/i.test(pattern)) {
+      return 'module';
+    }
     return 'general';
   }
 }

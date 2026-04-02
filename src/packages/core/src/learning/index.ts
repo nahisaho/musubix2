@@ -148,21 +148,17 @@ export class LearningEngine {
   getPatterns(category?: PatternCategory): LearnedPattern[] {
     const all = [...this.patterns.values()];
     if (category) {
-      return all.filter(p => p.category === category);
+      return all.filter((p) => p.category === category);
     }
     return all;
   }
 
   getTopPatterns(limit: number): LearnedPattern[] {
-    return [...this.patterns.values()]
-      .sort((a, b) => b.frequency - a.frequency)
-      .slice(0, limit);
+    return [...this.patterns.values()].sort((a, b) => b.frequency - a.frequency).slice(0, limit);
   }
 
   getMostConfident(limit: number): LearnedPattern[] {
-    return [...this.patterns.values()]
-      .sort((a, b) => b.confidence - a.confidence)
-      .slice(0, limit);
+    return [...this.patterns.values()].sort((a, b) => b.confidence - a.confidence).slice(0, limit);
   }
 
   getEvents(): LearningEvent[] {
@@ -176,7 +172,9 @@ export class LearningEngine {
 
     for (const extractedPattern of extracted) {
       const matching = knownPatterns.filter(
-        known => known.category === extractedPattern.category && known.pattern === extractedPattern.pattern
+        (known) =>
+          known.category === extractedPattern.category &&
+          known.pattern === extractedPattern.pattern,
       );
       suggestions.push(...matching);
     }

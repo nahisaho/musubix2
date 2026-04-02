@@ -43,9 +43,12 @@ export class ParallelExecutor {
 // ── ResultAggregator ──
 
 export class ResultAggregator {
-  aggregate(
-    results: Array<{ id: string; result?: unknown; error?: string }>,
-  ): { totalTasks: number; succeeded: number; failed: number; results: Map<string, unknown> } {
+  aggregate(results: Array<{ id: string; result?: unknown; error?: string }>): {
+    totalTasks: number;
+    succeeded: number;
+    failed: number;
+    results: Map<string, unknown>;
+  } {
     const resultMap = new Map<string, unknown>();
     let succeeded = 0;
     let failed = 0;
@@ -91,14 +94,20 @@ export class WorkstreamManager {
 
   updateProgress(id: string, progress: number): void {
     const ws = this.workstreams.get(id);
-    if (!ws) throw new Error(`Workstream not found: ${id}`);
+    if (!ws) {
+      throw new Error(`Workstream not found: ${id}`);
+    }
     ws.progress = Math.max(0, Math.min(100, progress));
-    if (ws.status === 'pending') ws.status = 'running';
+    if (ws.status === 'pending') {
+      ws.status = 'running';
+    }
   }
 
   complete(id: string): void {
     const ws = this.workstreams.get(id);
-    if (!ws) throw new Error(`Workstream not found: ${id}`);
+    if (!ws) {
+      throw new Error(`Workstream not found: ${id}`);
+    }
     ws.status = 'completed';
     ws.progress = 100;
   }

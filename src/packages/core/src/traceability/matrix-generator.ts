@@ -40,7 +40,7 @@ export class MatrixGenerator {
     for (const src of sourceIds) {
       for (const tgt of targetIds) {
         const srcLinks = linkMap.get(src) ?? [];
-        const match = srcLinks.find(l => l.target === tgt);
+        const match = srcLinks.find((l) => l.target === tgt);
         cells.push({
           sourceId: src,
           targetId: tgt,
@@ -51,8 +51,8 @@ export class MatrixGenerator {
     }
 
     const gaps: GapInfo[] = [];
-    const linkedSources = new Set(links.map(l => l.source));
-    const linkedTargets = new Set(links.map(l => l.target));
+    const linkedSources = new Set(links.map((l) => l.source));
+    const linkedTargets = new Set(links.map((l) => l.target));
 
     for (const src of sourceIds) {
       if (!linkedSources.has(src)) {
@@ -75,23 +75,25 @@ export class MatrixGenerator {
     }
 
     const totalPairs = sourceIds.length * targetIds.length;
-    const linkedCount = cells.filter(c => c.linked).length;
+    const linkedCount = cells.filter((c) => c.linked).length;
     const completeness = totalPairs === 0 ? 100 : Math.round((linkedCount / totalPairs) * 100);
 
     return { cells, gaps, completeness };
   }
 
   toMarkdown(report: TraceabilityMatrixReport): string {
-    const sourceIds = [...new Set(report.cells.map(c => c.sourceId))];
-    const targetIds = [...new Set(report.cells.map(c => c.targetId))];
+    const sourceIds = [...new Set(report.cells.map((c) => c.sourceId))];
+    const targetIds = [...new Set(report.cells.map((c) => c.targetId))];
 
     const header = `| Source \\ Target | ${targetIds.join(' | ')} |`;
     const separator = `|${'-'.repeat(17)}|${targetIds.map(() => '------').join('|')}|`;
 
-    const rows = sourceIds.map(src => {
-      const vals = targetIds.map(tgt => {
-        const cell = report.cells.find(c => c.sourceId === src && c.targetId === tgt);
-        if (!cell || !cell.linked) return ' ';
+    const rows = sourceIds.map((src) => {
+      const vals = targetIds.map((tgt) => {
+        const cell = report.cells.find((c) => c.sourceId === src && c.targetId === tgt);
+        if (!cell || !cell.linked) {
+          return ' ';
+        }
         return cell.verified ? '✓' : '○';
       });
       return `| ${src} | ${vals.join(' | ')} |`;
@@ -112,14 +114,16 @@ export class MatrixGenerator {
   }
 
   toCSV(report: TraceabilityMatrixReport): string {
-    const sourceIds = [...new Set(report.cells.map(c => c.sourceId))];
-    const targetIds = [...new Set(report.cells.map(c => c.targetId))];
+    const sourceIds = [...new Set(report.cells.map((c) => c.sourceId))];
+    const targetIds = [...new Set(report.cells.map((c) => c.targetId))];
 
     const headerRow = ['Source', ...targetIds].join(',');
-    const dataRows = sourceIds.map(src => {
-      const vals = targetIds.map(tgt => {
-        const cell = report.cells.find(c => c.sourceId === src && c.targetId === tgt);
-        if (!cell || !cell.linked) return '0';
+    const dataRows = sourceIds.map((src) => {
+      const vals = targetIds.map((tgt) => {
+        const cell = report.cells.find((c) => c.sourceId === src && c.targetId === tgt);
+        if (!cell || !cell.linked) {
+          return '0';
+        }
         return cell.verified ? '2' : '1';
       });
       return [src, ...vals].join(',');
@@ -129,9 +133,15 @@ export class MatrixGenerator {
   }
 
   private inferType(id: string): 'requirement' | 'design' | 'test' {
-    if (id.startsWith('REQ')) return 'requirement';
-    if (id.startsWith('DES')) return 'design';
-    if (id.startsWith('TST') || id.startsWith('TEST')) return 'test';
+    if (id.startsWith('REQ')) {
+      return 'requirement';
+    }
+    if (id.startsWith('DES')) {
+      return 'design';
+    }
+    if (id.startsWith('TST') || id.startsWith('TEST')) {
+      return 'test';
+    }
     return 'requirement';
   }
 }

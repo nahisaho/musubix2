@@ -57,7 +57,7 @@ export class SemanticCodeFilterPipeline {
       passed,
       stages,
       finalConfidence,
-      hallucinationDetected: !passed && stages.some(s => s.stage === 'semantic'),
+      hallucinationDetected: !passed && stages.some((s) => s.stage === 'semantic'),
     };
   }
 
@@ -67,23 +67,58 @@ export class SemanticCodeFilterPipeline {
 }
 
 const BUILTIN_TYPES = new Set([
-  'String', 'Number', 'Boolean', 'Object', 'Array', 'Date',
-  'Map', 'Set', 'Promise', 'Error', 'RegExp', 'Function',
-  'Record', 'Partial', 'Required', 'Readonly',
+  'String',
+  'Number',
+  'Boolean',
+  'Object',
+  'Array',
+  'Date',
+  'Map',
+  'Set',
+  'Promise',
+  'Error',
+  'RegExp',
+  'Function',
+  'Record',
+  'Partial',
+  'Required',
+  'Readonly',
 ]);
 
 const BUILTIN_FUNCTIONS = new Set([
-  'console', 'parseInt', 'parseFloat', 'isNaN', 'isFinite',
-  'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
-  'require', 'import', 'export', 'typeof', 'instanceof',
-  'if', 'else', 'for', 'while', 'do', 'switch', 'case',
-  'return', 'throw', 'try', 'catch', 'finally', 'new',
+  'console',
+  'parseInt',
+  'parseFloat',
+  'isNaN',
+  'isFinite',
+  'setTimeout',
+  'setInterval',
+  'clearTimeout',
+  'clearInterval',
+  'require',
+  'import',
+  'export',
+  'typeof',
+  'instanceof',
+  'if',
+  'else',
+  'for',
+  'while',
+  'do',
+  'switch',
+  'case',
+  'return',
+  'throw',
+  'try',
+  'catch',
+  'finally',
+  'new',
 ]);
 
 export class HallucinationDetector {
   detect(
     generatedCode: string,
-    context: { existingTypes: string[]; existingFunctions: string[] }
+    context: { existingTypes: string[]; existingFunctions: string[] },
   ): { detected: boolean; issues: HallucinationIssue[] } {
     const issues: HallucinationIssue[] = [];
     const knownTypes = new Set(context.existingTypes);
@@ -95,7 +130,11 @@ export class HallucinationDetector {
     const checkedTypes = new Set<string>();
     while ((match = typePattern.exec(generatedCode)) !== null) {
       const typeName = match[1];
-      if (!checkedTypes.has(typeName) && !knownTypes.has(typeName) && !BUILTIN_TYPES.has(typeName)) {
+      if (
+        !checkedTypes.has(typeName) &&
+        !knownTypes.has(typeName) &&
+        !BUILTIN_TYPES.has(typeName)
+      ) {
         checkedTypes.add(typeName);
         issues.push({
           type: 'unknown-type',

@@ -83,7 +83,9 @@ function magnitude(v: EmbeddingVector): number {
 function cosineSimilarity(a: EmbeddingVector, b: EmbeddingVector): number {
   const magA = magnitude(a);
   const magB = magnitude(b);
-  if (magA === 0 || magB === 0) return 0;
+  if (magA === 0 || magB === 0) {
+    return 0;
+  }
   return dotProduct(a, b) / (magA * magB);
 }
 
@@ -106,7 +108,9 @@ export class NeuralSearchEngine {
 
   remove(id: string): boolean {
     const idx = this.index.findIndex((doc) => doc.id === id);
-    if (idx === -1) return false;
+    if (idx === -1) {
+      return false;
+    }
     this.index.splice(idx, 1);
     return true;
   }

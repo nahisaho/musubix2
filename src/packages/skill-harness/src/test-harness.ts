@@ -3,11 +3,7 @@
  * Isolated test execution environment with mock injection and assertions.
  */
 
-import type {
-  SkillRuntimeContract,
-  SkillInput,
-  SkillOutput,
-} from './runtime-contract.js';
+import type { SkillRuntimeContract, SkillInput, SkillOutput } from './runtime-contract.js';
 
 // --- Types ---
 

@@ -178,11 +178,7 @@ export class EarsToLeanConverter {
 
   // ---- private helpers ----------------------------------------------------
 
-  private generateTheorem(
-    spec: Specification,
-    sanitizedId: string,
-    warnings: string[],
-  ): string {
+  private generateTheorem(spec: Specification, sanitizedId: string, warnings: string[]): string {
     switch (spec.pattern) {
       case 'ubiquitous':
         return `theorem req_${sanitizedId} : ∀ (state : State), ${toLeanName(spec.action)} state :=`;
@@ -213,21 +209,17 @@ export class EarsToLeanConverter {
         if (!spec.trigger) {
           warnings.push('Complex pattern missing trigger');
         }
-        const condPart = spec.condition
-          ? `${toLeanName(spec.condition)} state → `
-          : '';
-        const trigPart = spec.trigger
-          ? `${toLeanName(spec.trigger)} state → `
-          : '';
+        const condPart = spec.condition ? `${toLeanName(spec.condition)} state → ` : '';
+        const trigPart = spec.trigger ? `${toLeanName(spec.trigger)} state → ` : '';
         return `theorem req_${sanitizedId} : ∀ (state : State), ${condPart}${trigPart}${toLeanName(spec.action)} state :=`;
       }
 
       case 'optional': {
-        const trigPart = spec.trigger
-          ? `${toLeanName(spec.trigger)} state → `
-          : '';
+        const trigPart = spec.trigger ? `${toLeanName(spec.trigger)} state → ` : '';
         if (!spec.trigger) {
-          warnings.push('Optional pattern missing trigger; treating as ubiquitous with feature flag');
+          warnings.push(
+            'Optional pattern missing trigger; treating as ubiquitous with feature flag',
+          );
         }
         return `theorem req_${sanitizedId} : ∀ (state : State), feature_enabled state → ${trigPart}${toLeanName(spec.action)} state :=`;
       }
@@ -276,8 +268,8 @@ export class HybridVerifier {
   async verify(spec: Specification): Promise<HybridResult> {
     const start = Date.now();
 
-    const smtStatus = this.mockSmtResult ?? 'skipped' as const;
-    const leanStatus = this.mockLeanResult ?? 'skipped' as const;
+    const smtStatus = this.mockSmtResult ?? ('skipped' as const);
+    const leanStatus = this.mockLeanResult ?? ('skipped' as const);
 
     const combinedVerdict = deriveVerdict(smtStatus, leanStatus);
     const explanation = buildExplanation(smtStatus, leanStatus, combinedVerdict);
@@ -371,10 +363,18 @@ function deriveVerdict(
   smt: 'sat' | 'unsat' | 'unknown' | 'skipped',
   lean: ProofStatus,
 ): HybridResult['combinedVerdict'] {
-  if (smt === 'unsat' && lean === 'proven') return 'verified';
-  if (smt === 'unsat' || lean === 'proven') return 'partially-verified';
-  if (smt === 'sat' || lean === 'failed') return 'error';
-  if (lean === 'error' || lean === 'timeout') return 'error';
+  if (smt === 'unsat' && lean === 'proven') {
+    return 'verified';
+  }
+  if (smt === 'unsat' || lean === 'proven') {
+    return 'partially-verified';
+  }
+  if (smt === 'sat' || lean === 'failed') {
+    return 'error';
+  }
+  if (lean === 'error' || lean === 'timeout') {
+    return 'error';
+  }
   return 'unverified';
 }
 

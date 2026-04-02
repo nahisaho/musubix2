@@ -67,11 +67,7 @@ export class Logger {
   private minLevel: LogLevel;
   private source?: string;
 
-  constructor(options?: {
-    transports?: LogTransport[];
-    level?: LogLevel;
-    source?: string;
-  }) {
+  constructor(options?: { transports?: LogTransport[]; level?: LogLevel; source?: string }) {
     this.transports = options?.transports ?? [new ConsoleTransport()];
     this.minLevel = options?.level ?? 'info';
     this.source = options?.source;
@@ -142,7 +138,9 @@ export class AuditLogger {
   record(event: Omit<AuditEvent, 'timestamp'>): void {
     const full: AuditEvent = { ...event, timestamp: new Date() };
     this.events.push(full);
-    this.logger.info(`[AUDIT] ${event.action} on ${event.target} by ${event.actor}: ${event.result}`);
+    this.logger.info(
+      `[AUDIT] ${event.action} on ${event.target} by ${event.actor}: ${event.result}`,
+    );
   }
 
   getEvents(filter?: { action?: string; actor?: string }): AuditEvent[] {

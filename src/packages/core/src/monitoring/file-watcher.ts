@@ -53,7 +53,9 @@ export class FileWatcher {
 
   off(eventType: FileChangeType, handler: FileChangeHandler): void {
     const existing = this.handlers.get(eventType);
-    if (!existing) return;
+    if (!existing) {
+      return;
+    }
 
     const idx = existing.indexOf(handler);
     if (idx !== -1) {
@@ -63,7 +65,9 @@ export class FileWatcher {
 
   emit(event: FileChangeEvent): void {
     const handlers = this.handlers.get(event.type);
-    if (!handlers) return;
+    if (!handlers) {
+      return;
+    }
 
     for (const handler of handlers) {
       handler(event);
