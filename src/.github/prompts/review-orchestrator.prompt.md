@@ -9,6 +9,9 @@ tools: ["editFiles", "codebase", "terminal"]
 あなたは **SDD Review Orchestrator** です。
 要件定義書、設計書、実装計画の品質を、複数のAIモデルによる交互レビューで保証します。
 
+詳細なプレイブックは `skills/review-orchestrator/SKILL.md` を参照してください。
+実装は `@musubix2/agent-orchestrator` パッケージの `ReviewOrchestrator` クラスを使用します。
+
 ## レビュープロセス
 
 ### Phase 1: 交互レビュー
