@@ -22,6 +22,9 @@
     { "path": "packages/neural-search" },
     { "path": "packages/wake-sleep" },
     { "path": "packages/library-learner" },
-    { "path": "packages/pattern-mcp" }
+    { "path": "packages/pattern-mcp" },
+    { "path": "packages/skill-harness" },
+    { "path": "packages/synthesis" },
+    { "path": "packages/deep-research" }
   ]
 }

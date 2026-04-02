@@ -255,3 +255,9 @@ export {
   QualityGateReporter, createQualityGateReporter,
   type GateStatus, type GateReportEntry, type QualityReport,
 } from './monitoring/quality-reporter.js';
+
+// Realtime Learning Engine
+export {
+  RealtimeLearningEngine, createRealtimeLearningEngine,
+  type LearningDashboard,
+} from './learning/realtime-engine.js';
