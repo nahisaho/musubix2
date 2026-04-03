@@ -4,10 +4,12 @@ import {
   EarsToLeanConverter,
   HybridVerifier,
   LeanIntegration,
+  LeanProofRunner,
   createLeanIntegration,
   createLeanEnvironmentDetector,
   createEarsToLeanConverter,
   createHybridVerifier,
+  createLeanProofRunner,
   type Specification,
 } from '../src/index.js';
 
@@ -264,5 +266,88 @@ describe('DES-FV-002: Factory functions', () => {
 
   it('createHybridVerifier returns a HybridVerifier instance', () => {
     expect(createHybridVerifier()).toBeInstanceOf(HybridVerifier);
+  });
+
+  it('createLeanProofRunner returns a LeanProofRunner instance', () => {
+    expect(createLeanProofRunner()).toBeInstanceOf(LeanProofRunner);
+  });
+
+  it('createLeanProofRunner accepts custom detector and options', () => {
+    const detector = new LeanEnvironmentDetector({ mockAvailable: false });
+    const runner = createLeanProofRunner(detector, { defaultTimeoutMs: 5000 });
+    expect(runner).toBeInstanceOf(LeanProofRunner);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DES-FV-002: LeanProofRunner
+// ---------------------------------------------------------------------------
+
+describe('DES-FV-002: LeanProofRunner', () => {
+  it('returns skipped when Lean is not available', async () => {
+    const detector = new LeanEnvironmentDetector({ mockAvailable: false });
+    const runner = new LeanProofRunner(detector);
+    const result = await runner.runProof('-- no lean installed');
+    expect(result.status).toBe('skipped');
+    expect(result.diagnostics).toEqual([]);
+    expect(result.time).toBeGreaterThanOrEqual(0);
+  });
+
+  it('constructs with default timeout', () => {
+    const detector = new LeanEnvironmentDetector();
+    const runner = new LeanProofRunner(detector);
+    expect(runner).toBeInstanceOf(LeanProofRunner);
+  });
+
+  it('constructs with custom timeout', () => {
+    const detector = new LeanEnvironmentDetector();
+    const runner = new LeanProofRunner(detector, { defaultTimeoutMs: 10000 });
+    expect(runner).toBeInstanceOf(LeanProofRunner);
+  });
+
+  it('result always contains time field', async () => {
+    const detector = new LeanEnvironmentDetector({ mockAvailable: false });
+    const runner = new LeanProofRunner(detector);
+    const result = await runner.runProof('theorem test : True := trivial');
+    expect(typeof result.time).toBe('number');
+    expect(result.time).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DES-FV-002: HybridVerifier with LeanProofRunner
+// ---------------------------------------------------------------------------
+
+describe('DES-FV-002: HybridVerifier with proofRunner', () => {
+  it('uses proofRunner when provided and no mockLeanResult', async () => {
+    const detector = new LeanEnvironmentDetector({ mockAvailable: false });
+    const runner = new LeanProofRunner(detector);
+    const verifier = new HybridVerifier({ proofRunner: runner });
+    const spec = makeSpec({ id: 'RUNNER-01', action: 'test action' });
+    const result = await verifier.verify(spec);
+    // Lean not available → proof runner returns skipped
+    expect(result.leanStatus).toBe('skipped');
+    expect(result.smtStatus).toBe('skipped');
+    expect(result.combinedVerdict).toBe('unverified');
+  });
+
+  it('mockLeanResult takes precedence over proofRunner', async () => {
+    const detector = new LeanEnvironmentDetector({ mockAvailable: false });
+    const runner = new LeanProofRunner(detector);
+    const verifier = new HybridVerifier({
+      proofRunner: runner,
+      mockLeanResult: 'proven',
+      mockSmtResult: 'unsat',
+    });
+    const spec = makeSpec({ id: 'RUNNER-02', action: 'test' });
+    const result = await verifier.verify(spec);
+    expect(result.leanStatus).toBe('proven');
+    expect(result.combinedVerdict).toBe('verified');
+  });
+
+  it('accepts custom converter in options', () => {
+    const converter = new EarsToLeanConverter();
+    const verifier = new HybridVerifier({ converter });
+    expect(verifier).toBeInstanceOf(HybridVerifier);
   });
 });

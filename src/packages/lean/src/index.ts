@@ -5,7 +5,11 @@
  */
 
 import { execFile } from 'node:child_process';
+import { writeFile, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { randomBytes } from 'node:crypto';
 
 const execFileAsync = promisify(execFile);
 
@@ -135,6 +139,132 @@ export class LeanEnvironmentDetector {
 }
 
 // ---------------------------------------------------------------------------
+// LeanProofRunner
+// ---------------------------------------------------------------------------
+
+export interface LeanProofRunnerOptions {
+  defaultTimeoutMs?: number;
+}
+
+export class LeanProofRunner {
+  private readonly detector: LeanEnvironmentDetector;
+  private readonly defaultTimeoutMs: number;
+
+  constructor(detector: LeanEnvironmentDetector, options?: LeanProofRunnerOptions) {
+    this.detector = detector;
+    this.defaultTimeoutMs = options?.defaultTimeoutMs ?? 60000;
+  }
+
+  async runProof(leanCode: string, timeoutMs?: number): Promise<ProofResult> {
+    const start = Date.now();
+    const env = await this.detector.detect();
+
+    if (!env.available || !env.leanPath) {
+      return {
+        requirementId: '',
+        status: 'skipped',
+        diagnostics: [],
+        time: Date.now() - start,
+      };
+    }
+
+    const tmpFile = join(tmpdir(), `musubix2-lean-${randomBytes(8).toString('hex')}.lean`);
+
+    try {
+      await writeFile(tmpFile, leanCode, 'utf-8');
+      const timeout = timeoutMs ?? this.defaultTimeoutMs;
+
+      const { stdout, stderr } = await execFileAsync(env.leanPath, [tmpFile], {
+        timeout,
+      });
+
+      const diagnostics = this.parseDiagnostics(stdout, stderr);
+      const hasErrors = diagnostics.some((d) => d.severity === 'error');
+
+      return {
+        requirementId: '',
+        status: hasErrors ? 'failed' : 'proven',
+        proofCode: leanCode,
+        diagnostics,
+        time: Date.now() - start,
+      };
+    } catch (err: unknown) {
+      const elapsed = Date.now() - start;
+
+      if (err && typeof err === 'object' && 'killed' in err && (err as { killed: boolean }).killed) {
+        return {
+          requirementId: '',
+          status: 'timeout',
+          diagnostics: [],
+          time: elapsed,
+        };
+      }
+
+      const diagnostics = this.parseDiagnosticsFromError(err);
+      const hasErrors = diagnostics.some((d) => d.severity === 'error');
+
+      return {
+        requirementId: '',
+        status: hasErrors ? 'failed' : 'error',
+        diagnostics,
+        time: elapsed,
+      };
+    } finally {
+      try {
+        await unlink(tmpFile);
+      } catch {
+        /* cleanup best-effort */
+      }
+    }
+  }
+
+  private parseDiagnostics(stdout: string, stderr: string): LeanDiagnostic[] {
+    const diagnostics: LeanDiagnostic[] = [];
+    const combined = (stdout + '\n' + stderr).trim();
+    if (!combined) return diagnostics;
+
+    for (const line of combined.split('\n')) {
+      const diag = this.parseDiagnosticLine(line);
+      if (diag) diagnostics.push(diag);
+    }
+    return diagnostics;
+  }
+
+  private parseDiagnosticsFromError(err: unknown): LeanDiagnostic[] {
+    if (!err || typeof err !== 'object') return [];
+    const stderr = ('stderr' in err ? String((err as { stderr: unknown }).stderr) : '').trim();
+    const stdout = ('stdout' in err ? String((err as { stdout: unknown }).stdout) : '').trim();
+    return this.parseDiagnostics(stdout, stderr);
+  }
+
+  private parseDiagnosticLine(line: string): LeanDiagnostic | null {
+    const trimmed = line.trim();
+    if (!trimmed) return null;
+
+    // Lean 4 format: file:line:col: severity: message
+    const match = /^[^:]+:(\d+):(\d+):\s*(error|warning|info(?:rmation)?)\s*:\s*(.+)$/.exec(trimmed);
+    if (match) {
+      const severity = match[3].startsWith('info') ? 'info' : (match[3] as 'error' | 'warning');
+      return {
+        severity,
+        message: match[4],
+        line: parseInt(match[1], 10),
+        column: parseInt(match[2], 10),
+      };
+    }
+
+    // Fallback: treat non-empty lines as info
+    if (trimmed.toLowerCase().includes('error')) {
+      return { severity: 'error', message: trimmed };
+    }
+    if (trimmed.toLowerCase().includes('warning')) {
+      return { severity: 'warning', message: trimmed };
+    }
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // EarsToLeanConverter
 // ---------------------------------------------------------------------------
 
@@ -254,22 +384,36 @@ export class EarsToLeanConverter {
 export interface HybridVerifierOptions {
   mockSmtResult?: 'sat' | 'unsat' | 'unknown';
   mockLeanResult?: ProofStatus;
+  proofRunner?: LeanProofRunner;
+  converter?: EarsToLeanConverter;
 }
 
 export class HybridVerifier {
   private readonly mockSmtResult: 'sat' | 'unsat' | 'unknown' | undefined;
   private readonly mockLeanResult: ProofStatus | undefined;
+  private readonly proofRunner: LeanProofRunner | undefined;
+  private readonly converter: EarsToLeanConverter;
 
   constructor(options?: HybridVerifierOptions) {
     this.mockSmtResult = options?.mockSmtResult;
     this.mockLeanResult = options?.mockLeanResult;
+    this.proofRunner = options?.proofRunner;
+    this.converter = options?.converter ?? new EarsToLeanConverter();
   }
 
   async verify(spec: Specification): Promise<HybridResult> {
     const start = Date.now();
 
     const smtStatus = this.mockSmtResult ?? ('skipped' as const);
-    const leanStatus = this.mockLeanResult ?? ('skipped' as const);
+
+    let leanStatus: ProofStatus;
+    if (this.mockLeanResult !== undefined) {
+      leanStatus = this.mockLeanResult;
+    } else if (this.proofRunner) {
+      leanStatus = await this.runLeanProof(spec);
+    } else {
+      leanStatus = 'skipped' as const;
+    }
 
     const combinedVerdict = deriveVerdict(smtStatus, leanStatus);
     const explanation = buildExplanation(smtStatus, leanStatus, combinedVerdict);
@@ -282,6 +426,16 @@ export class HybridVerifier {
       explanation,
       time: Date.now() - start,
     };
+  }
+
+  private async runLeanProof(spec: Specification): Promise<ProofStatus> {
+    const conversion = this.converter.convert(spec);
+    if (!conversion.success || !conversion.leanCode) {
+      return 'error';
+    }
+    const skeleton = this.converter.generateProofSkeleton(spec);
+    const result = await this.proofRunner!.runProof(skeleton);
+    return result.status;
   }
 }
 
@@ -341,6 +495,13 @@ export function createEarsToLeanConverter(): EarsToLeanConverter {
 
 export function createHybridVerifier(): HybridVerifier {
   return new HybridVerifier();
+}
+
+export function createLeanProofRunner(
+  detector?: LeanEnvironmentDetector,
+  options?: LeanProofRunnerOptions,
+): LeanProofRunner {
+  return new LeanProofRunner(detector ?? new LeanEnvironmentDetector(), options);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,11 +1,13 @@
 /**
  * @musubix2/codegraph — Code Graph Engine
  *
- * AST parsing (regex-based fallback), in-memory dependency graph,
- * storage adapters, and keyword-based GraphRAG search.
+ * AST parsing (TypeScript Compiler API for TS/JS, regex-based fallback for others),
+ * in-memory dependency graph, storage adapters, and keyword-based GraphRAG search.
  *
  * @see DES-CG-001 — Code Graph
  */
+
+import ts from 'typescript';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -227,18 +229,125 @@ LANGUAGE_PATTERNS['javascript'] = LANGUAGE_PATTERNS['typescript'];
 
 export class ASTParser {
   parse(source: string, language: SupportedLanguage): ASTNode[] {
-    const patterns = LANGUAGE_PATTERNS[language];
-    if (!patterns) {
-      return [];
+    if (language === 'typescript' || language === 'javascript') {
+      return this.parseWithTypeScriptAPI(source, language);
     }
-    return this.parseWithPatterns(source, patterns);
+    return this.parseWithRegex(source, language);
   }
 
   getSupportedLanguages(): SupportedLanguage[] {
     return [...ALL_LANGUAGES];
   }
 
-  // -- private --------------------------------------------------------------
+  // -- TypeScript Compiler API ------------------------------------------------
+
+  private parseWithTypeScriptAPI(source: string, language: SupportedLanguage): ASTNode[] {
+    const scriptKind = language === 'typescript' ? ts.ScriptKind.TS : ts.ScriptKind.JS;
+    const sourceFile = ts.createSourceFile('temp.ts', source, ts.ScriptTarget.Latest, true, scriptKind);
+    const nodes: ASTNode[] = [];
+
+    for (const statement of sourceFile.statements) {
+      const node = this.visitTsNode(statement, sourceFile);
+      if (node) nodes.push(node);
+    }
+
+    return nodes;
+  }
+
+  private visitTsNode(node: ts.Node, sourceFile: ts.SourceFile): ASTNode | null {
+    const startPos = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+    const endPos = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
+    const startLine = startPos.line + 1;
+    const endLine = endPos.line + 1;
+
+    if (ts.isClassDeclaration(node)) {
+      const name = node.name?.text ?? '<anonymous>';
+      const children: ASTNode[] = [];
+      for (const member of node.members) {
+        if (ts.isMethodDeclaration(member) || ts.isConstructorDeclaration(member)) {
+          const methodName = member.name
+            ? (ts.isIdentifier(member.name) ? member.name.text : member.name.getText(sourceFile))
+            : 'constructor';
+          const mStart = sourceFile.getLineAndCharacterOfPosition(member.getStart(sourceFile));
+          const mEnd = sourceFile.getLineAndCharacterOfPosition(member.getEnd());
+          children.push({
+            kind: 'method',
+            name: methodName,
+            startLine: mStart.line + 1,
+            endLine: mEnd.line + 1,
+            children: [],
+          });
+        }
+      }
+      return { kind: 'class', name, startLine, endLine, children };
+    }
+
+    if (ts.isFunctionDeclaration(node)) {
+      const name = node.name?.text ?? '<anonymous>';
+      return { kind: 'function', name, startLine, endLine, children: [] };
+    }
+
+    if (ts.isInterfaceDeclaration(node)) {
+      return { kind: 'interface', name: node.name.text, startLine, endLine, children: [] };
+    }
+
+    if (ts.isImportDeclaration(node)) {
+      const specifier = node.moduleSpecifier;
+      const name = ts.isStringLiteral(specifier) ? specifier.text : specifier.getText(sourceFile);
+      return { kind: 'import', name, startLine, endLine, children: [] };
+    }
+
+    if (ts.isExportDeclaration(node)) {
+      if (node.exportClause && ts.isNamedExports(node.exportClause)) {
+        const names = node.exportClause.elements.map((e) => e.name.text).join(', ');
+        return { kind: 'export', name: names, startLine, endLine, children: [] };
+      }
+      const modSpec = node.moduleSpecifier;
+      const name = modSpec && ts.isStringLiteral(modSpec) ? modSpec.text : '*';
+      return { kind: 'export', name, startLine, endLine, children: [] };
+    }
+
+    if (ts.isExportAssignment(node)) {
+      return { kind: 'export', name: 'default', startLine, endLine, children: [] };
+    }
+
+    if (ts.isVariableStatement(node)) {
+      const children: ASTNode[] = [];
+      for (const decl of node.declarationList.declarations) {
+        if (ts.isIdentifier(decl.name)) {
+          const dStart = sourceFile.getLineAndCharacterOfPosition(decl.getStart(sourceFile));
+          const dEnd = sourceFile.getLineAndCharacterOfPosition(decl.getEnd());
+          children.push({
+            kind: 'variable',
+            name: decl.name.text,
+            startLine: dStart.line + 1,
+            endLine: dEnd.line + 1,
+            children: [],
+          });
+        }
+      }
+      // Return single variable directly, or a variable node with children for destructuring
+      if (children.length === 1) {
+        return children[0];
+      }
+      if (children.length > 0) {
+        return { kind: 'variable', name: children.map((c) => c.name).join(', '), startLine, endLine, children };
+      }
+      return null;
+    }
+
+    return null;
+  }
+
+  // -- Regex fallback ---------------------------------------------------------
+
+  private parseWithRegex(source: string, language: SupportedLanguage): ASTNode[] {
+    const patterns = LANGUAGE_PATTERNS[language];
+    if (!patterns) {
+      return [];
+    }
+    return this.parseWithPatterns(source, patterns);
+  }
 
   private parseWithPatterns(source: string, patterns: LanguagePatterns): ASTNode[] {
     const lines = source.split('\n');

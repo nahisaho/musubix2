@@ -255,8 +255,131 @@ export class EarsToSmtConverter {
 
 // ── Z3Adapter ───────────────────────────────────────────────────
 
+import { execFile } from 'node:child_process';
+import { writeFile, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { randomBytes } from 'node:crypto';
+
+const execFileAsync = promisify(execFile);
+
+export interface Z3AdapterOptions {
+  timeoutMs?: number;
+}
+
 export class Z3Adapter {
+  private z3Path: string | null = null;
+  private z3Version: string | null = null;
+  private detectionDone = false;
+  private timeoutMs: number;
+
+  constructor(options?: Z3AdapterOptions) {
+    this.timeoutMs = options?.timeoutMs ?? 30000;
+  }
+
+  async isAvailable(): Promise<boolean> {
+    if (!this.detectionDone) {
+      await this.detectZ3();
+    }
+    return this.z3Path !== null;
+  }
+
+  getVersion(): string {
+    return this.z3Version ?? 'mock-4.12.0';
+  }
+
   async solve(smtScript: string): Promise<SolverResult> {
+    if (await this.isAvailable()) {
+      return this.realSolve(smtScript);
+    }
+    return this.mockSolve(smtScript);
+  }
+
+  private async detectZ3(): Promise<void> {
+    this.detectionDone = true;
+    try {
+      const cmd = process.platform === 'win32' ? 'where' : 'which';
+      const { stdout } = await execFileAsync(cmd, ['z3']);
+      const path = stdout.trim().split('\n')[0];
+      if (path) {
+        this.z3Path = path;
+        try {
+          const ver = await execFileAsync(path, ['--version']);
+          this.z3Version = ver.stdout.trim().split('\n')[0] ?? null;
+        } catch {
+          /* version detection failed, path is still valid */
+        }
+      }
+    } catch {
+      this.z3Path = null;
+    }
+  }
+
+  private async realSolve(smtScript: string): Promise<SolverResult> {
+    const start = Date.now();
+    const tmpFile = join(tmpdir(), `musubix2-z3-${randomBytes(8).toString('hex')}.smt2`);
+
+    try {
+      await writeFile(tmpFile, smtScript, 'utf-8');
+      const { stdout, stderr } = await execFileAsync(this.z3Path!, ['-smt2', tmpFile], {
+        timeout: this.timeoutMs,
+      });
+
+      const output = stdout.trim();
+      const lines = output.split('\n');
+      const firstLine = lines[0]?.trim() ?? '';
+
+      let status: SolverStatus;
+      let model: Record<string, string> | undefined;
+
+      if (firstLine === 'sat') {
+        status = 'sat';
+        model = this.parseModel(lines.slice(1).join('\n'));
+      } else if (firstLine === 'unsat') {
+        status = 'unsat';
+      } else if (firstLine === 'unknown') {
+        status = 'unknown';
+      } else {
+        status = 'error';
+        return {
+          status,
+          time: Date.now() - start,
+          error: stderr.trim() || `Unexpected Z3 output: ${firstLine}`,
+        };
+      }
+
+      return { status, model, time: Date.now() - start };
+    } catch (err: unknown) {
+      const elapsed = Date.now() - start;
+      if (err && typeof err === 'object' && 'killed' in err && (err as { killed: boolean }).killed) {
+        return { status: 'timeout', time: elapsed };
+      }
+      return {
+        status: 'error',
+        time: elapsed,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    } finally {
+      try {
+        await unlink(tmpFile);
+      } catch {
+        /* cleanup best-effort */
+      }
+    }
+  }
+
+  private parseModel(modelOutput: string): Record<string, string> {
+    const model: Record<string, string> = {};
+    const defineRegex = /\(define-fun\s+(\S+)\s+\(\)\s+\S+\s+(.+?)\)/g;
+    let match: RegExpExecArray | null;
+    while ((match = defineRegex.exec(modelOutput)) !== null) {
+      model[match[1]] = match[2].trim();
+    }
+    return model;
+  }
+
+  private mockSolve(smtScript: string): SolverResult {
     const start = Date.now();
 
     try {
@@ -290,14 +413,6 @@ export class Z3Adapter {
         error: err instanceof Error ? err.message : String(err),
       };
     }
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return false;
-  }
-
-  getVersion(): string {
-    return 'mock-4.12.0';
   }
 }
 

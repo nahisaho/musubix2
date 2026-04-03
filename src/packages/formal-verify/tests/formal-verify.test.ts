@@ -7,7 +7,7 @@ import {
   createZ3Adapter,
   createPreconditionVerifier,
 } from '../src/index.js';
-import type { ParsedRequirement } from '../src/index.js';
+import type { ParsedRequirement, Z3AdapterOptions } from '../src/index.js';
 
 // ── Test data ───────────────────────────────────────────────────
 
@@ -217,5 +217,64 @@ describe('DES-FV-001: PreconditionVerifier', () => {
     });
     expect(result.requirementId).toBe('postcondition');
     expect(['verified', 'violated', 'inconclusive']).toContain(result.status);
+  });
+});
+
+// ── Z3Adapter — Real Z3 / Mock fallback ─────────────────────────
+
+describe('DES-FV-001: Z3Adapter real subprocess integration', () => {
+  it('should accept optional timeout config', () => {
+    const adapter = new Z3Adapter({ timeoutMs: 5000 });
+    expect(adapter).toBeInstanceOf(Z3Adapter);
+  });
+
+  it('should construct with no options (backward-compat)', () => {
+    const adapter = new Z3Adapter();
+    expect(adapter).toBeInstanceOf(Z3Adapter);
+  });
+
+  it('should cache isAvailable result across calls', async () => {
+    const adapter = new Z3Adapter();
+    const first = await adapter.isAvailable();
+    const second = await adapter.isAvailable();
+    expect(first).toBe(second);
+  });
+
+  it('should return mock version when z3 not installed', async () => {
+    const adapter = new Z3Adapter();
+    const avail = await adapter.isAvailable();
+    if (!avail) {
+      expect(adapter.getVersion()).toBe('mock-4.12.0');
+    }
+  });
+
+  it('mockSolve fallback handles unknown script gracefully', async () => {
+    const adapter = new Z3Adapter();
+    // A script with no heuristic matches falls back to 'unknown'
+    const result = await adapter.solve('(set-logic QF_LIA)');
+    expect(result.status).toBe('unknown');
+    expect(result.time).toBeGreaterThanOrEqual(0);
+  });
+
+  it('mockSolve fallback returns sat for implication assertion', async () => {
+    const adapter = new Z3Adapter();
+    const script = '(declare-const a Bool)\n(assert (=> a a))\n(check-sat)';
+    const result = await adapter.solve(script);
+    expect(result.status).toBe('sat');
+  });
+
+  it('mockSolve fallback returns unsat for assert false', async () => {
+    const adapter = new Z3Adapter();
+    const script = '(assert false)\n(check-sat)';
+    const result = await adapter.solve(script);
+    expect(result.status).toBe('unsat');
+  });
+
+  it('solve always returns a SolverResult with time field', async () => {
+    const adapter = new Z3Adapter();
+    const result = await adapter.solve('(check-sat)');
+    expect(result).toHaveProperty('status');
+    expect(result).toHaveProperty('time');
+    expect(typeof result.time).toBe('number');
   });
 });

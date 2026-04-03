@@ -319,3 +319,147 @@ describe('DES-CG-001: Factory Functions', () => {
     expect(createMemoryStorage()).toBeInstanceOf(MemoryStorage);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ASTParser — TypeScript Compiler API
+// ---------------------------------------------------------------------------
+
+describe('DES-CG-001: ASTParser TypeScript Compiler API', () => {
+  const parser = createASTParser();
+
+  it('should parse class methods as children of the class', () => {
+    const source = `
+export class HelloService {
+  sayHello() { return 'hello'; }
+  async fetchData() { return []; }
+}`;
+    const nodes = parser.parse(source, 'typescript');
+    const cls = nodes.find((n) => n.kind === 'class');
+    expect(cls).toBeDefined();
+    expect(cls!.name).toBe('HelloService');
+    expect(cls!.children.length).toBe(2);
+    expect(cls!.children[0].kind).toBe('method');
+    expect(cls!.children[0].name).toBe('sayHello');
+    expect(cls!.children[1].name).toBe('fetchData');
+  });
+
+  it('should compute accurate multi-line endLine for classes', () => {
+    const source = `class Foo {
+  bar() {}
+  baz() {}
+}`;
+    const nodes = parser.parse(source, 'typescript');
+    const cls = nodes.find((n) => n.kind === 'class');
+    expect(cls).toBeDefined();
+    expect(cls!.startLine).toBe(1);
+    expect(cls!.endLine).toBe(4);
+  });
+
+  it('should parse export declarations', () => {
+    const source = `export { Foo, Bar } from './mod';`;
+    const nodes = parser.parse(source, 'typescript');
+    const exports = nodes.filter((n) => n.kind === 'export');
+    expect(exports.length).toBe(1);
+    expect(exports[0].name).toContain('Foo');
+    expect(exports[0].name).toContain('Bar');
+  });
+
+  it('should parse export default assignment', () => {
+    const source = `const x = 42;\nexport default x;`;
+    const nodes = parser.parse(source, 'typescript');
+    const exports = nodes.filter((n) => n.kind === 'export');
+    expect(exports.length).toBe(1);
+    expect(exports[0].name).toBe('default');
+  });
+
+  it('should parse multiple variables in a single declaration', () => {
+    const source = `const a = 1, b = 2;`;
+    const nodes = parser.parse(source, 'typescript');
+    const vars = nodes.filter((n) => n.kind === 'variable');
+    expect(vars.length).toBe(1);
+    expect(vars[0].children.length).toBe(2);
+    expect(vars[0].children[0].name).toBe('a');
+    expect(vars[0].children[1].name).toBe('b');
+  });
+
+  it('should parse JavaScript files the same as TypeScript', () => {
+    const source = `function greet(name) { return "Hello, " + name; }`;
+    const tsNodes = parser.parse(source, 'typescript');
+    const jsNodes = parser.parse(source, 'javascript');
+    expect(jsNodes.length).toBe(tsNodes.length);
+    expect(jsNodes[0].kind).toBe('function');
+    expect(jsNodes[0].name).toBe('greet');
+  });
+
+  it('should parse arrow function assigned to const as variable', () => {
+    const source = `const greet = (name: string) => "hello " + name;`;
+    const nodes = parser.parse(source, 'typescript');
+    const vars = nodes.filter((n) => n.kind === 'variable');
+    expect(vars.length).toBe(1);
+    expect(vars[0].name).toBe('greet');
+  });
+
+  it('should parse interface with correct line range', () => {
+    const source = `
+interface Config {
+  host: string;
+  port: number;
+}`;
+    const nodes = parser.parse(source, 'typescript');
+    const iface = nodes.find((n) => n.kind === 'interface');
+    expect(iface).toBeDefined();
+    expect(iface!.name).toBe('Config');
+    expect(iface!.startLine).toBe(2);
+    expect(iface!.endLine).toBe(5);
+  });
+
+  it('should still use regex for non-TS/JS languages', () => {
+    const pythonSource = `class Foo:\n    pass\ndef bar():\n    pass`;
+    const nodes = parser.parse(pythonSource, 'python');
+    expect(nodes.length).toBeGreaterThanOrEqual(2);
+    expect(nodes.some((n) => n.kind === 'class' && n.name === 'Foo')).toBe(true);
+    expect(nodes.some((n) => n.kind === 'function' && n.name === 'bar')).toBe(true);
+  });
+
+  it('should handle complex TypeScript with generics and decorators', () => {
+    const source = `
+import { Injectable } from '@nestjs/common';
+
+interface Repository<T> {
+  find(id: string): T;
+}
+
+export class UserService {
+  constructor(private repo: Repository<User>) {}
+
+  getUser(id: string) {
+    return this.repo.find(id);
+  }
+}
+
+export function createService<T>(ctor: new () => T): T {
+  return new ctor();
+}
+
+const MAX_RETRIES = 3;
+`;
+    const nodes = parser.parse(source, 'typescript');
+    const imports = nodes.filter((n) => n.kind === 'import');
+    const interfaces = nodes.filter((n) => n.kind === 'interface');
+    const classes = nodes.filter((n) => n.kind === 'class');
+    const functions = nodes.filter((n) => n.kind === 'function');
+    const variables = nodes.filter((n) => n.kind === 'variable');
+
+    expect(imports.length).toBe(1);
+    expect(imports[0].name).toBe('@nestjs/common');
+    expect(interfaces.length).toBe(1);
+    expect(interfaces[0].name).toBe('Repository');
+    expect(classes.length).toBe(1);
+    expect(classes[0].name).toBe('UserService');
+    expect(classes[0].children.length).toBe(2); // constructor + getUser
+    expect(functions.length).toBe(1);
+    expect(functions[0].name).toBe('createService');
+    expect(variables.length).toBe(1);
+    expect(variables[0].name).toBe('MAX_RETRIES');
+  });
+});
