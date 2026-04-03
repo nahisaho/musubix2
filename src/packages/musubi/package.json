@@ -1,6 +1,6 @@
 {
   "name": "musubix2",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "MUSUBIX2 — Specification Driven Development System",
   "type": "module",
   "main": "./dist/index.js",
@@ -48,7 +48,7 @@
     "clean": "rm -rf dist *.tsbuildinfo",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "node scripts/copy-github-assets.mjs",
+    "prepublishOnly": "npm run build && node scripts/copy-github-assets.mjs",
     "postpublish": "node scripts/clean-github-assets.mjs"
   },
   "dependencies": {
