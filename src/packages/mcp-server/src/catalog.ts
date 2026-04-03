@@ -1,6 +1,7 @@
 // MCP Tool Catalog — registers tools from all MUSUBIX2 packages
 
 import type { MCPServer, ToolDefinition, ToolHandler, ToolResult } from './index.js';
+import type { EntityType, RelationType } from '@musubix2/knowledge';
 
 // ---------------------------------------------------------------------------
 // Catalog entry helper
@@ -56,7 +57,7 @@ function sddCoreTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const req = core.createRequirement?.({
             pattern: params['pattern'] as string,
             text: params['text'] as string,
@@ -75,7 +76,7 @@ function sddCoreTools(): CatalogEntry[] {
       [param('requirements', 'array', 'Array of requirement objects to validate')],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const result = core.validateRequirements?.(params['requirements'] as unknown[]);
           return ok(result ?? { valid: true, issues: [] });
         } catch {
@@ -90,7 +91,7 @@ function sddCoreTools(): CatalogEntry[] {
       [param('basePath', 'string', 'Project base path', false, '.')],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const list = core.listRequirements?.(params['basePath'] as string ?? '.');
           return ok(list ?? []);
         } catch {
@@ -108,7 +109,7 @@ function sddCoreTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const design = core.generateDesign?.({
             requirements: params['requirements'] as unknown[],
             format: params['format'] as string ?? 'markdown',
@@ -129,7 +130,7 @@ function sddCoreTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const result = core.verifyTraceability?.({
             design: params['design'],
             requirements: params['requirements'] as unknown[],
@@ -150,7 +151,7 @@ function sddCoreTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const code = core.generateCode?.({
             design: params['design'],
             language: params['language'] as string ?? 'typescript',
@@ -171,7 +172,7 @@ function sddCoreTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const tests = core.generateTests?.({
             design: params['design'],
             framework: params['framework'] as string ?? 'vitest',
@@ -189,7 +190,7 @@ function sddCoreTools(): CatalogEntry[] {
       [param('basePath', 'string', 'Project base path', false, '.')],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const result = core.verifyTraceabilityMatrix?.(params['basePath'] as string ?? '.');
           return ok(result ?? { complete: true, matrix: [], gaps: [] });
         } catch {
@@ -205,7 +206,7 @@ function sddCoreTools(): CatalogEntry[] {
       [param('input', 'string', 'Initial user input describing the project')],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const interviewer = core.createRequirementsInterviewer();
           const result = interviewer.analyzeInput(params['input'] as string);
           return ok(result);
@@ -225,7 +226,7 @@ function sddCoreTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const interviewer = core.createRequirementsInterviewer();
           // Restore state if provided
           const state = params['state'] as Record<string, unknown> | undefined;
@@ -250,7 +251,7 @@ function sddCoreTools(): CatalogEntry[] {
       [],
       async () => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const interviewer = core.createRequirementsInterviewer();
           return ok(interviewer.getState());
         } catch {
@@ -265,7 +266,7 @@ function sddCoreTools(): CatalogEntry[] {
       [param('context', 'object', 'RequirementsContext gathered from interview')],
       async (params) => {
         try {
-          const core = await import('@musubix2/core');
+          const core = await import('@musubix2/core') as any;
           const generator = core.createRequirementsDocGenerator();
           const context = params['context'] as Record<string, unknown>;
           const doc = generator.generate(context as never);
@@ -321,9 +322,9 @@ function knowledgeTools(): CatalogEntry[] {
           await store.load();
           store.putEntity({
             id: params['id'] as string,
-            type: params['type'] as string,
+            type: params['type'] as EntityType,
             properties: (params['properties'] as Record<string, unknown>) ?? {},
-          });
+          } as any);
           await store.save();
           return ok({ id: params['id'], type: params['type'], saved: true });
         } catch {
@@ -344,7 +345,7 @@ function knowledgeTools(): CatalogEntry[] {
           const { createKnowledgeStore } = await import('@musubix2/knowledge');
           const store = createKnowledgeStore(params['basePath'] as string ?? '.knowledge');
           await store.load();
-          const deleted = store.deleteEntity(params['id'] as string);
+          const deleted = await store.deleteEntity(params['id'] as string);
           if (deleted) await store.save();
           return ok({ id: params['id'], deleted });
         } catch {
@@ -370,8 +371,8 @@ function knowledgeTools(): CatalogEntry[] {
           store.addRelation({
             from: params['from'] as string,
             to: params['to'] as string,
-            type: params['type'] as string,
-          });
+            type: params['type'] as RelationType,
+          } as any);
           await store.save();
           return ok({ from: params['from'], to: params['to'], type: params['type'], added: true });
         } catch {
@@ -393,7 +394,7 @@ function knowledgeTools(): CatalogEntry[] {
           const { createKnowledgeStore } = await import('@musubix2/knowledge');
           const store = createKnowledgeStore(params['basePath'] as string ?? '.knowledge');
           await store.load();
-          const results = store.search(params['query'] as string, params['limit'] as number ?? 10);
+          const results = store.search(params['query'] as string, { limit: (params['limit'] as number) ?? 10 });
           return ok(results);
         } catch {
           return fail('Knowledge package not available');
@@ -414,7 +415,7 @@ function knowledgeTools(): CatalogEntry[] {
           const { createKnowledgeStore } = await import('@musubix2/knowledge');
           const store = createKnowledgeStore(params['basePath'] as string ?? '.knowledge');
           await store.load();
-          const result = store.traverse(params['startId'] as string, params['depth'] as number ?? 2);
+          const result = store.traverse(params['startId'] as string, { depth: (params['depth'] as number) ?? 2 });
           return ok(result);
         } catch {
           return fail('Knowledge package not available');
@@ -457,7 +458,7 @@ function policyTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const policy = await import('@musubix2/policy');
+          const policy = await import('@musubix2/policy') as any;
           const engine = new policy.PolicyEngine();
           const result = engine.validate(params['artifact'], params['articleIds'] as string[] | undefined);
           return ok(result);
@@ -476,7 +477,7 @@ function policyTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const policy = await import('@musubix2/policy');
+          const policy = await import('@musubix2/policy') as any;
           const runner = new policy.QualityGateRunner();
           const result = runner.run(params['gate'] as string, params['context']);
           return ok(result);
@@ -492,7 +493,7 @@ function policyTools(): CatalogEntry[] {
       [],
       async () => {
         try {
-          const policy = await import('@musubix2/policy');
+          const policy = await import('@musubix2/policy') as any;
           const engine = new policy.PolicyEngine();
           const articles = engine.listArticles();
           return ok(articles);
@@ -521,7 +522,7 @@ function ontologyTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const ont = await import('@musubix2/ontology-mcp');
+          const ont = await import('@musubix2/ontology-mcp') as any;
           const store = ont.createTripleStore?.();
           store?.add(params['subject'] as string, params['predicate'] as string, params['object'] as string);
           return ok({ added: true, subject: params['subject'], predicate: params['predicate'], object: params['object'] });
@@ -541,7 +542,7 @@ function ontologyTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const ont = await import('@musubix2/ontology-mcp');
+          const ont = await import('@musubix2/ontology-mcp') as any;
           const store = ont.createTripleStore?.();
           const results = store?.query(
             params['subject'] as string | undefined,
@@ -561,7 +562,7 @@ function ontologyTools(): CatalogEntry[] {
       [param('rules', 'array', 'Rules to apply', false)],
       async (params) => {
         try {
-          const ont = await import('@musubix2/ontology-mcp');
+          const ont = await import('@musubix2/ontology-mcp') as any;
           const engine = ont.createRuleEngine?.();
           const result = engine?.apply(params['rules'] as unknown[] | undefined);
           return ok(result ?? { inferred: 0, triples: [] });
@@ -577,7 +578,7 @@ function ontologyTools(): CatalogEntry[] {
       [],
       async () => {
         try {
-          const ont = await import('@musubix2/ontology-mcp');
+          const ont = await import('@musubix2/ontology-mcp') as any;
           const checker = ont.createConsistencyChecker?.();
           const result = checker?.check();
           return ok(result ?? { consistent: true, issues: [] });
@@ -593,7 +594,7 @@ function ontologyTools(): CatalogEntry[] {
       [param('query', 'string', 'SPARQL-like query string')],
       async (params) => {
         try {
-          const ont = await import('@musubix2/ontology-mcp');
+          const ont = await import('@musubix2/ontology-mcp') as any;
           const result = ont.sparqlQuery?.(params['query'] as string);
           return ok(result ?? { bindings: [] });
         } catch {
@@ -620,7 +621,7 @@ function codeAnalysisTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const cg = await import('@musubix2/codegraph');
+          const cg = await import('@musubix2/codegraph') as any;
           const ast = cg.parseSource?.(params['source'] as string, params['language'] as string ?? 'typescript');
           return ok(ast ?? { type: 'Program', body: [] });
         } catch {
@@ -638,7 +639,7 @@ function codeAnalysisTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const cg = await import('@musubix2/codegraph');
+          const cg = await import('@musubix2/codegraph') as any;
           const graph = cg.buildDependencyGraph?.(params['entryPoint'] as string, params['basePath'] as string ?? '.');
           return ok(graph ?? { nodes: [], edges: [] });
         } catch {
@@ -656,7 +657,7 @@ function codeAnalysisTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const cg = await import('@musubix2/codegraph');
+          const cg = await import('@musubix2/codegraph') as any;
           const results = cg.graphSearch?.(params['query'] as string, params['basePath'] as string ?? '.');
           return ok(results ?? []);
         } catch {
@@ -674,7 +675,7 @@ function codeAnalysisTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const dfg = await import('@musubix2/dfg');
+          const dfg = await import('@musubix2/dfg') as any;
           const result = dfg.analyzeDataFlow?.(params['source'] as string, params['language'] as string ?? 'typescript');
           return ok(result ?? { flows: [], variables: [] });
         } catch {
@@ -701,7 +702,7 @@ function securityTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const sec = await import('@musubix2/security');
+          const sec = await import('@musubix2/security') as any;
           const result = sec.scan?.(params['target'] as string, params['rules'] as string[] | undefined);
           return ok(result ?? { findings: [], severity: 'none' });
         } catch {
@@ -716,7 +717,7 @@ function securityTools(): CatalogEntry[] {
       [param('target', 'string', 'File or directory path to scan')],
       async (params) => {
         try {
-          const sec = await import('@musubix2/security');
+          const sec = await import('@musubix2/security') as any;
           const result = sec.detectSecrets?.(params['target'] as string);
           return ok(result ?? { secrets: [], count: 0 });
         } catch {
@@ -735,7 +736,7 @@ function securityTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const sec = await import('@musubix2/security');
+          const sec = await import('@musubix2/security') as any;
           const result = sec.taintAnalysis?.(
             params['source'] as string,
             params['sources'] as string[] | undefined,
@@ -757,7 +758,7 @@ function securityTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const sec = await import('@musubix2/security');
+          const sec = await import('@musubix2/security') as any;
           const result = sec.complianceCheck?.(params['target'] as string, params['standard'] as string ?? 'owasp');
           return ok(result ?? { compliant: true, issues: [] });
         } catch {
@@ -784,7 +785,7 @@ function researchTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const research = await import('@musubix2/deep-research');
+          const research = await import('@musubix2/deep-research') as any;
           const result = research.query?.(params['topic'] as string, params['depth'] as string ?? 'medium');
           return ok(result ?? { findings: [], topic: params['topic'] });
         } catch {
@@ -802,7 +803,7 @@ function researchTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const research = await import('@musubix2/deep-research');
+          const research = await import('@musubix2/deep-research') as any;
           const result = research.iterativeResearch?.(params['topic'] as string, params['iterations'] as number ?? 3);
           return ok(result ?? { findings: [], iterations: 0, topic: params['topic'] });
         } catch {
@@ -820,7 +821,7 @@ function researchTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const research = await import('@musubix2/deep-research');
+          const research = await import('@musubix2/deep-research') as any;
           const result = research.generateEvidence?.(params['claim'] as string, params['sources'] as string[] | undefined);
           return ok(result ?? { evidence: [], confidence: 0 });
         } catch {
@@ -847,7 +848,7 @@ function neuralTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const ns = await import('@musubix2/neural-search');
+          const ns = await import('@musubix2/neural-search') as any;
           const results = ns.search?.(params['query'] as string, params['topK'] as number ?? 10);
           return ok(results ?? []);
         } catch {
@@ -862,7 +863,7 @@ function neuralTools(): CatalogEntry[] {
       [param('text', 'string', 'Text to embed')],
       async (params) => {
         try {
-          const ns = await import('@musubix2/neural-search');
+          const ns = await import('@musubix2/neural-search') as any;
           const embedding = ns.embed?.(params['text'] as string);
           return ok(embedding ?? { vector: [], dimensions: 0 });
         } catch {
@@ -880,7 +881,7 @@ function neuralTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const ws = await import('@musubix2/wake-sleep');
+          const ws = await import('@musubix2/wake-sleep') as any;
           const patterns = ws.extractPatterns?.(params['source'] as string, params['type'] as string ?? 'structural');
           return ok(patterns ?? { patterns: [], type: params['type'] ?? 'structural' });
         } catch {
@@ -895,7 +896,7 @@ function neuralTools(): CatalogEntry[] {
       [param('patterns', 'array', 'Patterns to consolidate', false)],
       async (params) => {
         try {
-          const ws = await import('@musubix2/wake-sleep');
+          const ws = await import('@musubix2/wake-sleep') as any;
           const result = ws.consolidatePatterns?.(params['patterns'] as unknown[] | undefined);
           return ok(result ?? { consolidated: [], count: 0 });
         } catch {
@@ -913,7 +914,7 @@ function neuralTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const ll = await import('@musubix2/library-learner');
+          const ll = await import('@musubix2/library-learner') as any;
           const result = ll.learnLibrary?.(params['library'] as string, params['depth'] as string ?? 'api');
           return ok(result ?? { patterns: [], library: params['library'] });
         } catch {
@@ -940,7 +941,7 @@ function synthesisTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const syn = await import('@musubix2/synthesis');
+          const syn = await import('@musubix2/synthesis') as any;
           const result = syn.buildDSL?.(params['spec'], params['examples'] as unknown[] | undefined);
           return ok(result ?? { dsl: null, spec: params['spec'] });
         } catch {
@@ -958,7 +959,7 @@ function synthesisTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const syn = await import('@musubix2/synthesis');
+          const syn = await import('@musubix2/synthesis') as any;
           const result = syn.synthesize?.(params['examples'] as unknown[], params['constraints']);
           return ok(result ?? { program: null, confidence: 0 });
         } catch {
@@ -976,7 +977,7 @@ function synthesisTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const syn = await import('@musubix2/synthesis');
+          const syn = await import('@musubix2/synthesis') as any;
           const result = syn.versionSpace?.(params['action'] as string, params['examples'] as unknown[] | undefined);
           return ok(result ?? { action: params['action'], spaces: [] });
         } catch {
@@ -1000,7 +1001,7 @@ function formalVerifyTools(): CatalogEntry[] {
       [param('requirement', 'string', 'EARS requirement text')],
       async (params) => {
         try {
-          const fv = await import('@musubix2/formal-verify');
+          const fv = await import('@musubix2/formal-verify') as any;
           const smt = fv.earsToSmt?.(params['requirement'] as string);
           return ok(smt ?? { smtlib2: '', requirement: params['requirement'] });
         } catch {
@@ -1018,7 +1019,7 @@ function formalVerifyTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const fv = await import('@musubix2/formal-verify');
+          const fv = await import('@musubix2/formal-verify') as any;
           const result = fv.z3Solve?.(params['formula'] as string, params['timeout'] as number ?? 5000);
           return ok(result ?? { satisfiable: false, model: null });
         } catch {
@@ -1036,7 +1037,7 @@ function formalVerifyTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const lean = await import('@musubix2/lean');
+          const lean = await import('@musubix2/lean') as any;
           const result = lean.convertToLean?.(params['spec'] as string, params['name'] as string ?? 'spec_theorem');
           return ok(result ?? { lean4: '', name: params['name'] ?? 'spec_theorem' });
         } catch {
@@ -1051,7 +1052,7 @@ function formalVerifyTools(): CatalogEntry[] {
       [param('proof', 'string', 'Lean 4 proof code')],
       async (params) => {
         try {
-          const lean = await import('@musubix2/lean');
+          const lean = await import('@musubix2/lean') as any;
           const result = lean.runProof?.(params['proof'] as string);
           return ok(result ?? { verified: false, output: '' });
         } catch {
@@ -1069,7 +1070,7 @@ function formalVerifyTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const fv = await import('@musubix2/formal-verify');
+          const fv = await import('@musubix2/formal-verify') as any;
           const result = fv.hybridVerify?.(params['spec'] as string, params['strategy'] as string ?? 'z3-first');
           return ok(result ?? { verified: false, strategy: params['strategy'] ?? 'z3-first' });
         } catch {
@@ -1093,7 +1094,7 @@ function workflowTools(): CatalogEntry[] {
       [param('basePath', 'string', 'Project base path', false, '.')],
       async (params) => {
         try {
-          const wf = await import('@musubix2/workflow-engine');
+          const wf = await import('@musubix2/workflow-engine') as any;
           const engine = wf.createWorkflowEngine?.(params['basePath'] as string ?? '.');
           const phase = engine?.getCurrentPhase();
           return ok(phase ?? { phase: 'requirements', index: 0 });
@@ -1112,7 +1113,7 @@ function workflowTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const wf = await import('@musubix2/workflow-engine');
+          const wf = await import('@musubix2/workflow-engine') as any;
           const engine = wf.createWorkflowEngine?.(params['basePath'] as string ?? '.');
           const result = engine?.transition(params['targetPhase'] as string);
           return ok(result ?? { success: false, phase: params['targetPhase'] });
@@ -1131,7 +1132,7 @@ function workflowTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const wf = await import('@musubix2/workflow-engine');
+          const wf = await import('@musubix2/workflow-engine') as any;
           const engine = wf.createWorkflowEngine?.(params['basePath'] as string ?? '.');
           const result = engine?.checkGate(params['gate'] as string);
           return ok(result ?? { passed: false, gate: params['gate'] });
@@ -1147,7 +1148,7 @@ function workflowTools(): CatalogEntry[] {
       [param('basePath', 'string', 'Project base path', false, '.')],
       async (params) => {
         try {
-          const wf = await import('@musubix2/workflow-engine');
+          const wf = await import('@musubix2/workflow-engine') as any;
           const engine = wf.createWorkflowEngine?.(params['basePath'] as string ?? '.');
           const tasks = engine?.listTasks();
           return ok(tasks ?? []);
@@ -1177,7 +1178,7 @@ function decisionsTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const dec = await import('@musubix2/decisions');
+          const dec = await import('@musubix2/decisions') as any;
           const adr = dec.createADR?.({
             title: params['title'] as string,
             context: params['context'] as string,
@@ -1197,7 +1198,7 @@ function decisionsTools(): CatalogEntry[] {
       [param('basePath', 'string', 'ADR directory path', false, '.')],
       async (params) => {
         try {
-          const dec = await import('@musubix2/decisions');
+          const dec = await import('@musubix2/decisions') as any;
           const adrs = dec.listADRs?.(params['basePath'] as string ?? '.');
           return ok(adrs ?? []);
         } catch {
@@ -1215,7 +1216,7 @@ function decisionsTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const dec = await import('@musubix2/decisions');
+          const dec = await import('@musubix2/decisions') as any;
           const results = dec.searchADRs?.(params['query'] as string, params['basePath'] as string ?? '.');
           return ok(results ?? []);
         } catch {
@@ -1239,7 +1240,7 @@ function skillsTools(): CatalogEntry[] {
       [],
       async () => {
         try {
-          const sm = await import('@musubix2/skill-manager');
+          const sm = await import('@musubix2/skill-manager') as any;
           const skills = sm.listSkills?.();
           return ok(skills ?? []);
         } catch {
@@ -1258,7 +1259,7 @@ function skillsTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const sm = await import('@musubix2/skill-manager');
+          const sm = await import('@musubix2/skill-manager') as any;
           const result = sm.registerSkill?.({
             name: params['name'] as string,
             description: params['description'] as string,
@@ -1280,7 +1281,7 @@ function skillsTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const sm = await import('@musubix2/skill-manager');
+          const sm = await import('@musubix2/skill-manager') as any;
           const result = sm.executeSkill?.(params['name'] as string, params['input']);
           return ok(result ?? { executed: false, name: params['name'] });
         } catch {

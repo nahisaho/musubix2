@@ -9,6 +9,7 @@
  */
 
 import { ExitCode, type ExitCodeValue } from '@musubix2/core';
+import type { EntityType, RelationType } from '@musubix2/knowledge';
 import {
   createTraceabilityManager,
   createMatrixGenerator,
@@ -1135,7 +1136,7 @@ export async function handleSkills(
       } else {
         console.log('Registered skills:');
         for (const skill of skills) {
-          console.log(`  ${skill.name}`);
+          console.log(`  ${skill.metadata.name}`);
         }
       }
       return ExitCode.SUCCESS;
@@ -1217,7 +1218,7 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge put <id> <type>');
         return ExitCode.GENERAL_ERROR;
       }
-      store.putEntity({ id, type, properties: {} });
+      store.putEntity({ id, type: type as EntityType, properties: {} } as any);
       console.log(`✅ Stored entity: ${id} (${type})`);
       return ExitCode.SUCCESS;
     }
@@ -1239,7 +1240,7 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge link <from> <rel> <to>');
         return ExitCode.GENERAL_ERROR;
       }
-      store.addRelation({ from, to, type: rel });
+      store.addRelation({ from, to, type: rel as RelationType } as any);
       console.log(`✅ Linked: ${from} —[${rel}]→ ${to}`);
       return ExitCode.SUCCESS;
     }
@@ -1249,7 +1250,7 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge query <filter>');
         return ExitCode.GENERAL_ERROR;
       }
-      const results = store.query({ type: filter });
+      const results = await store.query({ type: filter as EntityType });
       console.log(`Results: ${results.length} entities`);
       for (const e of results) {
         console.log(`  ${e.id} (${e.type})`);
@@ -1262,7 +1263,7 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge traverse <startId>');
         return ExitCode.GENERAL_ERROR;
       }
-      const traversed = store.traverse(startId);
+      const traversed = await store.traverse(startId);
       console.log(`Traversal from ${startId}: ${traversed.length} nodes`);
       for (const node of traversed) {
         console.log(`  ${node.id} (${node.type})`);
@@ -1275,7 +1276,7 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge search <term>');
         return ExitCode.GENERAL_ERROR;
       }
-      const results = store.search(term);
+      const results = await store.search(term);
       console.log(`Search "${term}": ${results.length} results`);
       for (const e of results) {
         console.log(`  ${e.id} (${e.type})`);
@@ -1406,7 +1407,7 @@ export async function handleDeepResearch(
         console.error('❌ Usage: musubix deep-research query <question>');
         return ExitCode.GENERAL_ERROR;
       }
-      const result = engine.research({ topic: question, depth: 'standard' }, []);
+      const result = engine.research({ topic: question, depth: 'medium' }, []);
       console.log(`Question: ${question}`);
       console.log(`Confidence: ${result.confidence}`);
       console.log(`Sources: ${result.sources.length}`);
@@ -1420,7 +1421,7 @@ export async function handleDeepResearch(
         return ExitCode.GENERAL_ERROR;
       }
       const result = engine.researchIterative(
-        { topic: question, depth: 'standard' },
+        { topic: question, depth: 'medium' },
         () => [],
       );
       console.log(`Iterative research: ${question}`);
@@ -1579,7 +1580,7 @@ export async function handleLearn(
         console.log(`Analyzed: ${path}`);
         console.log(`Patterns found: ${patterns.length}`);
         for (const p of patterns) {
-          console.log(`  - ${p.name}: ${p.description}`);
+          console.log(`  - ${p.name}: ${p.abstraction}`);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -1595,7 +1596,7 @@ export async function handleLearn(
       } else {
         console.log('Learned patterns:');
         for (const p of patterns) {
-          console.log(`  - ${p.name}: ${p.description}`);
+          console.log(`  - ${p.name}: ${p.abstraction}`);
         }
       }
       return ExitCode.SUCCESS;
@@ -1608,7 +1609,7 @@ export async function handleLearn(
       } else {
         console.log('Suggestions:');
         for (const s of suggestions) {
-          console.log(`  - ${s.name}: ${s.description}`);
+          console.log(`  - ${s.name}: ${s.abstraction}`);
         }
       }
       return ExitCode.SUCCESS;
@@ -1685,7 +1686,7 @@ export async function handleWatch(
   const watcher = createFileWatcher();
   console.log(`👁 Watching: ${pattern}`);
   console.log('Press Ctrl+C to stop.\n');
-  watcher.on('modified', (event: { path: string; type: string }) => {
+  watcher.on('modify', (event: { path: string; type: string }) => {
     console.log(`  [${event.type}] ${event.path}`);
   });
   return ExitCode.SUCCESS;
