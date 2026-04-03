@@ -17,7 +17,8 @@
   },
   "files": [
     "dist",
-    "bin"
+    "bin",
+    ".github"
   ],
   "keywords": [
     "sdd",
@@ -46,7 +47,9 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist *.tsbuildinfo",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "node scripts/copy-github-assets.mjs",
+    "postpublish": "node scripts/clean-github-assets.mjs"
   },
   "dependencies": {
     "@musubix2/core": "*",

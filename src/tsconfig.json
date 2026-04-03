@@ -25,6 +25,7 @@
     { "path": "packages/pattern-mcp" },
     { "path": "packages/skill-harness" },
     { "path": "packages/synthesis" },
-    { "path": "packages/deep-research" }
+    { "path": "packages/deep-research" },
+    { "path": "packages/git-knowledge" }
   ]
 }
