@@ -833,6 +833,9 @@ import {
   createSOLIDValidator,
   createCodeGenerator,
   createUnitTestGenerator,
+  createRequirementsInterviewer,
+  createRequirementsDocGenerator,
+  type RequirementsInterviewer as RequirementsInterviewerType,
 } from '@musubix2/core';
 
 export async function handleReqValidate(filePath: string): Promise<ExitCodeValue> {
@@ -874,6 +877,120 @@ export async function handleReqWizard(): Promise<ExitCodeValue> {
     console.log('Interactive mode — follow these steps to create a requirement:\n');
     for (let i = 0; i < steps.length; i++) {
       console.log(`  ${i + 1}. ${steps[i].prompt}`);
+    }
+    return ExitCode.SUCCESS;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ${msg}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+// Singleton interviewer for session persistence across CLI calls
+let _interviewer: RequirementsInterviewerType | null = null;
+function getInterviewer(): RequirementsInterviewerType {
+  if (!_interviewer) _interviewer = createRequirementsInterviewer();
+  return _interviewer;
+}
+
+export async function handleReqInterview(args: Record<string, unknown>): Promise<ExitCodeValue> {
+  try {
+    const interviewer = getInterviewer();
+
+    // --reset: Reset interview state
+    if (args['reset'] === true) {
+      _interviewer = createRequirementsInterviewer();
+      console.log('🔄 Interview state reset.');
+      return ExitCode.SUCCESS;
+    }
+
+    // --state: Show current state
+    if (args['state'] === true) {
+      const state = interviewer.getState();
+      console.log('📋 Interview State:');
+      console.log(`  Completion: ${state.completionPercentage}%`);
+      console.log(`  Complete: ${state.isComplete}`);
+      console.log(`  Answered: ${state.answeredQuestions.length} questions`);
+      if (state.missingRequired.length > 0) {
+        console.log(`  Missing required: ${state.missingRequired.join(', ')}`);
+      }
+      if (state.currentQuestion) {
+        console.log(`  Current question: ${state.currentQuestion.question}`);
+      }
+      return ExitCode.SUCCESS;
+    }
+
+    // --generate: Force generate from current state
+    if (args['generate'] === true) {
+      const state = interviewer.getState();
+      const generator = createRequirementsDocGenerator();
+      const doc = generator.generate(state.context);
+      console.log(doc.markdown);
+      return ExitCode.SUCCESS;
+    }
+
+    // --answer <question-id> <response>: Answer a question
+    if (args['answer'] === true || typeof args['answer'] === 'string') {
+      const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+      const questionId = typeof args['answer'] === 'string'
+        ? args['answer']
+        : (args['subcommand'] as string | undefined) ?? positionalArgs[0];
+      const response = typeof args['answer'] === 'string'
+        ? positionalArgs.join(' ')
+        : positionalArgs.slice(1).join(' ');
+
+      if (!questionId || !response) {
+        console.error('❌ Usage: musubix req:interview --answer <question-id> <response>');
+        return ExitCode.GENERAL_ERROR;
+      }
+
+      const result = interviewer.answer(questionId, response);
+      if (result.status === 'complete') {
+        console.log('✅ Interview complete! All required info gathered.');
+        console.log('   Run `musubix req:interview --generate` to generate the spec.');
+      } else {
+        console.log(`📝 Next question (${result.state.completionPercentage}% complete):`);
+        console.log(`   ${result.question.question}`);
+        if (result.question.hint) {
+          console.log(`   💡 ${result.question.hint}`);
+        }
+      }
+      return ExitCode.SUCCESS;
+    }
+
+    // Default: analyze input text and start interview
+    const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+    const inputText = (args['subcommand'] as string | undefined)
+      ? [(args['subcommand'] as string), ...positionalArgs].join(' ')
+      : positionalArgs.join(' ');
+
+    if (!inputText) {
+      console.log('🎤 Requirements Interview (1問1答)');
+      console.log('');
+      console.log('Usage:');
+      console.log('  musubix req:interview <input-text>             Analyze input, get first question');
+      console.log('  musubix req:interview --answer <id> <response> Answer a question');
+      console.log('  musubix req:interview --state                  Show interview state');
+      console.log('  musubix req:interview --generate               Generate requirements doc');
+      console.log('  musubix req:interview --reset                  Reset interview');
+      return ExitCode.SUCCESS;
+    }
+
+    const result = interviewer.analyzeInput(inputText);
+    if (result.status === 'complete') {
+      console.log('✅ Sufficient info gathered! Generating requirements...');
+      const generator = createRequirementsDocGenerator();
+      const doc = generator.generate(result.context);
+      console.log(doc.markdown);
+    } else {
+      console.log(`📝 Question (${result.state.completionPercentage}% complete):`);
+      console.log(`   ${result.question.question}`);
+      if (result.question.hint) {
+        console.log(`   💡 ${result.question.hint}`);
+      }
+      if (result.question.choices) {
+        console.log(`   選択肢: ${result.question.choices.join(' | ')}`);
+      }
     }
     return ExitCode.SUCCESS;
   } catch (err) {
@@ -1657,6 +1774,17 @@ export function getDefaultCommands(): CLICommand[] {
           return;
         }
         await handleReqWizard();
+      },
+    },
+    {
+      name: 'req:interview',
+      description: 'Requirements interview — 1問1答 flow for gathering requirements',
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('requirements'));
+          return;
+        }
+        await handleReqInterview(args);
       },
     },
     {

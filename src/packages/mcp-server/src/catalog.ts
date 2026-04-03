@@ -197,6 +197,84 @@ function sddCoreTools(): CatalogEntry[] {
         }
       },
     ),
+    // ── Requirements Interview tools ──
+    tool(
+      'sdd.requirements.interview.start',
+      'Start requirements interview with initial input text (1問1答 flow)',
+      'sdd-core',
+      [param('input', 'string', 'Initial user input describing the project')],
+      async (params) => {
+        try {
+          const core = await import('@musubix2/core');
+          const interviewer = core.createRequirementsInterviewer();
+          const result = interviewer.analyzeInput(params['input'] as string);
+          return ok(result);
+        } catch {
+          return fail('Requirements interviewer not available');
+        }
+      },
+    ),
+    tool(
+      'sdd.requirements.interview.answer',
+      'Answer a requirements interview question',
+      'sdd-core',
+      [
+        param('questionId', 'string', 'ID of the question being answered'),
+        param('response', 'string', 'The answer text'),
+        param('state', 'object', 'Serialized interview state from previous call', false),
+      ],
+      async (params) => {
+        try {
+          const core = await import('@musubix2/core');
+          const interviewer = core.createRequirementsInterviewer();
+          // Restore state if provided
+          const state = params['state'] as Record<string, unknown> | undefined;
+          if (state?.context) {
+            const input = JSON.stringify(state.context);
+            interviewer.analyzeInput(input);
+          }
+          const result = interviewer.answer(
+            params['questionId'] as string,
+            params['response'] as string,
+          );
+          return ok(result);
+        } catch {
+          return fail('Requirements interviewer not available');
+        }
+      },
+    ),
+    tool(
+      'sdd.requirements.interview.state',
+      'Get the current requirements interview state',
+      'sdd-core',
+      [],
+      async () => {
+        try {
+          const core = await import('@musubix2/core');
+          const interviewer = core.createRequirementsInterviewer();
+          return ok(interviewer.getState());
+        } catch {
+          return fail('Requirements interviewer not available');
+        }
+      },
+    ),
+    tool(
+      'sdd.requirements.interview.generate',
+      'Generate a requirements document from gathered interview context',
+      'sdd-core',
+      [param('context', 'object', 'RequirementsContext gathered from interview')],
+      async (params) => {
+        try {
+          const core = await import('@musubix2/core');
+          const generator = core.createRequirementsDocGenerator();
+          const context = params['context'] as Record<string, unknown>;
+          const doc = generator.generate(context as never);
+          return ok(doc);
+        } catch {
+          return fail('Requirements doc generator not available');
+        }
+      },
+    ),
   ];
 }
 

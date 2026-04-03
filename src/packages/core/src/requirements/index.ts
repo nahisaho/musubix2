@@ -200,3 +200,21 @@ export function createRequirementWizard(): RequirementWizard {
 export function createAcceptanceCriteriaGenerator(): AcceptanceCriteriaGenerator {
   return new AcceptanceCriteriaGenerator();
 }
+
+// Requirements Interviewer
+export {
+  RequirementsInterviewer,
+  createRequirementsInterviewer,
+  type RequirementsContext,
+  type FeatureInput,
+  type InterviewQuestion,
+  type InterviewState,
+  type InterviewResult,
+} from './interviewer.js';
+
+// Requirements Document Generator
+export {
+  RequirementsDocGenerator,
+  createRequirementsDocGenerator,
+  type GeneratedRequirementsDoc,
+} from './generator.js';

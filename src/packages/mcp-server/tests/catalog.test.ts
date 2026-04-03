@@ -22,7 +22,7 @@ describe('registerDefaultTools', () => {
   it('should register the expected number of tools (50)', () => {
     const server = new MCPServer();
     registerDefaultTools(server);
-    expect(server.getToolManifest()).toHaveLength(57);
+    expect(server.getToolManifest()).toHaveLength(61);
   });
 
   it('should assign the correct number of categories', () => {
@@ -145,6 +145,6 @@ describe('createFullMCPServer', () => {
     const info = server.getInfo();
     expect(info.name).toBe('test-full');
     expect(info.version).toBe('9.9.9');
-    expect(info.toolCount).toBe(57);
+    expect(info.toolCount).toBe(61);
   });
 });

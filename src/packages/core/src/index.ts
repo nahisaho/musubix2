@@ -147,6 +147,18 @@ export {
   type WizardStep,
   type GeneratedRequirement,
   type ProjectContext,
+  // Requirements Interviewer
+  RequirementsInterviewer,
+  createRequirementsInterviewer,
+  type RequirementsContext,
+  type FeatureInput,
+  type InterviewQuestion,
+  type InterviewState,
+  type InterviewResult,
+  // Requirements Document Generator
+  RequirementsDocGenerator,
+  createRequirementsDocGenerator,
+  type GeneratedRequirementsDoc,
 } from './requirements/index.js';
 
 // Design Generator
