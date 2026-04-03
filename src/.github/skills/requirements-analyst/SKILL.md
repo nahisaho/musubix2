@@ -51,8 +51,7 @@ WHEN ユーザーが要件文書の検証を要求する:
 5. TraceabilityValidator でカバレッジレポート生成
 ```
 
-**CLI**: `npx musubix requirements analyze <file>`
-**CLI**: `npx musubix requirements validate <file>`
+**CLI**: `npx musubix req <file>`
 
 ### 2. 対話的要件作成
 
@@ -66,17 +65,14 @@ WHEN ユーザーが新規要件の作成を要求する:
 6. ユーザー承認 ⏸️
 ```
 
-**CLI**: `npx musubix requirements new <feature>`
+**CLI**: `npx musubix req:wizard`
 
-### 3. 要件マッピング・検索
+### 3. 要件検索
 
 ```
-WHEN ユーザーが要件の検索・マッピングを要求する:
-1. RequirementsValidator.map() でマッピング生成
-2. RequirementsValidator.search() で全文検索
+WHEN ユーザーが要件の検索を要求する:
+1. RequirementsValidator.search() で全文検索
 ```
-
-**CLI**: `npx musubix requirements map|search`
 
 ## 要件文書フォーマット
 

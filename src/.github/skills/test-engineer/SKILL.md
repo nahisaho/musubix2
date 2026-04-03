@@ -49,7 +49,7 @@ WHEN ユーザーがテスト生成を要求する:
 4. CoverageReporter でカバレッジ目標を設定
 ```
 
-**CLI**: `npx musubix codegen test <design-file>`
+**CLI**: `npx musubix test:gen <source-file>`
 
 ### 2. カバレッジ検証
 

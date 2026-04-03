@@ -42,7 +42,7 @@ WHEN ユーザーがコード生成を要求する:
 4. EARS 要件 ID をコメントとしてリンク
 ```
 
-**CLI**: `npx musubix codegen generate <design-file>`
+**CLI**: `npx musubix codegen <name> [--type class|interface|function|...]`
 
 ### 2. ドメインスキャフォールド
 
@@ -56,7 +56,7 @@ WHEN ユーザーが新規パッケージのスキャフォールドを要求す
 3. package.json に workspace 参照を追加
 ```
 
-**CLI**: `npx musubix codegen scaffold <package-name> [--mode minimal|standard|full]`
+**CLI**: `npx musubix scaffold <project|package|skill> <name>`
 
 ### 3. 静的解析
 
@@ -67,7 +67,7 @@ WHEN ユーザーが静的解析を要求する:
 3. codegraph の ASTParser と連携
 ```
 
-**CLI**: `npx musubix codegen analyze <path>`
+**CLI**: `npx musubix learn analyze <path>`
 
 ### 4. ステータス遷移分析
 
@@ -78,7 +78,7 @@ WHEN ユーザーがステータス遷移の分析を要求する:
 3. 不正遷移の検出
 ```
 
-**CLI**: `npx musubix codegen status <entity>`
+**CLI**: `npx musubix workflow status <entity>`
 
 ## パッケージ構成テンプレート
 

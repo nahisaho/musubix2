@@ -48,10 +48,10 @@ WHEN ユーザーがトレーサビリティマトリクスの生成を要求す
 
 **CLI**: `npx musubix trace matrix [--format md|json|csv]`
 
-### 2. ギャップ検出
+### 2. トレーサビリティ検証
 
 ```
-WHEN ユーザーがトレーサビリティギャップの検出を要求する:
+WHEN ユーザーがトレーサビリティの検証を要求する:
 1. 全 REQ ID を抽出
 2. 各 REQ に対応する DES を検索
 3. 各 DES に対応するソースファイルを検索
@@ -59,7 +59,8 @@ WHEN ユーザーがトレーサビリティギャップの検出を要求する
 5. 欠落リンクをレポート
 ```
 
-**CLI**: `npx musubix trace gaps`
+**CLI**: `npx musubix trace validate`
+**CLI**: `npx musubix trace:verify`
 
 ### 3. 影響分析
 
@@ -72,17 +73,13 @@ WHEN ユーザーが変更影響分析を要求する:
 
 **CLI**: `npx musubix trace impact <req-id|des-id>`
 
-### 4. トレーサビリティ同期
+### 4. 影響分析レポート
 
 ```
-WHEN ユーザーがトレーサビリティの同期を要求する:
-1. TraceSyncService で REQ ↔ DES ↔ コード間のリンクを検証
-2. 不整合を検出してレポート
-3. --dry-run で変更プレビュー
-4. 承認後に自動修正
+WHEN ユーザーが影響分析レポートの生成を要求する:
+1. ImpactAnalyzer で変更影響をまとめる
+2. 影響範囲を Markdown 形式でレポート
 ```
-
-**CLI**: `npx musubix trace sync [--dry-run]`
 
 ## マトリクス出力フォーマット
 
