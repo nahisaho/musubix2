@@ -62,7 +62,14 @@
     "@musubix2/agent-orchestrator": "*",
     "@musubix2/expert-delegation": "*",
     "@musubix2/skill-harness": "*",
-    "@musubix2/skill-manager": "*"
+    "@musubix2/skill-manager": "*",
+    "@musubix2/deep-research": "*",
+    "@musubix2/synthesis": "*",
+    "@musubix2/library-learner": "*",
+    "@musubix2/mcp-server": "*",
+    "@musubix2/formal-verify": "*",
+    "@musubix2/lean": "*",
+    "@musubix2/wake-sleep": "*"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
