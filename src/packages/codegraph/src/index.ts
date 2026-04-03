@@ -8,6 +8,10 @@
  */
 
 import ts from 'typescript';
+import {
+  MultiLanguageParser,
+  type ASTNode as MLASTNode,
+} from './multi-lang-parser.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,6 +96,15 @@ export interface StorageAdapter {
   save(graph: CodeGraph): Promise<void>;
   load(): Promise<CodeGraph>;
   query(filter: GraphQuery): Promise<CodeNode[]>;
+}
+
+// ---------------------------------------------------------------------------
+// ASTParser options
+// ---------------------------------------------------------------------------
+
+export interface ASTParserOptions {
+  /** Use enhanced multi-language parser instead of regex fallback (default false). */
+  enhancedParsing?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,9 +241,30 @@ const LANGUAGE_PATTERNS: Record<string, LanguagePatterns> = {
 LANGUAGE_PATTERNS['javascript'] = LANGUAGE_PATTERNS['typescript'];
 
 export class ASTParser {
+  private enhancedParsing: boolean;
+  private multiLangParser: MultiLanguageParser | null = null;
+
+  constructor(options?: ASTParserOptions) {
+    this.enhancedParsing = options?.enhancedParsing ?? false;
+    if (this.enhancedParsing) {
+      this.multiLangParser = new MultiLanguageParser();
+    }
+  }
+
+  /** Enable or disable enhanced multi-language parsing at runtime. */
+  useEnhancedParsing(enabled: boolean): void {
+    this.enhancedParsing = enabled;
+    if (enabled && !this.multiLangParser) {
+      this.multiLangParser = new MultiLanguageParser();
+    }
+  }
+
   parse(source: string, language: SupportedLanguage): ASTNode[] {
     if (language === 'typescript' || language === 'javascript') {
       return this.parseWithTypeScriptAPI(source, language);
+    }
+    if (this.enhancedParsing && this.multiLangParser) {
+      return this.parseWithMultiLang(source, language);
     }
     return this.parseWithRegex(source, language);
   }
@@ -337,6 +371,46 @@ export class ASTParser {
     }
 
     return null;
+  }
+
+  // -- Enhanced multi-language parser -----------------------------------------
+
+  private parseWithMultiLang(source: string, language: SupportedLanguage): ASTNode[] {
+    const result = this.multiLangParser!.parse(source, language);
+    return result.nodes.map((n) => this.convertMLNode(n));
+  }
+
+  private convertMLNode(node: MLASTNode): ASTNode {
+    const kindMap: Record<string, CodeNodeKind> = {
+      class: 'class',
+      struct: 'class',
+      interface: 'interface',
+      trait: 'interface',
+      function: 'function',
+      method: 'method',
+      module: 'module',
+      import: 'import',
+      export: 'export',
+      enum: 'class',
+      property: 'variable',
+      decorator: 'variable',
+      type_alias: 'variable',
+    };
+    const kind = kindMap[node.type] ?? 'variable';
+    return {
+      kind,
+      name: node.name,
+      startLine: node.startLine,
+      endLine: node.endLine,
+      children: node.children.map((c) => this.convertMLNode(c)),
+      metadata: {
+        modifiers: node.modifiers,
+        params: node.params,
+        returnType: node.returnType,
+        parent: node.parent,
+        originalType: node.type,
+      },
+    };
   }
 
   // -- Regex fallback ---------------------------------------------------------
@@ -570,8 +644,8 @@ export class GraphRAGSearch {
 // Factory functions
 // ---------------------------------------------------------------------------
 
-export function createASTParser(): ASTParser {
-  return new ASTParser();
+export function createASTParser(options?: ASTParserOptions): ASTParser {
+  return new ASTParser(options);
 }
 
 export function createGraphEngine(): GraphEngine {
@@ -584,3 +658,26 @@ export function createMemoryStorage(): MemoryStorage {
 
 export { TestPlacementValidator, createTestPlacementValidator } from './test-placement.js';
 export type { TestPlacementRule, MissingTest, TestPlacementReport } from './test-placement.js';
+
+export {
+  MultiLanguageParser,
+  createMultiLanguageParser,
+  BraceBlockTracker,
+  IndentBlockTracker,
+  PythonParser,
+  JavaParser,
+  GoParser,
+  RustParser,
+  RubyParser,
+  PhpParser,
+} from './multi-lang-parser.js';
+
+export type {
+  ASTNode as MLASTNode,
+  ParseResult,
+  ImportInfo,
+  ExportInfo,
+  ParseError,
+  BlockInfo,
+  LanguageParser,
+} from './multi-lang-parser.js';
