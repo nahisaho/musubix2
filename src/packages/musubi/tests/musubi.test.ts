@@ -10,7 +10,7 @@ import {
 
 describe('REQ-PKG-001: Musubi wrapper', () => {
   it('should export version', () => {
-    expect(MUSUBI_VERSION).toBe('0.1.0');
+    expect(MUSUBI_VERSION).toBe('0.3.0');
   });
 
   it('should re-export core classes', () => {

@@ -1,6 +1,6 @@
 {
   "name": "musubix2",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MUSUBIX2 — Specification Driven Development System",
   "type": "module",
   "private": true,
