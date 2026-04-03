@@ -149,3 +149,14 @@ npx musubix req:interview --reset                    # リセット
 1. **EARS パターン混在に注意**: 1つの要件に複数パターンが混在する場合、COMPLEX に分類する。「WHEN ... WHILE ...」は COMPLEX。
 2. **受入基準の粒度**: 「動作すること」のような曖昧な基準は不合格。具体的なコマンド・出力・閾値を含めること。
 3. **トレーサビリティの双方向性**: REQ → DES だけでなく、DES → REQ の逆参照も維持する。片方向のみは Article V 違反。
+
+## スクリプト
+
+| スクリプト | 説明 | 使い方 |
+|-----------|------|--------|
+| `scripts/analyze.sh` | 要件分析 | `./scripts/analyze.sh <requirements-file.md>` |
+| `scripts/validate.sh` | EARS 準拠検証 | `./scripts/validate.sh <requirements-file.md>` |
+| `scripts/interview.sh` | 1問1答インタビュー開始 | `./scripts/interview.sh [input-text]` |
+| `scripts/interview-answer.sh` | インタビュー質問に回答 | `./scripts/interview-answer.sh <id> <response>` |
+| `scripts/interview-generate.sh` | インタビューから要件生成 | `./scripts/interview-generate.sh` |
+| `scripts/wizard.sh` | 要件ウィザード実行 | `./scripts/wizard.sh` |

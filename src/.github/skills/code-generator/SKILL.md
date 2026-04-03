@@ -134,3 +134,12 @@ export function registerXCommand(program: Command): void {
 1. **ESM 必須**: `type: "module"` を package.json に設定。`import` 文に `.js` 拡張子を付けること（TypeScript でもビルド後のパスを指定）。
 2. **依存性逆転の徹底**: `domain/` 内で `infrastructure/` の具象クラスを import してはならない。必ずインターフェースを経由。
 3. **ActionableError の使用**: 標準 Error ではなく `ActionableError` を使用し、ユーザーへの修正提案を含める。
+
+## スクリプト
+
+| スクリプト | 説明 | 使い方 |
+|-----------|------|--------|
+| `scripts/generate.sh` | 設計からコード生成 | `./scripts/generate.sh [args]` |
+| `scripts/scaffold.sh` | プロジェクト構造スキャフォールド | `./scripts/scaffold.sh [args]` |
+| `scripts/explain.sh` | コード説明 | `./scripts/explain.sh [args]` |
+| `scripts/synthesis.sh` | プログラム合成 | `./scripts/synthesis.sh [args]` |

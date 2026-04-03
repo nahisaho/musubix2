@@ -107,3 +107,11 @@ WHEN ユーザーがトレーサビリティの同期を要求する:
 1. **N:M 関係の扱い**: 1つの REQ が複数の DES にマッピングされる場合がある。マトリクスでは全組み合わせを列挙すること。
 2. **DES-SDD-002a/b/c のような複合 ID**: サフィックス付き ID も個別にトレースすること。グループ化表記（`002a/b/c`）は表示用。
 3. **コード内の REQ ID コメント**: `// REQ-XXX-NNN` 形式のコメントを検索対象にする。テスト内の `describe('REQ-XXX-NNN: ...')` も対象。
+
+## スクリプト
+
+| スクリプト | 説明 | 使い方 |
+|-----------|------|--------|
+| `scripts/verify.sh` | トレーサビリティ検証 | `./scripts/verify.sh [args]` |
+| `scripts/matrix.sh` | トレーサビリティマトリクス生成 | `./scripts/matrix.sh [args]` |
+| `scripts/verify-detailed.sh` | 詳細トレーサビリティ検証 | `./scripts/verify-detailed.sh [args]` |

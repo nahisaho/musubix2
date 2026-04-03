@@ -154,3 +154,9 @@ const canProceed = orchestrator.canProceedToImplementation();
 1. **モデル応答のばらつき**: 同じアーティファクトでもモデルの応答が異なる場合がある。合意チェックで一貫性を担保する。
 2. **ラウンド数と品質のトレードオフ**: ラウンド数が多いほど品質は上がるが、時間コストも増加する。5 ラウンド制限はこのバランスを取るもの。
 3. **Phase 遷移との連携**: review-orchestrator の承認は PhaseController の遷移条件に組み込まれる。review-orchestrator 単体では Phase を遷移させない。
+
+## スクリプト
+
+| スクリプト | 説明 | 使い方 |
+|-----------|------|--------|
+| `scripts/review.sh` | レビューワークフロー案内 | `./scripts/review.sh` |

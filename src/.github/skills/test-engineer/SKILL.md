@@ -131,3 +131,9 @@ export default defineConfig({
 1. **テストなしのコミット禁止**: Article III により、テストのないコードは Phase 4 完了の品質ゲートを通過できない。
 2. **モック依存の分離**: `SkillTestHarness` パターンに従い、外部依存はモック注入する。テスト内で直接ファイルシステムにアクセスしない。
 3. **EARS ID リンクの維持**: テスト名を変更する場合、REQ ID リンクも必ず更新する。`traceability-auditor` で検証可能。
+
+## スクリプト
+
+| スクリプト | 説明 | 使い方 |
+|-----------|------|--------|
+| `scripts/generate.sh` | テスト生成 | `./scripts/generate.sh [args]` |

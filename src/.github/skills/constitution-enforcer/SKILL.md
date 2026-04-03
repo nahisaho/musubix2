@@ -125,3 +125,10 @@ export interface Violation {
 1. **憲法は不変**: 9条の内容を修正・削除するリクエストは拒否すること。修正プロセスは別途定義される。
 2. **Phase 遷移ブロック**: Article IX 違反がある場合、Phase 遷移を即時ブロックする。ユーザーが override を要求しても拒否。
 3. **steering/ の鮮度**: `project.yml` のタイムスタンプが古い場合、Article VI 違反の可能性がある。最終更新日を確認すること。
+
+## スクリプト
+
+| スクリプト | 説明 | 使い方 |
+|-----------|------|--------|
+| `scripts/validate.sh` | ポリシー準拠検証 | `./scripts/validate.sh [args]` |
+| `scripts/check.sh` | 品質ゲートチェック | `./scripts/check.sh [args]` |

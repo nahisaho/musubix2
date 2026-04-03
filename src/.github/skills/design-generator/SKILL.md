@@ -125,3 +125,12 @@ WHEN ユーザーが設計文書の検証を要求する:
 1. **DES と REQ の N:M 関係**: 1つの DES が複数の REQ を参照する場合がある。逆も同様。全方向のリンクを維持すること。
 2. **Mermaid 記法の制限**: classDiagram で `?` nullable 表記を使う場合、TypeScript 側の `| undefined` と一致させること。
 3. **ADR のステータス管理**: `accept` と `deprecate` は状態遷移。直接 `superseded` にはできない（必ず `deprecated` を経由）。
+
+## スクリプト
+
+| スクリプト | 説明 | 使い方 |
+|-----------|------|--------|
+| `scripts/generate.sh` | 要件から設計生成 | `./scripts/generate.sh [args]` |
+| `scripts/c4.sh` | C4 ダイアグラム生成 | `./scripts/c4.sh [args]` |
+| `scripts/verify.sh` | 設計トレーサビリティ検証 | `./scripts/verify.sh [args]` |
+| `scripts/decision.sh` | ADR 作成・管理 | `./scripts/decision.sh [args]` |
