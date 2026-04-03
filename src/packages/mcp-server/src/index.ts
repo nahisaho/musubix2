@@ -1,6 +1,51 @@
 // DES-MCP-001: Model Context Protocol Server — Tool registry and dispatch layer
 
 // ---------------------------------------------------------------------------
+// Re-exports from sub-modules
+// ---------------------------------------------------------------------------
+
+export {
+  type JsonRpcRequest,
+  type JsonRpcResponse,
+  type JsonRpcNotification,
+  MCP_METHODS,
+  createJsonRpcResponse,
+  createJsonRpcError,
+  isJsonRpcRequest,
+} from './jsonrpc.js';
+
+export {
+  type MCPTransport,
+  StdioTransport,
+  SSETransport,
+  InMemoryTransport,
+} from './transport.js';
+
+export {
+  type MCPPrompt,
+  type MCPPromptMessage,
+  type PromptHandler,
+  PromptRegistry,
+} from './prompts.js';
+
+export {
+  type MCPResource,
+  type MCPResourceContent,
+  type ResourceHandler,
+  ResourceRegistry,
+} from './resources.js';
+
+// ---------------------------------------------------------------------------
+// Internal imports
+// ---------------------------------------------------------------------------
+
+import type { JsonRpcRequest, JsonRpcResponse } from './jsonrpc.js';
+import { MCP_METHODS, createJsonRpcResponse, createJsonRpcError } from './jsonrpc.js';
+import type { MCPTransport } from './transport.js';
+import { PromptRegistry } from './prompts.js';
+import { ResourceRegistry } from './resources.js';
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -104,12 +149,17 @@ export class MCPServer {
   private readonly version: string;
   private readonly platform: PlatformAdapter;
   private readonly registry: MCPToolRegistry;
+  readonly prompts: PromptRegistry;
+  readonly resources: ResourceRegistry;
+  private transport: MCPTransport | null = null;
 
   constructor(options?: MCPServerOptions) {
     this.name = options?.name ?? 'musubix2-mcp';
     this.version = options?.version ?? '0.1.0';
     this.platform = options?.platform ?? 'generic';
     this.registry = new MCPToolRegistry();
+    this.prompts = new PromptRegistry();
+    this.resources = new ResourceRegistry();
   }
 
   getRegistry(): MCPToolRegistry {
@@ -142,6 +192,120 @@ export class MCPServer {
   getToolManifest(): ToolDefinition[] {
     return this.registry.list();
   }
+
+  // -----------------------------------------------------------------------
+  // MCP Protocol — JSON-RPC handler
+  // -----------------------------------------------------------------------
+
+  async handleJsonRpc(request: JsonRpcRequest): Promise<JsonRpcResponse> {
+    switch (request.method) {
+      case MCP_METHODS.INITIALIZE:
+        return createJsonRpcResponse(request.id, {
+          protocolVersion: '2024-11-05',
+          serverInfo: { name: this.name, version: this.version },
+          capabilities: {
+            tools: { listChanged: false },
+            prompts: { listChanged: false },
+            resources: { subscribe: false, listChanged: false },
+          },
+        });
+
+      case MCP_METHODS.PING:
+        return createJsonRpcResponse(request.id, {});
+
+      case MCP_METHODS.TOOLS_LIST:
+        return createJsonRpcResponse(request.id, {
+          tools: this.registry.list().map((def) => ({
+            name: def.name,
+            description: def.description,
+            inputSchema: {
+              type: 'object',
+              properties: Object.fromEntries(
+                def.parameters.map((p) => [p.name, { type: p.type, description: p.description }]),
+              ),
+              required: def.parameters.filter((p) => p.required).map((p) => p.name),
+            },
+          })),
+        });
+
+      case MCP_METHODS.TOOLS_CALL: {
+        const toolName = request.params?.['name'] as string | undefined;
+        if (!toolName) {
+          return createJsonRpcError(request.id, -32602, 'Missing required parameter: name');
+        }
+        const toolParams = (request.params?.['arguments'] as Record<string, unknown>) ?? {};
+        const result = await this.registry.invoke(toolName, toolParams);
+        if (!result.success) {
+          return createJsonRpcResponse(request.id, {
+            content: [{ type: 'text', text: result.error ?? 'Unknown error' }],
+            isError: true,
+          });
+        }
+        return createJsonRpcResponse(request.id, {
+          content: [{ type: 'text', text: typeof result.data === 'string' ? result.data : JSON.stringify(result.data) }],
+        });
+      }
+
+      case MCP_METHODS.PROMPTS_LIST:
+        return createJsonRpcResponse(request.id, { prompts: this.prompts.list() });
+
+      case MCP_METHODS.PROMPTS_GET: {
+        const promptName = request.params?.['name'] as string | undefined;
+        if (!promptName) {
+          return createJsonRpcError(request.id, -32602, 'Missing required parameter: name');
+        }
+        const prompt = this.prompts.get(promptName);
+        if (!prompt) {
+          return createJsonRpcError(request.id, -32602, `Prompt not found: ${promptName}`);
+        }
+        const promptArgs = (request.params?.['arguments'] as Record<string, string>) ?? {};
+        try {
+          const messages = this.prompts.execute(promptName, promptArgs);
+          return createJsonRpcResponse(request.id, { description: prompt.description, messages });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return createJsonRpcError(request.id, -32603, msg);
+        }
+      }
+
+      case MCP_METHODS.RESOURCES_LIST:
+        return createJsonRpcResponse(request.id, { resources: this.resources.list() });
+
+      case MCP_METHODS.RESOURCES_READ: {
+        const uri = request.params?.['uri'] as string | undefined;
+        if (!uri) {
+          return createJsonRpcError(request.id, -32602, 'Missing required parameter: uri');
+        }
+        try {
+          const content = this.resources.read(uri);
+          return createJsonRpcResponse(request.id, { contents: [content] });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return createJsonRpcError(request.id, -32602, msg);
+        }
+      }
+
+      default:
+        return createJsonRpcError(request.id, -32601, `Method not found: ${request.method}`);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Transport lifecycle
+  // -----------------------------------------------------------------------
+
+  async start(transport: MCPTransport): Promise<void> {
+    this.transport = transport;
+    transport.onMessage((request) => this.handleJsonRpc(request));
+    await transport.start();
+  }
+
+  async stop(): Promise<void> {
+    if (this.transport) {
+      await this.transport.stop();
+      this.transport = null;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -167,8 +331,21 @@ export class PlatformAdapterFactory {
 }
 
 // ---------------------------------------------------------------------------
+// Catalog, default prompts, and default resources
+// ---------------------------------------------------------------------------
+
+export { registerDefaultTools, getToolCategories } from './catalog.js';
+export type { ToolCategory } from './catalog.js';
+export { registerDefaultPrompts, getDefaultPrompts } from './default-prompts.js';
+export { registerDefaultResources, getDefaultResources } from './default-resources.js';
+
+// ---------------------------------------------------------------------------
 // Factory functions
 // ---------------------------------------------------------------------------
+
+import { registerDefaultTools as _registerDefaultTools } from './catalog.js';
+import { registerDefaultPrompts as _registerDefaultPrompts } from './default-prompts.js';
+import { registerDefaultResources as _registerDefaultResources } from './default-resources.js';
 
 export function createMCPServer(options?: MCPServerOptions): MCPServer {
   return new MCPServer(options);
@@ -176,4 +353,16 @@ export function createMCPServer(options?: MCPServerOptions): MCPServer {
 
 export function createMCPToolRegistry(): MCPToolRegistry {
   return new MCPToolRegistry();
+}
+
+/**
+ * Create a fully-configured MCP server with all default tools, prompts, and
+ * resources pre-registered.
+ */
+export function createFullMCPServer(options?: MCPServerOptions): MCPServer {
+  const server = new MCPServer(options);
+  _registerDefaultTools(server);
+  _registerDefaultPrompts(server);
+  _registerDefaultResources(server);
+  return server;
 }
