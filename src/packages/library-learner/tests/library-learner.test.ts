@@ -175,3 +175,73 @@ describe('DES-LRN-003: Factory functions', () => {
     expect(createLibraryLearner()).toBeInstanceOf(LibraryLearner);
   });
 });
+
+// ---------------------------------------------------------------------------
+// DES-LRN-003: LibraryLearner — E-graph integration
+// ---------------------------------------------------------------------------
+
+describe('DES-LRN-003: LibraryLearner — E-graph integration', () => {
+  let learner: LibraryLearner;
+
+  beforeEach(() => {
+    learner = createLibraryLearner();
+  });
+
+  it('should populate e-graph when learning code', () => {
+    learner.learn([
+      'function fetchData(url) { return fetch(url); }',
+      'function processData(data) { return data; }',
+    ]);
+    const egraph = learner.getEGraph();
+    expect(egraph.size()).toBeGreaterThan(0);
+  });
+
+  it('should merge structurally similar functions (same arity) into e-classes', () => {
+    learner.learn([
+      'function fetchData(url) { return fetch(url); }',
+      'function loadData(url) { return load(url); }',
+      'function processAll(items, config) { return items; }',
+    ]);
+    const egraph = learner.getEGraph();
+    // fetchData/1 and loadData/1 share "Data" substring and arity 1
+    // so they should be merged, reducing total classes
+    expect(egraph.size()).toBeLessThan(3);
+  });
+
+  it('should not merge functions with different arities', () => {
+    learner.learn([
+      'function singleArg(x) { return x; }',
+      'function doubleArg(x, y) { return x + y; }',
+    ]);
+    const egraph = learner.getEGraph();
+    // Different arities → no merge
+    expect(egraph.size()).toBe(2);
+  });
+
+  it('should suggest patterns using structural matching', () => {
+    learner.learn([
+      'function validate(input) { return input; }',
+      'function transform(input) { return input; }',
+    ]);
+    const suggestions = learner.suggest('function validate(x) { check(x); }');
+    expect(suggestions.some((p) => p.name === 'validate')).toBe(true);
+  });
+
+  it('should track frequency correctly when same function appears multiple times', () => {
+    const patterns = learner.learn([
+      'function handle(req) { process(req); }',
+      'function handle(req, res) { respond(req, res); }',
+      'function handle(req) { route(req); }',
+    ]);
+    const handlePattern = patterns.find((p) => p.name === 'handle');
+    expect(handlePattern).toBeDefined();
+    // handle appears in 3 snippets but with different arities,
+    // the regex picks up 'handle' in each, so count >= 2
+    expect(handlePattern!.frequency).toBeGreaterThanOrEqual(2);
+  });
+
+  it('should expose getEGraph method', () => {
+    expect(typeof learner.getEGraph).toBe('function');
+    expect(learner.getEGraph()).toBeInstanceOf(EGraphEngine);
+  });
+});

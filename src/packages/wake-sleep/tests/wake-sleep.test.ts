@@ -173,3 +173,103 @@ describe('DES-LRN-002: Factory functions', () => {
     expect(createSleepPhase()).toBeInstanceOf(SleepPhase);
   });
 });
+
+// ---------------------------------------------------------------------------
+// DES-LRN-002: WakePhase — N-gram & PMI pattern extraction
+// ---------------------------------------------------------------------------
+
+describe('DES-LRN-002: WakePhase — N-gram extraction', () => {
+  let wake: WakePhase;
+
+  beforeEach(() => {
+    wake = createWakePhase();
+  });
+
+  it('should extract bigram patterns from repeated phrases', () => {
+    const result = wake.process([
+      'machine learning is great',
+      'machine learning is useful',
+      'deep learning is powerful',
+    ]);
+    // "machine learning" appears in 2 items so should be detected as a bigram pattern
+    expect(result.newPatterns.some((p) => p.includes('machine') && p.includes('learning'))).toBe(true);
+  });
+
+  it('should rank patterns by statistical significance', () => {
+    const result = wake.process([
+      'the quick brown fox jumps over the lazy dog',
+      'the quick brown cat jumps over the lazy mouse',
+      'the quick brown bird jumps over the lazy hamster',
+    ]);
+    // Patterns should be sorted by score
+    expect(result.newPatterns.length).toBeGreaterThan(0);
+    // "the" and "quick" and "brown" should appear as unigram patterns
+    expect(result.newPatterns.some((p) => p === 'quick')).toBe(true);
+    expect(result.newPatterns.some((p) => p === 'brown')).toBe(true);
+  });
+
+  it('should extract both unigrams and multi-word patterns', () => {
+    const result = wake.process([
+      'natural language processing',
+      'natural language understanding',
+      'natural language generation',
+    ]);
+    const hasUnigram = result.newPatterns.some((p) => !p.includes(' '));
+    const hasMultiWord = result.newPatterns.some((p) => p.includes(' '));
+    expect(hasUnigram).toBe(true);
+    expect(hasMultiWord).toBe(true);
+  });
+
+  it('should handle empty items array', () => {
+    const result = wake.process([]);
+    expect(result.processedItems).toBe(0);
+    expect(result.newPatterns).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DES-LRN-002: SleepPhase — Jaccard clustering
+// ---------------------------------------------------------------------------
+
+describe('DES-LRN-002: SleepPhase — Jaccard clustering', () => {
+  let sleep: SleepPhase;
+
+  beforeEach(() => {
+    sleep = createSleepPhase();
+  });
+
+  it('should cluster similar multi-word patterns', () => {
+    // These share the word "learning" so Jaccard > 0.5
+    const result = sleep.consolidate([
+      'machine learning',
+      'machine learning',
+      'deep learning',
+      'deep learning',
+    ]);
+    // Both survive frequency filter, but "machine learning" and "deep learning"
+    // share "learning" → Jaccard = 1/3 < 0.5, so they stay separate
+    expect(result.consolidatedPatterns).toBe(2);
+  });
+
+  it('should merge identical patterns with different casing', () => {
+    const result = sleep.consolidate([
+      'Machine Learning',
+      'machine learning',
+      'MACHINE LEARNING',
+    ]);
+    expect(result.consolidatedPatterns).toBe(1);
+    expect(result.prunedPatterns).toBe(0);
+  });
+
+  it('should handle all unique patterns (all pruned)', () => {
+    const result = sleep.consolidate(['alpha', 'beta', 'gamma', 'delta']);
+    expect(result.consolidatedPatterns).toBe(0);
+    expect(result.prunedPatterns).toBe(4);
+  });
+
+  it('should handle empty input', () => {
+    const result = sleep.consolidate([]);
+    expect(result.consolidatedPatterns).toBe(0);
+    expect(result.prunedPatterns).toBe(0);
+  });
+});

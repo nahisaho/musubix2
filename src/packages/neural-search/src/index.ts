@@ -33,6 +33,10 @@ export interface SearchHit {
 // MockEmbeddingModel
 // ---------------------------------------------------------------------------
 
+/**
+ * @deprecated Use {@link TfIdfEmbeddingModel} for real TF-IDF embeddings.
+ * MockEmbeddingModel generates pseudo-random vectors unrelated to input text.
+ */
 export class MockEmbeddingModel implements IEmbeddingModel {
   readonly dimensions: number;
   private _seed: number;
@@ -61,6 +65,122 @@ export class MockEmbeddingModel implements IEmbeddingModel {
 
   async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
     return texts.map(() => this._generateVector());
+  }
+}
+
+// ---------------------------------------------------------------------------
+// TfIdfEmbeddingModel
+// ---------------------------------------------------------------------------
+
+const TOKEN_RE = /[a-z0-9]+/g;
+
+function tokenize(text: string): string[] {
+  return (text.toLowerCase().match(TOKEN_RE) ?? []);
+}
+
+/**
+ * Real TF-IDF vectorizer that produces semantically meaningful embeddings.
+ * Similar texts produce similar vectors (high cosine similarity).
+ * Uses the hashing trick to project TF-IDF scores to fixed dimensions.
+ */
+export class TfIdfEmbeddingModel implements IEmbeddingModel {
+  readonly dimensions: number;
+  private vocabulary: Map<string, number> = new Map();
+  private idfScores: Map<string, number> = new Map();
+  private documentCount = 0;
+  private documentFrequency: Map<string, number> = new Map();
+
+  constructor(dimensions: number = 128) {
+    this.dimensions = dimensions;
+  }
+
+  /** Build vocabulary and IDF scores from a corpus of documents. */
+  fit(documents: string[]): void {
+    this.documentCount = documents.length;
+    this.documentFrequency.clear();
+    this.vocabulary.clear();
+    this.idfScores.clear();
+
+    let vocabIndex = 0;
+
+    for (const doc of documents) {
+      const tokens = tokenize(doc);
+      const seen = new Set<string>();
+      for (const token of tokens) {
+        if (!this.vocabulary.has(token)) {
+          this.vocabulary.set(token, vocabIndex++);
+        }
+        if (!seen.has(token)) {
+          seen.add(token);
+          this.documentFrequency.set(token, (this.documentFrequency.get(token) ?? 0) + 1);
+        }
+      }
+    }
+
+    for (const [term, df] of this.documentFrequency) {
+      this.idfScores.set(term, Math.log(this.documentCount / df));
+    }
+  }
+
+  /** Get current vocabulary size. */
+  getVocabularySize(): number {
+    return this.vocabulary.size;
+  }
+
+  async embed(text: string): Promise<EmbeddingVector> {
+    return this._computeVector(text);
+  }
+
+  async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
+    return texts.map((t) => this._computeVector(t));
+  }
+
+  private _computeVector(text: string): EmbeddingVector {
+    const tokens = tokenize(text);
+    const vec = new Array<number>(this.dimensions).fill(0);
+
+    if (tokens.length === 0) return vec;
+
+    // Compute term frequencies
+    const tf = new Map<string, number>();
+    for (const token of tokens) {
+      tf.set(token, (tf.get(token) ?? 0) + 1);
+    }
+
+    // Compute TF-IDF and project via hashing trick
+    for (const [term, count] of tf) {
+      const termFreq = count / tokens.length;
+      const idf = this.idfScores.get(term) ?? Math.log(this.documentCount + 1);
+      const tfidf = termFreq * idf;
+
+      // Hashing trick: deterministic bucket assignment
+      const bucket = this._hash(term) % this.dimensions;
+      // Sign hash for variance reduction
+      const sign = this._signHash(term) ? 1 : -1;
+      vec[bucket] += sign * tfidf;
+    }
+
+    return vec;
+  }
+
+  /** FNV-1a hash for deterministic bucket assignment. */
+  private _hash(str: string): number {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0);
+  }
+
+  /** Separate hash for sign determination. */
+  private _signHash(str: string): boolean {
+    let h = 0x6c62272e;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x5bd1e995);
+    }
+    return (h >>> 0) % 2 === 0;
   }
 }
 
@@ -134,4 +254,8 @@ export function createNeuralSearchEngine(): NeuralSearchEngine {
 
 export function createMockEmbeddingModel(dimensions = 128): MockEmbeddingModel {
   return new MockEmbeddingModel(dimensions);
+}
+
+export function createTfIdfEmbeddingModel(dimensions = 128): TfIdfEmbeddingModel {
+  return new TfIdfEmbeddingModel(dimensions);
 }

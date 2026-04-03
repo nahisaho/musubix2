@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   NeuralSearchEngine,
   MockEmbeddingModel,
+  TfIdfEmbeddingModel,
   createNeuralSearchEngine,
   createMockEmbeddingModel,
+  createTfIdfEmbeddingModel,
 } from '../src/index.js';
 import type { EmbeddingVector } from '../src/index.js';
 
@@ -151,5 +153,120 @@ describe('DES-LRN-004: Factory functions', () => {
   it('should create MockEmbeddingModel with custom dimensions', () => {
     const model = createMockEmbeddingModel(256);
     expect(model.dimensions).toBe(256);
+  });
+
+  it('should create TfIdfEmbeddingModel via factory', () => {
+    const model = createTfIdfEmbeddingModel(64);
+    expect(model).toBeInstanceOf(TfIdfEmbeddingModel);
+    expect(model.dimensions).toBe(64);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DES-LRN-004: TfIdfEmbeddingModel
+// ---------------------------------------------------------------------------
+
+function cosine(a: EmbeddingVector, b: EmbeddingVector): number {
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  magA = Math.sqrt(magA);
+  magB = Math.sqrt(magB);
+  if (magA === 0 || magB === 0) return 0;
+  return dot / (magA * magB);
+}
+
+describe('DES-LRN-004: TfIdfEmbeddingModel', () => {
+  let model: TfIdfEmbeddingModel;
+
+  beforeEach(() => {
+    model = new TfIdfEmbeddingModel(64);
+    model.fit([
+      'the cat sat on the mat',
+      'the dog played in the park',
+      'machine learning is a subset of artificial intelligence',
+      'neural networks are used in deep learning',
+      'the cat and the dog played together',
+    ]);
+  });
+
+  it('should produce consistent vectors for the same text', async () => {
+    const v1 = await model.embed('the cat sat on the mat');
+    const v2 = await model.embed('the cat sat on the mat');
+    expect(v1).toEqual(v2);
+  });
+
+  it('should produce vectors of the correct dimension', async () => {
+    const vec = await model.embed('hello world');
+    expect(vec).toHaveLength(64);
+    expect(model.dimensions).toBe(64);
+  });
+
+  it('should produce higher cosine similarity for similar texts than unrelated texts', async () => {
+    const catMat = await model.embed('the cat sat on the mat');
+    const catDog = await model.embed('the cat and the dog played together');
+    const ml = await model.embed('machine learning is a subset of artificial intelligence');
+
+    const simSimilar = cosine(catMat, catDog);
+    const simUnrelated = cosine(catMat, ml);
+
+    expect(simSimilar).toBeGreaterThan(simUnrelated);
+  });
+
+  it('should update vocabulary when fit() is called', () => {
+    const model2 = new TfIdfEmbeddingModel(32);
+    expect(model2.getVocabularySize()).toBe(0);
+    model2.fit(['hello world', 'world peace']);
+    expect(model2.getVocabularySize()).toBeGreaterThan(0);
+    expect(model2.getVocabularySize()).toBe(3); // hello, world, peace
+  });
+
+  it('should return correct count from embedBatch', async () => {
+    const texts = ['cat', 'dog', 'bird', 'fish'];
+    const vecs = await model.embedBatch(texts);
+    expect(vecs).toHaveLength(4);
+    vecs.forEach((v) => expect(v).toHaveLength(64));
+  });
+
+  it('should handle empty text', async () => {
+    const vec = await model.embed('');
+    expect(vec).toHaveLength(64);
+    expect(vec.every((v) => v === 0)).toBe(true);
+  });
+
+  it('should default to 128 dimensions', () => {
+    const m = new TfIdfEmbeddingModel();
+    expect(m.dimensions).toBe(128);
+  });
+
+  it('should work without calling fit (unseen terms get default IDF)', async () => {
+    const unfitted = new TfIdfEmbeddingModel(32);
+    const vec = await unfitted.embed('some random text');
+    expect(vec).toHaveLength(32);
+  });
+
+  it('should integrate with NeuralSearchEngine for semantic search', async () => {
+    const engine = createNeuralSearchEngine();
+    const corpus = [
+      'javascript programming language',
+      'python programming language',
+      'cooking recipes and food',
+    ];
+
+    model.fit(corpus);
+    for (let i = 0; i < corpus.length; i++) {
+      const vec = await model.embed(corpus[i]);
+      engine.addDocument(`doc${i}`, vec);
+    }
+
+    const query = await model.embed('programming language syntax');
+    const hits = engine.search(query, 3);
+    // Programming-related docs should score higher than cooking
+    const cookingHit = hits.find((h) => h.id === 'doc2')!;
+    const jsHit = hits.find((h) => h.id === 'doc0')!;
+    expect(jsHit.score).toBeGreaterThan(cookingHit.score);
   });
 });
