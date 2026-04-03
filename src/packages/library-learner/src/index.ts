@@ -191,7 +191,6 @@ export class LibraryLearner {
     }
 
     // 3. Find structurally similar functions and merge their e-classes
-    const sigEntries = [...sigToEClass.entries()];
     for (let i = 0; i < allSigs.length; i++) {
       for (let j = i + 1; j < allSigs.length; j++) {
         if (structurallySimilar(allSigs[i], allSigs[j])) {
@@ -231,13 +230,13 @@ export class LibraryLearner {
 
       const nodeKey = `${sig.name}/${sig.arity}`;
       const eclassId = sigToEClass.get(nodeKey);
-      const classSize = eclassId ? this.egraph.getClass(eclassId).length : 1;
+      const eclassSize = eclassId ? this.egraph.getClass(eclassId).length : 1;
       const freq = nameFreq.get(sig.name);
 
       learned.push({
         name: sig.name,
         abstraction: `pattern:${sig.name}`,
-        frequency: freq?.count ?? 1,
+        frequency: (freq?.count ?? 1) * eclassSize,
         examples: freq?.examples ?? [],
       });
     }
