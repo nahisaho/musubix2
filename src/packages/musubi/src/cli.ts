@@ -477,6 +477,41 @@ export async function handleInit(
   for (const f of result.createdFiles) {
     console.log(`  ${f}`);
   }
+
+  // Copy .github/skills and copilot-instructions from the installed package
+  try {
+    const { cpSync, existsSync, mkdirSync } = await import('node:fs');
+    const { resolve, dirname } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+
+    // Find the package's .github directory (relative to this module)
+    const thisDir = typeof __dirname !== 'undefined'
+      ? __dirname
+      : dirname(fileURLToPath(import.meta.url));
+    const pkgGithub = resolve(thisDir, '..', '.github');
+    const destGithub = resolve(targetPath, '.github');
+
+    if (existsSync(pkgGithub)) {
+      mkdirSync(destGithub, { recursive: true });
+
+      // Copy skills
+      const skillsSrc = resolve(pkgGithub, 'skills');
+      if (existsSync(skillsSrc)) {
+        cpSync(skillsSrc, resolve(destGithub, 'skills'), { recursive: true });
+        console.log('  .github/skills/ (SDD skills)');
+      }
+
+      // Copy copilot-instructions
+      const instrSrc = resolve(pkgGithub, 'copilot-instructions.md');
+      if (existsSync(instrSrc)) {
+        cpSync(instrSrc, resolve(destGithub, 'copilot-instructions.md'));
+        console.log('  .github/copilot-instructions.md');
+      }
+    }
+  } catch {
+    // Non-critical — skills copy is best-effort
+  }
+
   return ExitCode.SUCCESS;
 }
 
