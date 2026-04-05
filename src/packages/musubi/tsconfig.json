@@ -13,6 +13,7 @@
     { "path": "../ontology-mcp" },
     { "path": "../codegraph" },
     { "path": "../security" },
-    { "path": "../workflow-engine" }
+    { "path": "../workflow-engine" },
+    { "path": "../mcp-server" }
   ]
 }

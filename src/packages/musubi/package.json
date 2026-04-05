@@ -1,6 +1,6 @@
 {
   "name": "musubix2",
-  "version": "0.3.8",
+  "version": "0.4.3",
   "description": "MUSUBIX2 — Specification Driven Development System",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,7 +18,9 @@
   "files": [
     "dist",
     "bin",
-    ".github"
+    "postinstall.cjs",
+    ".github",
+    ".claude"
   ],
   "keywords": [
     "sdd",
@@ -48,8 +50,9 @@
     "clean": "rm -rf dist *.tsbuildinfo",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && node scripts/copy-github-assets.mjs",
-    "postpublish": "node scripts/clean-github-assets.mjs"
+    "postinstall": "node ./postinstall.cjs",
+    "prepublishOnly": "npm run build && node scripts/copy-assets.mjs",
+    "postpublish": "node scripts/clean-assets.mjs"
   },
   "dependencies": {
     "typescript": "^5.7.0"

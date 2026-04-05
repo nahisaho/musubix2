@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { CLIDispatcher, createCLIDispatcher, getDefaultCommands, parseArgs, showHelp } from '../dist/index.js';
+import { createCLIDispatcher, getDefaultCommands, showHelp } from '../dist/cli.js';
 
 const args = process.argv.slice(2);
 
-if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+if (args.length === 0 || (args[0] === '--help' || args[0] === '-h')) {
   console.log(showHelp());
   process.exit(0);
 }
@@ -16,13 +16,9 @@ if (args.includes('--version') || args.includes('-v')) {
 
 const dispatcher = createCLIDispatcher();
 const commands = getDefaultCommands();
-commands.forEach(cmd => dispatcher.register(cmd.name, cmd.description, cmd.handler));
-
-const parsed = parseArgs(args);
-try {
-  const exitCode = await dispatcher.dispatch(parsed.command, parsed.args, parsed.flags);
-  process.exit(exitCode);
-} catch (err) {
-  console.error('Error:', err instanceof Error ? err.message : err);
-  process.exit(1);
+for (const cmd of commands) {
+  dispatcher.register(cmd);
 }
+
+const exitCode = await dispatcher.run(args);
+process.exit(exitCode);

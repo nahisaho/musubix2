@@ -35,4 +35,21 @@ describe('REQ-ARC-004: ConfigLoader', () => {
     const config = loader.getConfig();
     expect(config).toEqual(DEFAULT_CONFIG);
   });
+
+  it('should have specs paths in DEFAULT_CONFIG', () => {
+    expect(DEFAULT_CONFIG.specs).toBeDefined();
+    expect(DEFAULT_CONFIG.specs.basePath).toBe('storage/specs');
+    expect(DEFAULT_CONFIG.specs.requirements).toBe('storage/specs/requirements');
+    expect(DEFAULT_CONFIG.specs.designs).toBe('storage/specs/designs');
+    expect(DEFAULT_CONFIG.specs.plans).toBe('storage/specs/plans');
+    expect(DEFAULT_CONFIG.specs.reviews).toBe('storage/specs/reviews');
+  });
+
+  it('should merge specs with defaults when config has no specs key', async () => {
+    const loader = new ConfigLoader(join(import.meta.dirname, '../../../..'));
+    const config = await loader.load();
+    expect(config.specs).toBeDefined();
+    expect(config.specs.basePath).toBe('storage/specs');
+    expect(config.specs.requirements).toBe('storage/specs/requirements');
+  });
 });

@@ -1,10 +1,11 @@
 import { build } from 'esbuild';
-import { readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync, cpSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const distDir = resolve(__dirname, '..', 'dist');
+const pkgDir = resolve(__dirname, '..');
+const distDir = resolve(pkgDir, 'dist');
 
 // Only bundle if dist/ exists (tsc must run first)
 if (!existsSync(distDir)) {
@@ -39,3 +40,12 @@ for (const entry of entryPoints) {
 }
 
 console.log('✓ Bundled dist/ with esbuild (all @musubix2/* inlined)');
+
+// ── Copy template assets to dist/templates/ ────────────────────────────────
+const srcTemplates = resolve(pkgDir, 'src', 'templates');
+const distTemplates = resolve(distDir, 'templates');
+if (existsSync(srcTemplates)) {
+  mkdirSync(distTemplates, { recursive: true });
+  cpSync(srcTemplates, distTemplates, { recursive: true });
+  console.log('✓ Copied templates to dist/templates/');
+}

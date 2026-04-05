@@ -110,8 +110,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 /** Command descriptions used by showHelp */
 const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
   init: {
-    usage: 'musubix init [path] [--name <name>] [--force]',
-    description: 'プロジェクト初期化',
+    usage: 'musubix init [path] [--name <name>] [--force] [--platform auto|copilot|claude|both] [--dry-run] [--update]',
+    description: 'プロジェクト初期化 / デュアルプラットフォームセットアップ',
   },
   requirements: {
     usage: 'musubix requirements <analyze|validate> <file>',
@@ -200,6 +200,10 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
   watch: {
     usage: 'musubix watch <glob-pattern>',
     description: 'ファイル監視',
+  },
+  mcp: {
+    usage: 'musubix2 mcp [--transport stdio|sse] [--port 3100]',
+    description: 'MCP サーバー起動',
   },
 };
 
@@ -1737,12 +1741,45 @@ export function getDefaultCommands(): CLICommand[] {
       options: [
         { flag: '--name <name>', description: 'Project name' },
         { flag: '--force', description: 'Overwrite existing files' },
+        { flag: '--platform <type>', description: 'Platform: auto|copilot|claude|both' },
+        { flag: '--dry-run', description: 'Show planned changes without writing' },
+        { flag: '--update', description: 'Update existing musubix config' },
       ],
       action: async (args) => {
         if (args['help'] === true || args['h'] === true) {
           console.log(showHelp('init'));
           return;
         }
+        // P3-05: Mode resolution — new flags trigger platform-bootstrap
+        const flags = args as Record<string, string | boolean>;
+        const { InitModeResolver } = await import('./interface/cli/init-mode-resolver.js');
+        const modeResolver = new InitModeResolver();
+        const mode = modeResolver.resolve(flags);
+
+        if (mode === 'platform-bootstrap') {
+          const { createInitCommandHandler } = await import('./interface/cli/init-command-handler.js');
+          const handler = createInitCommandHandler();
+          const targetPath = (args['subcommand'] as string) ?? (args['args'] as string[] | undefined)?.[0] ?? '.';
+          const { resolve } = await import('node:path');
+          const summary = await handler.run({
+            projectPath: resolve(targetPath),
+            platform: (flags['platform'] as string as 'auto' | 'copilot' | 'claude' | 'both') ?? 'auto',
+            force: flags['force'] === true,
+            dryRun: flags['dry-run'] === true,
+            update: flags['update'] === true,
+          });
+          if (!flags['dry-run']) {
+            console.log(`\n✅ Platform setup complete (${summary.durationMs}ms)`);
+            console.log(`   Platforms: copilot=${summary.detectedPlatforms.copilot}, claude=${summary.detectedPlatforms.claude}`);
+            if (summary.created.length) console.log(`   Created: ${summary.created.length} files`);
+            if (summary.updated.length) console.log(`   Updated: ${summary.updated.length} files`);
+            if (summary.skipped.length) console.log(`   Skipped: ${summary.skipped.length} files`);
+          }
+          for (const w of summary.warnings) console.warn(`   ⚠ ${w}`);
+          return;
+        }
+
+        // Legacy mode: existing project init
         const targetPath = (args['subcommand'] as string) ?? (args['args'] as string[] | undefined)?.[0] ?? '.';
         await handleInit(
           targetPath,
@@ -2147,6 +2184,26 @@ export function getDefaultCommands(): CLICommand[] {
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
         const pattern = (args['subcommand'] as string | undefined) ?? positionalArgs[0];
         await handleWatch(pattern);
+      },
+    },
+    // P3-07: MCP server launcher
+    {
+      name: 'mcp',
+      description: 'Start MCP server (stdio or SSE)',
+      options: [
+        { flag: '--transport <type>', description: 'Transport: stdio|sse', default: 'stdio' },
+        { flag: '--port <port>', description: 'SSE port number', default: 3100 },
+      ],
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('mcp'));
+          return;
+        }
+        const { McpCliLauncher } = await import('./interface/cli/mcp-cli-launcher.js');
+        const launcher = new McpCliLauncher();
+        const transport = (args['transport'] as string) === 'sse' ? 'sse' as const : 'stdio' as const;
+        const port = typeof args['port'] === 'string' ? parseInt(args['port'], 10) : undefined;
+        await launcher.start({ transport, port });
       },
     },
   ];

@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-25
+
+### Added
+
+- **デュアルプラットフォームインストール** — `musubix2 init --platform auto|copilot|claude|both` で GitHub Copilot / Claude Code 両対応セットアップ
+- **プラットフォーム自動検出** — `.vscode/`, `.claude/`, CLI 存在チェックで最適プラットフォームを推定
+- **テンプレートレンダリング** — `{{PLACEHOLDER}}` 補間で `copilot-instructions.md`, `CLAUDE.md`, MCP 設定を生成
+- **Claude アトミックセットアップ** — `CLAUDE.md` + `.claude/skills/*` + `.mcp.json` + `.musubix-managed` マーカーをトランザクション書き込み
+- **MCP 設定自動生成** — Copilot (`.vscode/mcp.json`) / Claude (`.mcp.json`) 形式を自動生成
+- **`--dry-run` モード** — ファイル書き込みなしで変更計画をプレビュー
+- **`--update` モード** — 既存設定の `.bak` バックアップ付き更新
+- **`musubix2 mcp` コマンド** — stdio/SSE トランスポートで MCP サーバーを直接起動
+- **WorkspaceWriter** — temp→rename アトミック書き込み + ロールバック機構
+- **Install ドメインモデル** — 23 型定義（InitOptions, InstallPlan, PlatformSelection 等）
+- **4 層アーキテクチャ** — Domain → Infrastructure → Application → Interface の完全分離
+
+### Changed
+
+- テスト数: 1588 → **1630**（94 ファイル、+42 テスト）
+- CLI `init` コマンド: `--platform`, `--dry-run`, `--update` フラグ追加
+- `package.json`: `.claude` を `files` に追加、`postinstall` スクリプト追加
+
 ## [0.3.0] - 2026-04-03
 
 ### Added

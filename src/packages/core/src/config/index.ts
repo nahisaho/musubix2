@@ -24,12 +24,21 @@ export interface IntegrationConfig {
   confidenceThreshold: number;
 }
 
+export interface SpecsConfig {
+  basePath: string;
+  requirements: string;
+  designs: string;
+  plans: string;
+  reviews: string;
+}
+
 export interface MuSubixConfig {
   steeringDir: string;
   storageDir: string;
   llm: LlmConfig;
   knowledge: KnowledgeConfig;
   integration: IntegrationConfig;
+  specs: SpecsConfig;
 }
 
 export const DEFAULT_CONFIG: MuSubixConfig = {
@@ -44,6 +53,13 @@ export const DEFAULT_CONFIG: MuSubixConfig = {
   },
   integration: {
     confidenceThreshold: 0.85,
+  },
+  specs: {
+    basePath: 'storage/specs',
+    requirements: 'storage/specs/requirements',
+    designs: 'storage/specs/designs',
+    plans: 'storage/specs/plans',
+    reviews: 'storage/specs/reviews',
   },
 };
 
@@ -115,6 +131,10 @@ export class ConfigLoader {
       integration: {
         ...DEFAULT_CONFIG.integration,
         ...partial.integration,
+      },
+      specs: {
+        ...DEFAULT_CONFIG.specs,
+        ...partial.specs,
       },
     };
   }

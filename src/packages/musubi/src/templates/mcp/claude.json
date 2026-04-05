@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "musubix2": {
+      "command": "{{COMMAND}}",
+      "args": {{ARGS}}
+    }
+  }
+}

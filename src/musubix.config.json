@@ -10,5 +10,12 @@
   },
   "integration": {
     "confidenceThreshold": 0.85
+  },
+  "specs": {
+    "basePath": "storage/specs",
+    "requirements": "storage/specs/requirements",
+    "designs": "storage/specs/designs",
+    "plans": "storage/specs/plans",
+    "reviews": "storage/specs/reviews"
   }
 }

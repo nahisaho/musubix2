@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "musubix2": {
+      "type": "stdio",
+      "command": "{{COMMAND}}",
+      "args": {{ARGS}}
+    }
+  }
+}

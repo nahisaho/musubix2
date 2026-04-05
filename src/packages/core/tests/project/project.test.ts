@@ -18,6 +18,10 @@ describe('DES-SDD-005: ProjectInitializer', () => {
     expect(result.createdFiles.length).toBeGreaterThan(0);
     expect(result.createdFiles.some(f => f.includes('steering/product.ja.md'))).toBe(true);
     expect(result.createdFiles.some(f => f.includes('musubix.config.json'))).toBe(true);
+    expect(result.createdFiles.some(f => f.includes('storage/specs/requirements/'))).toBe(true);
+    expect(result.createdFiles.some(f => f.includes('storage/specs/designs/'))).toBe(true);
+    expect(result.createdFiles.some(f => f.includes('storage/specs/plans/'))).toBe(true);
+    expect(result.createdFiles.some(f => f.includes('storage/specs/reviews/'))).toBe(true);
     expect(result.errors).toHaveLength(0);
   });
 
@@ -66,6 +70,17 @@ describe('DES-SDD-005: ProjectInitializer', () => {
     expect(templates.map(t => t.name)).toContain('default');
     expect(templates.map(t => t.name)).toContain('minimal');
     expect(templates.map(t => t.name)).toContain('full');
+  });
+
+  it('should include specs subdirectories in all templates', () => {
+    const pi = new ProjectInitializer();
+    for (const template of ['minimal', 'default', 'full'] as const) {
+      const result = pi.init({ projectName: 'proj', template, outputDir: '/out' });
+      expect(result.createdFiles.some(f => f.includes('storage/specs/requirements/'))).toBe(true);
+      expect(result.createdFiles.some(f => f.includes('storage/specs/designs/'))).toBe(true);
+      expect(result.createdFiles.some(f => f.includes('storage/specs/plans/'))).toBe(true);
+      expect(result.createdFiles.some(f => f.includes('storage/specs/reviews/'))).toBe(true);
+    }
   });
 
   it('should be created by factory function', () => {

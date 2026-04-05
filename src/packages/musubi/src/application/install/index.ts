@@ -1,0 +1,9 @@
+export { PlatformDetector } from './platform-detector.js';
+export { McpLaunchResolver } from './mcp-launch-resolver.js';
+export { McpConfigGenerator } from './mcp-config-generator.js';
+export { WorkspaceMergeService } from './workspace-merge-service.js';
+export { ClaudeSkillIndexBuilder } from './claude-skill-index-builder.js';
+export { CopilotSetupService } from './copilot-setup-service.js';
+export { ClaudeSetupTransaction } from './claude-setup-transaction.js';
+export { InstallPlanner } from './install-planner.js';
+export { UpdateService } from './update-service.js';

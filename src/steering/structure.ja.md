@@ -29,6 +29,13 @@ src/
 │   ├── policy/               # 憲法・ポリシー
 │   ├── skill-manager/        # スキル管理
 │   └── ...
+├── storage/                  # SDD 成果物ストレージ
+│   ├── specs/                # SDD 仕様文書
+│   │   ├── requirements/     # REQ-{PROJECT}-{SEQ}.md
+│   │   ├── designs/          # DES-{PROJECT}-{SEQ}.md
+│   │   ├── plans/            # PLAN-{PROJECT}-{SEQ}.md
+│   │   └── reviews/          # REVIEW-{PREFIX}-{PROJECT}-{SEQ}.md
+│   └── tasks/                # タスク管理
 ├── package.json              # workspaces root
 ├── tsconfig.base.json        # 共通コンパイラ設定
 ├── tsconfig.json             # Project References
