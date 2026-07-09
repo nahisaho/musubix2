@@ -153,8 +153,8 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'オントロジー管理',
   },
   cg: {
-    usage: 'musubix cg <index|search|stats|deps|impact|candidates|cycles|export|languages> [args]',
-    description: 'コードグラフ分析 (impact に --direct/--depth、candidates 書き換え候補、cycles 循環依存、export DOT/JSON)',
+    usage: 'musubix cg <index|search|stats|deps|impact|candidates|cycles|export|diff|languages> [args]',
+    description: 'コードグラフ分析 (impact --direct/--depth、candidates 書き換え候補、cycles 循環依存、export DOT/JSON、diff グラフ差分)',
   },
   security: {
     usage: 'musubix security <path> [--fail-on critical|high|medium|low|info] [--exclude-tests]',
@@ -1026,6 +1026,41 @@ function resolveImportToFiles(
   return max > 0 ? scored.filter((s) => s.score === max).map((s) => s.f) : candidates;
 }
 
+/**
+ * Resolve symbol-level edges to a deduped set of file → file dependency edges,
+ * keyed `from\tto\tkind`. Shared by cg export and cg diff.
+ */
+function resolveFileEdges(
+  nodes: StoredGraphNode[],
+  edges: StoredGraphEdge[],
+): Map<string, { from: string; to: string; kind: string }> {
+  const { defFiles, filesByBasename } = buildResolutionMaps(nodes);
+  const fileEdges = new Map<string, { from: string; to: string; kind: string }>();
+  for (const e of edges) {
+    for (const to of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
+      if (to === e.from) continue;
+      fileEdges.set(`${e.from}\t${to}\t${e.kind}`, { from: e.from, to, kind: e.kind });
+    }
+  }
+  return fileEdges;
+}
+
+/** Load a persisted code graph from an arbitrary path (for cg diff). */
+function loadGraphFromPath(
+  path: string,
+): { nodes: StoredGraphNode[]; edges: StoredGraphEdge[] } | null {
+  try {
+    if (!existsSync(path)) return null;
+    const data = JSON.parse(readFileSync(path, 'utf-8')) as {
+      nodes?: StoredGraphNode[];
+      edges?: StoredGraphEdge[];
+    };
+    return { nodes: data.nodes ?? [], edges: data.edges ?? [] };
+  } catch {
+    return null;
+  }
+}
+
 /** Detailed per-subcommand help for `cg`. */
 const CG_SUBCOMMAND_HELP: Record<string, string> = {
   index:
@@ -1064,6 +1099,11 @@ const CG_SUBCOMMAND_HELP: Record<string, string> = {
     '  Export the file-level dependency graph (symbol edges resolved to\n' +
     '  file → file). Default format dot (Graphviz), or json. Writes to <file>\n' +
     '  with --out, else stdout. A path-fragment limits it to a subgraph.',
+  diff:
+    'musubix cg diff <baseline.json> [current.json]\n' +
+    '  Compare two persisted graphs (.musubix/codegraph.json format) and report\n' +
+    '  files and file-level dependency edges added/removed. current defaults to\n' +
+    '  the working graph .musubix/codegraph.json. Useful for change-impact review.',
   languages:
     'musubix cg languages\n' +
     '  List the source languages the parser supports.',
@@ -1552,6 +1592,66 @@ export async function handleCodegraph(
         for (const f of sorted.slice(0, PER_CYCLE)) console.log(`    ↻ ${f}`);
         if (sorted.length > PER_CYCLE) console.log(`    … and ${sorted.length - PER_CYCLE} more`);
       });
+      return ExitCode.SUCCESS;
+    }
+    case 'diff': {
+      // Compare two persisted graphs and report file/dependency changes.
+      const positional = args.filter((a) => !a.startsWith('--'));
+      const baselinePath = positional[0];
+      const currentPath = positional[1];
+      if (!baselinePath) {
+        console.error('❌ Usage: musubix cg diff <baseline.json> [current.json]');
+        return ExitCode.VALIDATION_ERROR;
+      }
+      const baseline = loadGraphFromPath(baselinePath);
+      if (!baseline) {
+        console.error(`❌ Baseline graph not found or unreadable: ${baselinePath}`);
+        return ExitCode.GENERAL_ERROR;
+      }
+      const current = currentPath ? loadGraphFromPath(currentPath) : loadCodeGraphData();
+      if (!current) {
+        console.error(`❌ Current graph not found or unreadable: ${currentPath}`);
+        return ExitCode.GENERAL_ERROR;
+      }
+      if (current.nodes.length === 0) {
+        console.log('Current graph is empty. Run `musubix cg index <path>` first.');
+        return ExitCode.SUCCESS;
+      }
+      const baseFiles = new Set(baseline.nodes.map((n) => n.filePath));
+      const curFiles = new Set(current.nodes.map((n) => n.filePath));
+      const filesAdded = [...curFiles].filter((f) => !baseFiles.has(f)).sort();
+      const filesRemoved = [...baseFiles].filter((f) => !curFiles.has(f)).sort();
+
+      const baseEdges = resolveFileEdges(baseline.nodes, baseline.edges);
+      const curEdges = resolveFileEdges(current.nodes, current.edges);
+      const fmt = (r: { from: string; to: string; kind: string }) =>
+        `${r.from} → ${r.to}${r.kind === 'calls' ? ' [call]' : ''}`;
+      const edgesAdded = [...curEdges.entries()].filter(([k]) => !baseEdges.has(k)).map(([, v]) => v);
+      const edgesRemoved = [...baseEdges.entries()].filter(([k]) => !curEdges.has(k)).map(([, v]) => v);
+
+      const CAP = 25;
+      const list = (label: string, items: string[]) => {
+        if (items.length === 0) return;
+        console.log(`\n  ${label} (${items.length}):`);
+        for (const s of items.slice(0, CAP)) console.log(`    ${s}`);
+        if (items.length > CAP) console.log(`    … and ${items.length - CAP} more`);
+      };
+
+      console.log(`Diff ${baselinePath} → ${currentPath ?? '.musubix/codegraph.json'}`);
+      console.log(
+        `  Files: +${filesAdded.length} / -${filesRemoved.length}` +
+        `   Dependency edges: +${edgesAdded.length} / -${edgesRemoved.length}`,
+      );
+      list('Files added', filesAdded);
+      list('Files removed', filesRemoved);
+      list('Dependencies added', edgesAdded.map(fmt).sort());
+      list('Dependencies removed', edgesRemoved.map(fmt).sort());
+      if (
+        filesAdded.length === 0 && filesRemoved.length === 0 &&
+        edgesAdded.length === 0 && edgesRemoved.length === 0
+      ) {
+        console.log('\n  No differences. ✅');
+      }
       return ExitCode.SUCCESS;
     }
     case 'export': {

@@ -581,6 +581,46 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.26: cg diff — compare two graph snapshots.
+  it('cg diff reports added files and dependencies', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_diff');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'lib.c'), 'int helper_fn(int x)\n{\n\treturn x + 1;\n}\n');
+    writeFileSync(join(dir, 'app.c'), 'int run(void)\n{\n\treturn helper_fn(1);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      // Baseline: lib.c + app.c.
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      const baseline = join(dir, 'baseline.json');
+      writeFileSync(baseline, readFileSync(join(dir, '.musubix', 'codegraph.json'), 'utf-8'));
+
+      // No-diff against itself.
+      logSpy.mockClear();
+      expect(await handleCodegraph('diff', [baseline, baseline])).toBe(ExitCode.SUCCESS);
+      expect(logSpy.mock.calls.map((c) => String(c[0])).join('\n')).toContain('No differences');
+
+      // Add a new caller and re-index → current graph.
+      writeFileSync(join(dir, 'extra.c'), 'int extra(void)\n{\n\treturn helper_fn(2);\n}\n');
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('diff', [baseline])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('Files added');
+      expect(out).toContain('extra.c'); // new file
+      expect(out).toContain('Dependencies added'); // extra.c → lib.c call edge
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('cg diff errors when the baseline is missing', async () => {
+    expect(await handleCodegraph('diff', [])).toBe(ExitCode.VALIDATION_ERROR);
+    expect(await handleCodegraph('diff', ['/no/such/baseline.json'])).toBe(ExitCode.GENERAL_ERROR);
+  });
+
   // v0.5.20: enriched stats + candidates ranking for rewrite triage.
   it('cg stats reports kind breakdowns and top called functions', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_stats');

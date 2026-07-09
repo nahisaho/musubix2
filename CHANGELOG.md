@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.26] - 2026-07-10
+
+CodeGraph に**グラフ差分 `cg diff`** を追加。2 つのグラフスナップショット間で、ファイルと依存関係の増減を比較できる（変更影響レビュー・ブランチ間比較に有用）。
+
+### Added
+
+- **`cg diff <baseline.json> [current.json]`** — 2 つの永続化グラフ（`.musubix/codegraph.json` 形式）を比較し、追加/削除されたファイルと、ファイルレベル依存エッジ（call/import を解決）の増減を報告。`current` 省略時は作業中の `.musubix/codegraph.json` を使用。各リストは 25 件で打ち切り、差分なしは「No differences ✅」
+- 内部リファクタ: export/diff 共通のファイルレベルエッジ解決を `resolveFileEdges()` に、任意パスのグラフ読み込みを `loadGraphFromPath()` に集約
+
+### Impact
+
+- Linux カーネルコアで、`lib/` のみ → `kernel/`+`lib/` の差分が「Files +496 / Dependency edges +6004」と表示。逆方向は削除（-496 / -6004）、同一グラフは差分なしを正しく検出
+
+### Tests
+
+- musubi: ファイル・依存追加の検出、同一グラフの差分なし、baseline 欠如時のエラーを検証（67 → 69）
+
 ## [0.5.25] - 2026-07-10
 
 CodeGraph に**クラスメソッド呼び出しの解決**（`obj.method()`）を追加。従来 TS/JS のクラスメソッドはクラスノードの子として解析されるだけでグラフに登録されず、OO コードのコールグラフが不完全だった（musubix2 自身の TS ソースで検証）。
