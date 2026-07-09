@@ -99,6 +99,11 @@ interface DetectorPattern {
   validate?: (matchText: string) => boolean;
 }
 
+/** Escape a string for use as a literal inside a RegExp. */
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /** Shannon entropy (bits per character) of a string. */
 function shannonEntropy(s: string): number {
   if (s.length === 0) return 0;
@@ -565,6 +570,141 @@ export class TaintAnalyzer {
 }
 
 // ---------------------------------------------------------------------------
+// TaintDataflowAnalyzer — intra-file taint tracking
+// ---------------------------------------------------------------------------
+
+interface TaintSink {
+  re: RegExp;
+  severity: Severity;
+  type: VulnerabilityType;
+  label: string;
+  cweId: string;
+  suggestion: string;
+}
+
+/**
+ * Lightweight, intra-file taint dataflow analysis. Where the pattern scanner
+ * only sees a single expression, this tracks a value built from an unsafe
+ * string operation through a variable into a dangerous sink — catching e.g.
+ *
+ *     q = "SELECT … '{}'".format(name)   # tainted (dynamic SQL string)
+ *     cursor.execute(q)                  # sink — flagged
+ *
+ * It is heuristic (no full AST/scoping) but line-based and conservative: a sink
+ * is only flagged when its argument is a bare variable proven tainted earlier.
+ */
+export class TaintDataflowAnalyzer {
+  private readonly sinks: TaintSink[] = [
+    {
+      re: /\b(?:execute|executemany|query|raw|prepare)\s*\(\s*(\$?\w+)\s*[,)]/g,
+      severity: 'high', type: 'injection', cweId: 'CWE-89',
+      label: 'SQL injection — a dynamically-built string flows into a query',
+      suggestion: 'Use parameterized queries; never pass a formatted/concatenated string to the DB.',
+    },
+    {
+      re: /\bos\.system\s*\(\s*(\$?\w+)\s*\)/g,
+      severity: 'critical', type: 'injection', cweId: 'CWE-78',
+      label: 'Command injection — a dynamically-built string flows into os.system()',
+      suggestion: 'Pass an argument list with shell=False; never build shell strings from input.',
+    },
+    {
+      re: /\bsubprocess\.\w+\s*\(\s*(\$?\w+)/g,
+      severity: 'high', type: 'injection', cweId: 'CWE-78',
+      label: 'Command injection — a dynamically-built string flows into subprocess',
+      suggestion: 'Pass an argument list with shell=False.',
+    },
+    {
+      re: /(?<![.\w>:])(?:system|popen|shell_exec|passthru)\s*\(\s*(\$?\w+)\s*\)/g,
+      severity: 'critical', type: 'injection', cweId: 'CWE-78',
+      label: 'Command injection — a dynamically-built string flows into a shell function',
+      suggestion: 'Avoid shell execution of built strings; use safe APIs with argument arrays.',
+    },
+    {
+      re: /(?<![.\w>:])eval\s*\(\s*(\$?\w+)\s*\)/g,
+      severity: 'critical', type: 'injection', cweId: 'CWE-95',
+      label: 'Code injection — a dynamically-built string flows into eval()',
+      suggestion: 'Never eval built strings; use a safe parser/dispatch table.',
+    },
+  ];
+
+  private isDynamicRhs(rhs: string): boolean {
+    // A list/array literal (`args = [exe] + [...]`) is an argument vector, not a
+    // dynamic *string* — passing it to subprocess is the safe form.
+    if (/^\s*\[/.test(rhs)) return false;
+    return (
+      /\.\s*format\s*\(/.test(rhs) || // "…".format(x)
+      /\bf['"]/.test(rhs) || // f-string
+      /['"]\s*%\s*[\w([]/.test(rhs) || // "…" % x
+      /['"]\s*\+\s*[$\w]|[$\w.\])]\s*\+\s*['"]/.test(rhs) || // string + var / var + string
+      /['"]\s*\.\s*\$\w/.test(rhs) // PHP: "…" . $var
+    );
+  }
+
+  analyze(code: string, filePath: string): SecurityFinding[] {
+    const hashComments = /\.(py|rb|sh|php|pl|yaml|yml|r)$/i.test(filePath);
+    const lines = blankNonCode(code, hashComments).split('\n');
+    const orig = code.split('\n');
+    // `$var = …` / `var = …` at statement start (not ==, <=, >=, !=).
+    const assignRe = /^\s*(\$?[A-Za-z_]\w*)\s*=(?!=)\s*(.+)$/;
+
+    // Collect tainted variables (name → 1-based definition line), propagating
+    // taint through assignments to a fixpoint (bounded).
+    const tainted = new Map<string, number>();
+    for (let pass = 0; pass < 4; pass++) {
+      let changed = false;
+      lines.forEach((line, i) => {
+        const m = assignRe.exec(line);
+        if (!m) return;
+        const name = m[1];
+        const rhs = m[2];
+        if (tainted.has(name)) return;
+        let taint = this.isDynamicRhs(rhs);
+        if (!taint) {
+          for (const t of tainted.keys()) {
+            if (t !== name && new RegExp(`(?<![\\w$])${escapeRe(t)}(?![\\w])`).test(rhs) &&
+                /[+%]|\.\s*format|f['"]/.test(rhs)) {
+              taint = true;
+              break;
+            }
+          }
+        }
+        if (taint) { tainted.set(name, i + 1); changed = true; }
+      });
+      if (!changed) break;
+    }
+    if (tainted.size === 0) return [];
+
+    // Find sinks whose argument is a tainted variable.
+    const findings: SecurityFinding[] = [];
+    const seen = new Set<string>();
+    lines.forEach((line, i) => {
+      for (const sink of this.sinks) {
+        const re = new RegExp(sink.re.source, 'g');
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(line)) !== null) {
+          const arg = m[1];
+          const def = tainted.get(arg);
+          if (def === undefined || def >= i + 1) continue; // must be defined earlier
+          const key = `${i}:${arg}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          findings.push({
+            type: sink.type,
+            severity: sink.severity,
+            location: { file: filePath, line: i + 1, snippet: (orig[i] ?? '').trim() },
+            description: `${sink.label} (variable '${arg}' built at line ${def})`,
+            suggestion: sink.suggestion,
+            cweId: sink.cweId,
+            confidence: 0.8,
+          });
+        }
+      }
+    });
+    return findings;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // DependencyScanner
 // ---------------------------------------------------------------------------
 
@@ -670,6 +810,7 @@ export class SecurityScanner {
     this.detectors = options?.detectors ?? [
       new SecretDetector(),
       new TaintAnalyzer(),
+      new TaintDataflowAnalyzer(),
       new DependencyScanner(),
     ];
   }

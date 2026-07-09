@@ -33,6 +33,7 @@ import {
 import {
   createSecretDetector,
   TaintAnalyzer,
+  TaintDataflowAnalyzer,
   DependencyScanner,
   type SecurityFinding,
   type Severity,
@@ -2065,6 +2066,7 @@ export async function handleSecurity(
     }
     const secrets = createSecretDetector();
     const taint = new TaintAnalyzer();
+    const dataflow = new TaintDataflowAnalyzer();
     const deps = new DependencyScanner();
 
     // Accept a single file or a directory (recursively scanned). Vendored and
@@ -2080,6 +2082,7 @@ export async function handleSecurity(
       findings.push(
         ...secrets.scan(code, file),
         ...taint.analyze(code, file),
+        ...dataflow.analyze(code, file),
         ...deps.scan(code, file),
       );
     }

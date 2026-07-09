@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.37] - 2026-07-10
+
+`security` に**ファイル内 taint データフロー解析**（`TaintDataflowAnalyzer`）を追加。パターン検知では見逃していた「変数経由」の注入を検出。
+
+### Added
+
+- **`TaintDataflowAnalyzer`** — 動的に構築された文字列が変数を介して危険なシンクへ流入する経路を追跡（intra-file、行ベースのヒューリスティック、伝播はフィックスポイントまで反復）
+  - **汚染源**: `x = "…".format(v)` / `x = f"…{v}"` / `x = "…" % v` / `x = "…" + v` / PHP `$x = "…" . $v`
+  - **シンク**: `execute`/`query`/`raw`/`prepare`（SQLi, CWE-89）、`os.system`/`subprocess`/`system`/`popen`/`shell_exec`/`passthru`（コマンドインジェクション, CWE-78）、`eval`（コード注入, CWE-95）
+  - シンク引数が「先行行で汚染された素の変数」のときのみ報告し、汚染源／シンクの行番号を提示
+  - `SecurityScanner` の既定検知器と CLI（`musubix security`）に統合
+
+### Precision（安全形の除外）
+
+- **パラメータ化クエリ**（定数 SQL + `execute(sql, params)`）は汚染源にならず非検知
+- **引数リスト**（`args = [exe] + […]` → `subprocess.run(args)`）はシェル文字列でないため非検知（リストリテラルを汚染源から除外）
+- コメント・文字列は事前にブランク化（既存の仕組みを流用）
+
+### Validation
+
+- 目標ケース `q = "…".format(name); cursor.execute(q)` を検出（従来は見逃し）
+- 変数経由の f-string SQLi、連結コマンドインジェクション（Python/PHP）を検出
+- 実プロジェクトの誤検知は最小（Django 1・Laravel 0・Rails 0・ripgrep 0；Django の 1 件は `sql = "…" + suffix; execute(sql)` の実在パターン）
+
+### Tests
+
+- security: `.format()`/f-string/連結の変数経由注入検出、パラメータ化クエリ・引数リスト・非動的の非検知を検証（36 → 39）
+
 ## [0.5.36] - 2026-07-10
 
 `security` の**検知漏れ（recall）を検証**（意図的な脆弱性フィクスチャで測定）し、主要な脆弱性クラスの検出を追加。フィクスチャで検出が 3 → 20 件に向上。

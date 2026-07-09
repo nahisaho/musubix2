@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   SecretDetector,
   TaintAnalyzer,
+  TaintDataflowAnalyzer,
   DependencyScanner,
   ComplianceChecker,
   SecurityScanner,
@@ -220,6 +221,36 @@ describe('DES-COD-003: TaintAnalyzer', () => {
     expect(analyzer.analyze('# be careful with eval(x)', 'a.py')).toHaveLength(0);
     // a real eval on a code line is still flagged.
     expect(analyzer.analyze('eval(var_export($v, true))', 'Cache.php').length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TaintDataflowAnalyzer (v0.5.37)
+// ---------------------------------------------------------------------------
+
+describe('TaintDataflowAnalyzer', () => {
+  const df = new TaintDataflowAnalyzer();
+
+  it('flags a .format() string flowing through a variable into a query', () => {
+    const code = 'query = "SELECT * FROM u WHERE n = \'{}\'".format(name)\ncursor.execute(query)\n';
+    const findings = df.analyze(code, 'a.py');
+    expect(findings.some((f) => f.type === 'injection' && f.cweId === 'CWE-89')).toBe(true);
+    expect(findings[0]!.description).toMatch(/built at line 1/);
+  });
+
+  it('flags an f-string and a concatenation reaching sinks', () => {
+    expect(df.analyze('sql = f"DELETE FROM t WHERE id={uid}"\ncursor.execute(sql)', 'a.py').length).toBeGreaterThan(0);
+    expect(df.analyze('cmd = "ls " + d\nos.system(cmd)', 'a.py').length).toBeGreaterThan(0);
+    expect(df.analyze('$c = "ping " . $_GET["h"];\nsystem($c);', 'a.php').length).toBeGreaterThan(0);
+  });
+
+  it('does not flag parameterized queries or argument lists (safe forms)', () => {
+    // Constant SQL + params bound separately.
+    expect(df.analyze('sql = "SELECT * FROM t WHERE id = %s"\ncursor.execute(sql, [uid])', 'a.py')).toHaveLength(0);
+    // Argument vector (list) to subprocess is safe.
+    expect(df.analyze('args = [exe] + ["-W%s" % o for o in opts]\nsubprocess.run(args)', 'a.py')).toHaveLength(0);
+    // No dynamic construction at all.
+    expect(df.analyze('x = 1\ncursor.execute(x)', 'a.py')).toHaveLength(0);
   });
 });
 
