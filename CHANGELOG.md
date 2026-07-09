@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.25] - 2026-07-10
+
+CodeGraph に**クラスメソッド呼び出しの解決**（`obj.method()`）を追加。従来 TS/JS のクラスメソッドはクラスノードの子として解析されるだけでグラフに登録されず、OO コードのコールグラフが不完全だった（musubix2 自身の TS ソースで検証）。
+
+### Added
+
+- **メソッドノードのグラフ登録** — インデックス時にクラスの子メソッドを平坦化してグラフに追加。`cg search`/`cg stats` でメソッドが可視化され、`method` ノードとして計上される
+- **メソッド呼び出しのコールグラフ解決** — `obj.method()` を一意なメソッド定義に解決してエッジ化（関数と同じ一意名ヒューリスティック）。`cg impact`/`cg deps`/`cg cycles`/`cg export` がメソッド呼び出しを追跡
+
+### Fixed
+
+- **組み込みメソッド名の誤解決を抑止** — `map`/`filter`/`set`/`get`/`forEach` 等の標準ライブラリ名（`Array.map`・`Map.set` など）がユーザー定義メソッドに誤ってエッジ化されるのを防ぐ denylist を追加。**メソッド定義名に限定**して適用するため C の関数エッジには影響しない（カーネルコアの calls エッジ数は 8,474 で不変）
+
+### Impact
+
+- musubix2 自身の TS ソース（`src/packages`）で `method` ノード 853 個を新規登録、`registerAgent()`/`completeTask()` 等の実メソッド呼び出しを解決。`cg impact agent-orchestrator` がメソッド経由の依存元を追跡可能に。組み込み名（`.map()` 等）由来の誤エッジは 0
+- C（カーネルコア）グラフは完全に不変（メソッド概念なし）
+
+### Tests
+
+- musubi: クロスファイルのメソッド呼び出し解決、組み込みメソッド名の非解決を検証（65 → 67）
+
 ## [0.5.24] - 2026-07-10
 
 CodeGraph に**循環依存検出 `cg cycles`** を追加。ファイルレベルの強連結成分（SCC）を検出し、アーキテクチャ上の循環依存を可視化する。

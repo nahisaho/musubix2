@@ -944,6 +944,32 @@ function loadCodeGraphEdges(): StoredGraphEdge[] {
  * This is a heuristic: for colliding short names it may still over-match.
  */
 /**
+ * Built-in / standard-library method and global names. These collide heavily
+ * with user-defined method names (e.g. a unique `set()` method would otherwise
+ * capture every `Map.set()` / `Set.add()` call), so they are never resolved to
+ * user definitions when building the call graph.
+ */
+const BUILTIN_CALL_NAMES = new Set<string>([
+  // Array / iterable
+  'map', 'filter', 'forEach', 'reduce', 'reduceRight', 'find', 'findIndex', 'some', 'every',
+  'includes', 'indexOf', 'lastIndexOf', 'slice', 'splice', 'concat', 'join', 'push', 'pop',
+  'shift', 'unshift', 'sort', 'reverse', 'flat', 'flatMap', 'fill', 'copyWithin', 'at',
+  // Map / Set
+  'set', 'get', 'has', 'add', 'delete', 'clear', 'keys', 'values', 'entries',
+  // Promise
+  'then', 'catch', 'finally', 'resolve', 'reject', 'all', 'allSettled', 'race', 'any',
+  // String
+  'split', 'replace', 'replaceAll', 'trim', 'trimStart', 'trimEnd', 'padStart', 'padEnd',
+  'startsWith', 'endsWith', 'charAt', 'charCodeAt', 'codePointAt', 'substring', 'substr',
+  'toUpperCase', 'toLowerCase', 'match', 'matchAll', 'search', 'repeat', 'normalize',
+  // Object / function / misc
+  'toString', 'valueOf', 'hasOwnProperty', 'call', 'apply', 'bind', 'assign', 'freeze',
+  'keys', 'values', 'entries', 'stringify', 'parse', 'now', 'test', 'exec',
+  // console / logging
+  'log', 'error', 'warn', 'info', 'debug', 'trace', 'assert',
+]);
+
+/**
  * Build the symbol→file resolution maps used by impact/export/cycles:
  *  - defFiles: resolvable symbol name → defining files (static functions have
  *    internal linkage and are excluded as cross-file targets)
@@ -956,7 +982,10 @@ function buildResolutionMaps(
   const filesByBasename = new Map<string, Set<string>>();
   for (const n of nodes) {
     const isResolvable =
-      n.kind === 'class' || n.kind === 'interface' || (n.kind === 'function' && !n.isStatic);
+      n.kind === 'class' ||
+      n.kind === 'interface' ||
+      n.kind === 'method' ||
+      (n.kind === 'function' && !n.isStatic);
     if (isResolvable) {
       const set = defFiles.get(n.name) ?? new Set<string>();
       set.add(n.filePath);
@@ -1085,6 +1114,9 @@ export async function handleCodegraph(
         // Every function name a file defines (static or global) — a call to such
         // a name binds locally in C and must not create a cross-file edge.
         const fileDefines = new Map<string, Set<string>>();
+        // Names defined as class methods (used to scope the built-in denylist so
+        // it never affects C function edges).
+        const methodDefNames = new Set<string>();
         let indexedFiles = 0;
         for (const file of files) {
           const ext = file.split('.').pop() ?? '';
@@ -1122,6 +1154,29 @@ export async function handleCodegraph(
               engine.addEdge(edge);
               savedEdges.push(edge);
             }
+            // Flatten class method children into the graph so `obj.method()`
+            // calls can resolve (methods are parsed as children of the class).
+            for (const child of node.children ?? []) {
+              if (child.kind !== 'method' || !child.name) continue;
+              const mEntry = {
+                id: `${file}:${node.name}.${child.name}`,
+                name: child.name,
+                kind: 'method' as const,
+                filePath: file,
+                language: lang,
+                startLine: child.startLine ?? 0,
+                endLine: child.endLine ?? 0,
+              };
+              engine.addNode(mEntry);
+              savedNodes.push(mEntry);
+              const defined = fileDefines.get(file) ?? new Set<string>();
+              defined.add(child.name);
+              fileDefines.set(file, defined);
+              methodDefNames.add(child.name);
+              const set = globalFnToFiles.get(child.name) ?? new Set<string>();
+              set.add(file);
+              globalFnToFiles.set(child.name, set);
+            }
           }
           fileCalls.push({ file, calls: parser.extractCalls(content, lang) });
           indexedFiles++;
@@ -1135,6 +1190,10 @@ export async function handleCodegraph(
         for (const { file, calls } of fileCalls) {
           const localDefs = fileDefines.get(file);
           for (const name of calls) {
+            // Built-in method/global names (Array/Map/Set/Promise/console, …)
+            // collide with user *method* names and would produce spurious edges.
+            // Scoped to method-defined names so C function edges are unaffected.
+            if (methodDefNames.has(name) && BUILTIN_CALL_NAMES.has(name)) continue;
             if (localDefs?.has(name)) continue; // local binding (static/own def)
             const defs = globalFnToFiles.get(name);
             if (!defs || defs.size !== 1) continue; // undefined or ambiguous global
@@ -1244,15 +1303,8 @@ export async function handleCodegraph(
           extDeps.set(e.from, set);
         }
       }
-      // Dependents = files that call functions defined in this file.
-      const defFiles = new Map<string, Set<string>>();
-      for (const n of nodes) {
-        if (n.kind === 'function' && !n.isStatic) {
-          const set = defFiles.get(n.name) ?? new Set<string>();
-          set.add(n.filePath);
-          defFiles.set(n.name, set);
-        }
-      }
+      // Dependents = files that call functions/methods defined in this file.
+      const { defFiles } = buildResolutionMaps(nodes);
       const dependents = new Map<string, Set<string>>();
       for (const e of edges) {
         if (e.kind !== 'calls') continue;
@@ -1343,24 +1395,7 @@ export async function handleCodegraph(
       }
       // Map a defined symbol name → the file(s) that define it, and each file's
       // basename → its path (for path-style imports like `./mid`).
-      const defFiles = new Map<string, Set<string>>();
-      const filesByBasename = new Map<string, Set<string>>();
-      for (const n of nodes) {
-        // Static functions have internal linkage — never a cross-file target.
-        const isResolvable =
-          n.kind === 'class' || n.kind === 'interface' || (n.kind === 'function' && !n.isStatic);
-        if (isResolvable) {
-          const set = defFiles.get(n.name) ?? new Set<string>();
-          set.add(n.filePath);
-          defFiles.set(n.name, set);
-        }
-        const base = (n.filePath.split(/[\\/]/).pop() ?? '').replace(/\.[a-z]+$/i, '');
-        if (base) {
-          const set = filesByBasename.get(base) ?? new Set<string>();
-          set.add(n.filePath);
-          filesByBasename.set(base, set);
-        }
-      }
+      const { defFiles, filesByBasename } = buildResolutionMaps(nodes);
       // Reverse adjacency: definingFile → files that import it (its dependents).
       const dependents = new Map<string, Set<string>>();
       for (const e of edges) {

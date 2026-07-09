@@ -442,6 +442,58 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.25: class method call resolution (obj.method()).
+  it('cg impact resolves cross-file method calls', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_methods');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'service.ts'),
+      'export class Service {\n  doUniqueWork(): number { return 42; }\n}\n',
+    );
+    writeFileSync(
+      join(dir, 'consumer.ts'),
+      "import { Service } from './service';\nconst s = new Service();\nexport function run() { return s.doUniqueWork(); }\n",
+    );
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('search', ['doUniqueWork'])).toBe(ExitCode.SUCCESS);
+      const search = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(search).toContain('doUniqueWork'); // method is now an indexed node
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['service.ts'])).toBe(ExitCode.SUCCESS);
+      const impact = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(impact).toContain('consumer.ts'); // method call resolves cross-file
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('cg does not resolve built-in method names to user methods', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_builtin');
+    mkdirSync(dir, { recursive: true });
+    // A user class with a `map` method — must NOT capture Array.prototype.map calls.
+    writeFileSync(join(dir, 'coll.ts'), 'export class Coll {\n  map(): number { return 1; }\n}\n');
+    writeFileSync(join(dir, 'user.ts'), 'export function run() { return [1, 2].map((x) => x); }\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['coll.ts'])).toBe(ExitCode.SUCCESS);
+      const impact = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(impact).not.toContain('user.ts'); // built-in .map() is not an edge
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.24: cg cycles — detect circular file dependencies (SCCs).
   it('cg cycles detects mutual file dependencies', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_cycles');
