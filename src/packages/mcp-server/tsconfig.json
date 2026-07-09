@@ -5,6 +5,65 @@
     "rootDir": "./src",
     "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests"
+  ],
+  "references": [
+    {
+      "path": "../codegraph"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../decisions"
+    },
+    {
+      "path": "../deep-research"
+    },
+    {
+      "path": "../dfg"
+    },
+    {
+      "path": "../formal-verify"
+    },
+    {
+      "path": "../knowledge"
+    },
+    {
+      "path": "../lean"
+    },
+    {
+      "path": "../library-learner"
+    },
+    {
+      "path": "../neural-search"
+    },
+    {
+      "path": "../ontology-mcp"
+    },
+    {
+      "path": "../policy"
+    },
+    {
+      "path": "../security"
+    },
+    {
+      "path": "../skill-manager"
+    },
+    {
+      "path": "../synthesis"
+    },
+    {
+      "path": "../wake-sleep"
+    },
+    {
+      "path": "../workflow-engine"
+    }
+  ]
 }
