@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] - 2026-07-09
+
+MCP サーバー（Claude Code / GitHub Copilot 統合の主要経路）のドッグフーディングで発見した致命的バグを改修。
+
+### Fixed
+
+- **【重大】MCP サーバー(stdio)が即終了して全く機能しない問題を修正** — `musubix2 mcp` は `initialize` にすら応答せず ~300ms で終了していた。原因は `StdioTransport.start()` が readline 設定後すぐ resolve → `run()` が即 return → CLI の `process.exit()` がサーバーを即座に殺していたこと。`StdioTransport.waitForClose()` を追加し、`mcp` 起動時にクライアント切断（stdin EOF）まで待機してプロセスを生存させる。これにより MCP 統合が実際に動作するようになった（`tools/list` = 61 ツール）
+- **MCP `knowledge.entity.get` / `search` / `traverse` が `{}` を返す問題を修正** — 非同期の `store.getEntity/search/traverse` を await しておらず、未解決 Promise をシリアライズしていた（CLI の同種バグと同型）
+- **MCP `security.*` ツールが常に空結果を返す問題を修正** — `security.scan` / `secrets.detect` / `taint.analyze` / `compliance.check` が `@musubix2/security` に存在しない関数（`sec.scan?.()` 等）を optional-call し、`?.` で握り潰して偽の空成功を返していた。実 API（`createSecurityScanner` / `createSecretDetector` / `TaintAnalyzer` / `createComplianceChecker`）へ配線し、`code` 引数でソースを直接スキャンできるよう変更
+
+### Known Issues
+
+- 一部の MCP ツール（`synthesis` / `research` / `workflow` / `skills` / `decisions` / `formal-verify` / `neural` / `ontology` 系の一部）は依然として存在しない export を optional-call しており空結果を返す。次リリースで各パッケージ実 API へ順次配線予定
+
+### Tests
+
+- `StdioTransport.waitForClose`、MCP security 実スキャン、knowledge get の round-trip テストを追加。全ワークスペース 1669 テスト green
+
 ## [0.5.6] - 2026-07-09
 
 ドッグフーディングで残課題としていた3つの機能ギャップ（スタブ/データ未連携）を実装。

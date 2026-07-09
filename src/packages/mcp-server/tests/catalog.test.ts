@@ -6,6 +6,14 @@ import {
   getToolCategories,
 } from '../src/index.js';
 import type { ToolCategory } from '../src/index.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+function findTool(category: string, name: string) {
+  const cat = getToolCategories().find((c) => c.name === category)!;
+  return cat.tools.find((t) => t.definition.name === name)!;
+}
 
 // ---------------------------------------------------------------------------
 // catalog.ts — registerDefaultTools
@@ -146,5 +154,52 @@ describe('createFullMCPServer', () => {
     expect(info.name).toBe('test-full');
     expect(info.version).toBe('9.9.9');
     expect(info.toolCount).toBe(61);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v0.5.7 — security tools wired to real APIs, knowledge get awaits async
+// ---------------------------------------------------------------------------
+
+describe('v0.5.7 MCP tool fixes', () => {
+  const SECRET = 'const k = "AKIAIOSFODNN7EXAMPLE";';
+
+  it('security.scan detects a leaked AWS key (real scanner, not a no-op)', async () => {
+    const result = await findTool('security', 'security.scan').handler({ code: SECRET });
+    expect(result.success).toBe(true);
+    const data = result.data as { findings: unknown[]; severity: string };
+    expect(data.findings.length).toBeGreaterThan(0);
+    expect(data.severity).toBe('critical');
+  });
+
+  it('security.secrets.detect finds the secret', async () => {
+    const result = await findTool('security', 'security.secrets.detect').handler({ code: SECRET });
+    expect(result.success).toBe(true);
+    const data = result.data as { count: number };
+    expect(data.count).toBeGreaterThan(0);
+  });
+
+  it('security.scan on clean code reports no findings', async () => {
+    const result = await findTool('security', 'security.scan').handler({ code: 'export const n = 1;' });
+    const data = result.data as { findings: unknown[]; severity: string };
+    expect(data.findings.length).toBe(0);
+    expect(data.severity).toBe('none');
+  });
+
+  it('knowledge.entity.get returns the stored entity (awaits async, not {})', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'mcp-kg-'));
+    try {
+      const put = await findTool('knowledge', 'knowledge.entity.put').handler({
+        id: 'E1', type: 'concept', basePath: base,
+      });
+      expect(put.success).toBe(true);
+      const get = await findTool('knowledge', 'knowledge.entity.get').handler({
+        id: 'E1', basePath: base,
+      });
+      expect(get.success).toBe(true);
+      expect((get.data as { id: string }).id).toBe('E1');
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
   });
 });

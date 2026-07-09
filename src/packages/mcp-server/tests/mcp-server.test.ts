@@ -547,6 +547,26 @@ describe('StdioTransport', () => {
 
     await transport.stop();
   });
+
+  // v0.5.7 ISSUE-17: the CLI relies on waitForClose() to keep the server
+  // process alive; it must resolve only once the input stream closes.
+  it('waitForClose resolves when the input stream ends', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const transport = new StdioTransport(input, output);
+    transport.onMessage(async (req) => ({ jsonrpc: '2.0' as const, id: req.id, result: 'ok' }));
+    await transport.start();
+
+    let closed = false;
+    const wait = transport.waitForClose().then(() => { closed = true; });
+    // Still open right after start.
+    await new Promise((r) => setTimeout(r, 10));
+    expect(closed).toBe(false);
+
+    input.end(); // simulate client disconnect (stdin EOF)
+    await wait;
+    expect(closed).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

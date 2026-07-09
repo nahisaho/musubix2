@@ -60,6 +60,19 @@ export class StdioTransport implements MCPTransport {
     }
   }
 
+  /**
+   * Resolve once the input stream closes (client disconnect / stdin EOF).
+   * Used by the CLI launcher to keep the process alive for the lifetime of
+   * the connection — `start()` intentionally resolves immediately so callers
+   * can begin writing, so a separate wait hook is needed to block on.
+   */
+  async waitForClose(): Promise<void> {
+    if (!this.rl) return;
+    await new Promise<void>((resolve) => {
+      this.rl!.once('close', () => resolve());
+    });
+  }
+
   send(message: JsonRpcResponse | JsonRpcNotification): void {
     this.output.write(JSON.stringify(message) + '\n');
   }

@@ -19,6 +19,10 @@ export class McpCliLauncher {
     } else {
       const transport = new StdioTransport();
       await server.start(transport);
+      // StdioTransport.start() resolves immediately; without this the CLI's
+      // top-level `process.exit()` would kill the server before it handles any
+      // request. Block until the client disconnects (stdin EOF).
+      await transport.waitForClose();
     }
   }
 }

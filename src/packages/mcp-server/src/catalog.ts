@@ -298,7 +298,7 @@ function knowledgeTools(): CatalogEntry[] {
           const { createKnowledgeStore } = await import('@musubix2/knowledge');
           const store = createKnowledgeStore(params['basePath'] as string ?? '.knowledge');
           await store.load();
-          const entity = store.getEntity(params['id'] as string);
+          const entity = await store.getEntity(params['id'] as string);
           return entity ? ok(entity) : fail('Entity not found');
         } catch {
           return fail('Knowledge package not available');
@@ -394,7 +394,7 @@ function knowledgeTools(): CatalogEntry[] {
           const { createKnowledgeStore } = await import('@musubix2/knowledge');
           const store = createKnowledgeStore(params['basePath'] as string ?? '.knowledge');
           await store.load();
-          const results = store.search(params['query'] as string, { limit: (params['limit'] as number) ?? 10 });
+          const results = await store.search(params['query'] as string, { limit: (params['limit'] as number) ?? 10 });
           return ok(results);
         } catch {
           return fail('Knowledge package not available');
@@ -415,7 +415,7 @@ function knowledgeTools(): CatalogEntry[] {
           const { createKnowledgeStore } = await import('@musubix2/knowledge');
           const store = createKnowledgeStore(params['basePath'] as string ?? '.knowledge');
           await store.load();
-          const result = store.traverse(params['startId'] as string, { depth: (params['depth'] as number) ?? 2 });
+          const result = await store.traverse(params['startId'] as string, { depth: (params['depth'] as number) ?? 2 });
           return ok(result);
         } catch {
           return fail('Knowledge package not available');
@@ -690,6 +690,16 @@ function codeAnalysisTools(): CatalogEntry[] {
 // Security tools (from @musubix2/security)
 // ---------------------------------------------------------------------------
 
+// Accept inline source via `code` (preferred) or `target` for compatibility.
+function sourceOf(params: Record<string, unknown>): string {
+  return (params['code'] as string) ?? (params['source'] as string) ?? (params['target'] as string) ?? '';
+}
+function severityOf(findings: Array<{ severity?: string }>): string {
+  const order = ['critical', 'high', 'medium', 'low', 'info'];
+  for (const s of order) if (findings.some((f) => f.severity === s)) return s;
+  return 'none';
+}
+
 function securityTools(): CatalogEntry[] {
   return [
     tool(
@@ -697,16 +707,16 @@ function securityTools(): CatalogEntry[] {
       'Run a security scan on source code',
       'security',
       [
-        param('target', 'string', 'File or directory path to scan'),
-        param('rules', 'array', 'Specific rules to apply', false),
+        param('code', 'string', 'Source code to scan'),
+        param('filePath', 'string', 'File path for the source (for reporting)', false, 'inline'),
       ],
       async (params) => {
         try {
-          const sec = await import('@musubix2/security') as any;
-          const result = sec.scan?.(params['target'] as string, params['rules'] as string[] | undefined);
-          return ok(result ?? { findings: [], severity: 'none' });
+          const { createSecurityScanner } = await import('@musubix2/security');
+          const result = createSecurityScanner().scan(sourceOf(params), (params['filePath'] as string) ?? 'inline');
+          return ok({ findings: result.findings, severity: severityOf(result.findings) });
         } catch {
-          return ok({ findings: [], severity: 'none' });
+          return fail('Security package not available');
         }
       },
     ),
@@ -714,14 +724,17 @@ function securityTools(): CatalogEntry[] {
       'security.secrets.detect',
       'Detect secrets and credentials in source code',
       'security',
-      [param('target', 'string', 'File or directory path to scan')],
+      [
+        param('code', 'string', 'Source code to scan'),
+        param('filePath', 'string', 'File path for the source', false, 'inline'),
+      ],
       async (params) => {
         try {
-          const sec = await import('@musubix2/security') as any;
-          const result = sec.detectSecrets?.(params['target'] as string);
-          return ok(result ?? { secrets: [], count: 0 });
+          const { createSecretDetector } = await import('@musubix2/security');
+          const secrets = createSecretDetector().scan(sourceOf(params), (params['filePath'] as string) ?? 'inline');
+          return ok({ secrets, count: secrets.length });
         } catch {
-          return ok({ secrets: [], count: 0 });
+          return fail('Security package not available');
         }
       },
     ),
@@ -730,39 +743,34 @@ function securityTools(): CatalogEntry[] {
       'Perform taint analysis to track untrusted data flow',
       'security',
       [
-        param('source', 'string', 'Source code to analyze'),
-        param('sources', 'array', 'Taint sources', false),
-        param('sinks', 'array', 'Taint sinks', false),
+        param('code', 'string', 'Source code to analyze'),
+        param('filePath', 'string', 'File path for the source', false, 'inline'),
       ],
       async (params) => {
         try {
-          const sec = await import('@musubix2/security') as any;
-          const result = sec.taintAnalysis?.(
-            params['source'] as string,
-            params['sources'] as string[] | undefined,
-            params['sinks'] as string[] | undefined,
-          );
-          return ok(result ?? { tainted: [], paths: [] });
+          const { TaintAnalyzer } = await import('@musubix2/security');
+          const tainted = new TaintAnalyzer().analyze(sourceOf(params), (params['filePath'] as string) ?? 'inline');
+          return ok({ tainted, count: tainted.length });
         } catch {
-          return ok({ tainted: [], paths: [] });
+          return fail('Security package not available');
         }
       },
     ),
     tool(
       'security.compliance.check',
-      'Check code compliance against security standards',
+      'Check code compliance against registered security policies',
       'security',
       [
-        param('target', 'string', 'File or directory path'),
-        param('standard', 'string', 'Compliance standard: owasp | cwe | sans', false, 'owasp'),
+        param('code', 'string', 'Source code to check'),
+        param('filePath', 'string', 'File path for the source', false, 'inline'),
       ],
       async (params) => {
         try {
-          const sec = await import('@musubix2/security') as any;
-          const result = sec.complianceCheck?.(params['target'] as string, params['standard'] as string ?? 'owasp');
-          return ok(result ?? { compliant: true, issues: [] });
+          const { createComplianceChecker } = await import('@musubix2/security');
+          const result = createComplianceChecker().check(sourceOf(params), (params['filePath'] as string) ?? 'inline', []);
+          return ok(result);
         } catch {
-          return ok({ compliant: true, issues: [] });
+          return fail('Security package not available');
         }
       },
     ),
