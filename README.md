@@ -160,43 +160,49 @@ npx musubix --help              # Show help
 
 # SDD Workflow
 npx musubix init                # Initialize SDD project (--platform auto|copilot|claude|both)
-npx musubix req                 # Requirements validation
+                                #   also scaffolds steering/ and storage/specs/requirements.md
+npx musubix requirements analyze <file>   # Validate EARS requirements (alias: req <file>)
 npx musubix req:wizard          # Requirements creation wizard
 npx musubix req:interview       # 1-question-at-a-time requirements gathering
-npx musubix design              # Design generation
-npx musubix design:c4           # C4 diagram generation
-npx musubix design:verify       # Design verification
-npx musubix tasks               # Task breakdown management
-npx musubix codegen             # Code generation
-npx musubix test:gen            # Test generation
-npx musubix trace               # Traceability verification
-npx musubix trace:verify        # Detailed traceability verification
-npx musubix workflow            # Workflow management
+npx musubix design generate <file>        # Design generation (or: design <file>)
+npx musubix design:c4 <file>    # C4 diagram generation (--level context|container|component)
+npx musubix design:verify <file># Design verification (SOLID)
+npx musubix tasks               # Task breakdown management (validate|list|stats)
+npx musubix codegen generate <name>       # Code generation (--type class|interface|function)
+npx musubix test:gen <file|dir> # Test generation (accepts a file or a directory)
+npx musubix trace matrix        # Requirement → code coverage matrix (--specs <file> --src <dir>)
+npx musubix trace:verify        # Coverage verification (--specs --src [--strict])
+npx musubix workflow            # Workflow management (status|approve|transition, persisted)
 npx musubix status              # Status display
 
 # Analysis & Verification
-npx musubix cg                  # Code graph analysis
-npx musubix security            # Security scanning
+npx musubix cg index <file|dir> # Code graph analysis (index|search|stats|languages)
+npx musubix security <file|dir> # Security scanning (--fail-on critical|high|medium|low|info)
 npx musubix policy              # Policy verification
-npx musubix ontology            # Ontology management
+npx musubix ontology add <s> <p> <o>      # Ontology management (add|list|validate|stats, persisted)
 
 # Knowledge & Research
-npx musubix knowledge           # Knowledge graph operations
-npx musubix decision            # ADR management
+npx musubix knowledge           # Knowledge graph operations (put|get|link|query|stats, persisted)
+npx musubix decision            # ADR management (create|list|get|accept|deprecate, persisted)
 npx musubix deep-research       # Deep research queries
 
 # Neurosymbolic
-npx musubix explain             # Code explanation
-npx musubix learn               # Library pattern learning
-npx musubix synthesis           # Program synthesis
-npx musubix skills              # Skill management
-npx musubix scaffold            # Project scaffolding
+npx musubix explain <file|code> # Code explanation
+npx musubix learn analyze <file|dir>      # Library pattern learning
+npx musubix synthesis dsl <input> --ops trim,camelCase,...   # DSL transform pipeline
+npx musubix skills              # Skill management (list|validate|create)
+npx musubix scaffold package <name>       # Project scaffolding (project|package|skill, writes files)
 npx musubix repl                # Interactive REPL
 npx musubix watch               # File watcher
 
 # MCP
 npx musubix mcp                 # Start MCP server (--transport stdio|sse, --port)
 ```
+
+> Error paths return non-zero exit codes (missing files, invalid arguments,
+> `--strict`/`--fail-on` gate failures), so these commands are CI-friendly.
+> Stateful commands (`knowledge`, `decision`, `ontology`, `workflow`) persist
+> under the project directory and survive across separate invocations.
 
 ---
 

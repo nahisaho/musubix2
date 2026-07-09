@@ -162,43 +162,48 @@ npx musubix --help              # ヘルプ表示
 
 # SDD ワークフロー
 npx musubix init                # プロジェクト初期化（--platform auto|copilot|claude|both）
-npx musubix req                 # 要件検証
+                                #   steering/ と storage/specs/requirements.md も雛形生成
+npx musubix requirements analyze <file>   # EARS 要件検証（別名: req <file>）
 npx musubix req:wizard          # 要件作成ウィザード
 npx musubix req:interview       # 1問1答ヒアリング → 要件定義書生成
-npx musubix design              # 設計生成
-npx musubix design:c4           # C4 ダイアグラム生成
-npx musubix design:verify       # 設計検証
-npx musubix tasks               # タスク分解管理
-npx musubix codegen             # コード生成
-npx musubix test:gen            # テスト生成
-npx musubix trace               # トレーサビリティ検証
-npx musubix trace:verify        # トレーサビリティ詳細検証
-npx musubix workflow            # ワークフロー管理
+npx musubix design generate <file>        # 設計生成（または: design <file>）
+npx musubix design:c4 <file>    # C4 ダイアグラム生成（--level context|container|component）
+npx musubix design:verify <file># 設計検証（SOLID）
+npx musubix tasks               # タスク分解管理（validate|list|stats）
+npx musubix codegen generate <name>       # コード生成（--type class|interface|function）
+npx musubix test:gen <file|dir> # テスト生成（ファイル/ディレクトリ対応）
+npx musubix trace matrix        # 要件 → コード カバレッジマトリクス（--specs <file> --src <dir>）
+npx musubix trace:verify        # カバレッジ検証（--specs --src [--strict]）
+npx musubix workflow            # ワークフロー管理（status|approve|transition、永続化）
 npx musubix status              # ステータス表示
 
 # 分析・検証
-npx musubix cg                  # コードグラフ解析
-npx musubix security            # セキュリティスキャン
+npx musubix cg index <file|dir> # コードグラフ解析（index|search|stats|languages）
+npx musubix security <file|dir> # セキュリティスキャン（--fail-on critical|high|medium|low|info）
 npx musubix policy              # ポリシー検証
-npx musubix ontology            # オントロジー管理
+npx musubix ontology add <s> <p> <o>      # オントロジー管理（add|list|validate|stats、永続化）
 
 # 知識・リサーチ
-npx musubix knowledge           # 知識グラフ操作
-npx musubix decision            # ADR 管理
+npx musubix knowledge           # 知識グラフ操作（put|get|link|query|stats、永続化）
+npx musubix decision            # ADR 管理（create|list|get|accept|deprecate、永続化）
 npx musubix deep-research       # ディープリサーチ
 
 # ニューロシンボリック
-npx musubix explain             # コード説明
-npx musubix learn               # ライブラリパターン学習
-npx musubix synthesis           # プログラム合成
-npx musubix skills              # スキル管理
-npx musubix scaffold            # プロジェクトスキャフォールド
+npx musubix explain <file|code> # コード説明
+npx musubix learn analyze <file|dir>      # ライブラリパターン学習
+npx musubix synthesis dsl <input> --ops trim,camelCase,...   # DSL 変換パイプライン
+npx musubix skills              # スキル管理（list|validate|create）
+npx musubix scaffold package <name>       # スキャフォールド（project|package|skill、実ファイル生成）
 npx musubix repl                # 対話型 REPL
 npx musubix watch               # ファイル監視
 
 # MCP
 npx musubix mcp                 # MCP サーバー起動（--transport stdio|sse, --port）
 ```
+
+> エラー時は非ゼロ終了コードを返すため（ファイル欠如・引数不正・`--strict`/`--fail-on`
+> ゲート失敗）、CI で利用できます。状態を持つコマンド（`knowledge`/`decision`/
+> `ontology`/`workflow`）はプロジェクト配下に永続化され、別プロセス間で状態が保持されます。
 
 ---
 
