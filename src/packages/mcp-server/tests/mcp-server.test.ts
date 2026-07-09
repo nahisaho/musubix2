@@ -567,6 +567,39 @@ describe('StdioTransport', () => {
     await wait;
     expect(closed).toBe(true);
   });
+
+  // v0.5.12: requests must be processed one at a time, even when the handler
+  // for an earlier request is slower than a later one (no interleaving).
+  it('serializes concurrent requests in arrival order', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const transport = new StdioTransport(input, output);
+
+    const order: number[] = [];
+    transport.onMessage(async (req) => {
+      // First request is the slowest; without serialization it would finish last.
+      await new Promise((r) => setTimeout(r, req.id === 1 ? 40 : 5));
+      order.push(req.id as number);
+      return { jsonrpc: '2.0' as const, id: req.id, result: 'ok' };
+    });
+    await transport.start();
+
+    const responses: number[] = [];
+    output.on('data', (chunk: Buffer) => {
+      for (const line of chunk.toString().split('\n').filter(Boolean)) {
+        responses.push((JSON.parse(line) as JsonRpcResponse).id as number);
+      }
+    });
+
+    input.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'x' }) + '\n');
+    input.write(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'x' }) + '\n');
+    input.write(JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'x' }) + '\n');
+
+    await new Promise((r) => setTimeout(r, 120));
+    expect(order).toEqual([1, 2, 3]);
+    expect(responses).toEqual([1, 2, 3]);
+    await transport.stop();
+  });
 });
 
 // ---------------------------------------------------------------------------

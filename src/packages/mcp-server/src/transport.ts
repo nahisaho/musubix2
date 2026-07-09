@@ -20,6 +20,9 @@ export class StdioTransport implements MCPTransport {
   private output: NodeJS.WritableStream;
   private handler: ((msg: JsonRpcRequest) => Promise<JsonRpcResponse>) | null = null;
   private rl: readline.Interface | null = null;
+  // Serializes request handling so stateful tools (load → mutate → save) never
+  // interleave. Each incoming line is chained after the previous completes.
+  private queue: Promise<void> = Promise.resolve();
 
   constructor(input?: NodeJS.ReadableStream, output?: NodeJS.WritableStream) {
     this.input = input ?? process.stdin;
@@ -29,7 +32,7 @@ export class StdioTransport implements MCPTransport {
   async start(): Promise<void> {
     this.rl = readline.createInterface({ input: this.input });
     this.rl.on('line', (line: string) => {
-      void this.processLine(line);
+      this.queue = this.queue.then(() => this.processLine(line));
     });
   }
 

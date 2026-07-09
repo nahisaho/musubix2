@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.12] - 2026-07-09
+
+MCP stdio トランスポートのリクエスト直列化。エンドツーエンド統合を検証。
+
+### Fixed
+
+- **MCP stdio が受信行を並行処理して状態共有ツールがレースする問題を修正** — `StdioTransport` は `line` イベントごとにハンドラを await せず起動していたため、状態変更ツール（`ontology`/`workflow`/`knowledge` の load→mutate→save、`skills` セッションレジストリ）に対して**応答待ちせず連続送信するとレース**し、書き込みが失われることがあった（例: トリプル3件同時追加が total 1 に化ける）。受信行をキューにチェーンして**到着順に1件ずつ直列処理**するよう変更。これにより並行送信でも書き込みが失われず、`skills` の register→execute も順序保証される
+
+### Verified
+
+- 公開版 0.5.11 を `npx musubix2 init` で導入し、生成された `.mcp.json` の設定コマンド（`./node_modules/.bin/musubix2 mcp`）に対して MCP クライアント相当の完全ハンドシェイク（initialize → initialized → tools/list → tools/call）を実行。**61 ツールの取得と各カテゴリの実データ応答をエンドツーエンドで確認**
+
+### Tests
+
+- 直列化のリグレッションテスト（遅いリクエストが先でも到着順に処理）を追加。全ワークスペース 1693 テスト green
+
 ## [0.5.11] - 2026-07-09
 
 MCP ツール実 API 配線・最終回。残る formal-verify / lean / skills を実装し、**ISSUE-18 を完全解決**（全 13 カテゴリ・61 ツールが実パッケージ API で動作）。
