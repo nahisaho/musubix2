@@ -168,6 +168,17 @@ export function isNotFormatMarker(matchText: string): boolean {
 }
 
 /**
+ * Reject connection-string matches whose password is an obvious placeholder or
+ * interpolated variable (`user:password@`, `user:${PW}@`, `x:<pass>@`).
+ */
+export function isNotUrlPlaceholder(matchText: string): boolean {
+  const pass = matchText.match(/:\/\/[^:@/]+:([^:@/]+)@/)?.[1] ?? '';
+  if (/^(pass(word)?|secret|changeme|example|xxx+|\*+|test)$/i.test(pass)) return false;
+  if (/[$#]\{|<|%s|:\w+$/.test(pass)) return false; // ${..}, #{..}, <pass>, %s
+  return true;
+}
+
+/**
  * Blank out comments and string-literal interiors while preserving byte offsets
  * and line breaks, so injection patterns (eval/exec/innerHTML/…) don't match
  * inside a docblock (`* @method … eval()`) or a string literal (`'eval()'`).
@@ -283,6 +294,57 @@ export class SecretDetector {
       confidence: 0.85,
     },
     {
+      // GitHub personal access / OAuth / server / refresh tokens.
+      regex: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g,
+      severity: 'critical',
+      type: 'secret-leak',
+      description: 'GitHub token detected',
+      suggestion: 'Revoke the token and load it from a secrets manager',
+      cweId: 'CWE-798',
+      confidence: 0.95,
+    },
+    {
+      // Slack tokens (bot/user/app/refresh/legacy).
+      regex: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g,
+      severity: 'critical',
+      type: 'secret-leak',
+      description: 'Slack token detected',
+      suggestion: 'Revoke the token and load it from a secrets manager',
+      cweId: 'CWE-798',
+      confidence: 0.9,
+    },
+    {
+      // Stripe / similar `sk_live_` / `rk_live_` secret keys.
+      regex: /\b[sr]k_live_[A-Za-z0-9]{16,}\b/g,
+      severity: 'critical',
+      type: 'secret-leak',
+      description: 'Stripe live secret key detected',
+      suggestion: 'Revoke the key and load it from a secrets manager',
+      cweId: 'CWE-798',
+      confidence: 0.95,
+    },
+    {
+      // Google API key.
+      regex: /\bAIza[A-Za-z0-9_\-]{35}\b/g,
+      severity: 'high',
+      type: 'secret-leak',
+      description: 'Google API key detected',
+      suggestion: 'Restrict/revoke the key and load it from a secrets manager',
+      cweId: 'CWE-798',
+      confidence: 0.9,
+    },
+    {
+      // Credentials embedded in a connection URL: scheme://user:pass@host.
+      regex: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:'"@/]+:[^\s:'"@/]+@[^\s'"/]+/g,
+      severity: 'high',
+      type: 'hardcoded-credential',
+      description: 'Credentials in a connection string / URL detected',
+      suggestion: 'Move the username/password out of the URL into a secrets manager',
+      cweId: 'CWE-798',
+      confidence: 0.75,
+      validate: isNotUrlPlaceholder,
+    },
+    {
       regex: /['"][A-Za-z0-9]{32,}['"]/g,
       severity: 'medium',
       type: 'secret-leak',
@@ -377,6 +439,120 @@ export class TaintAnalyzer {
       suggestion: 'Use parameterized queries instead of template literals',
       cweId: 'CWE-89',
       confidence: 0.75,
+    },
+    // --- Command injection ---------------------------------------------------
+    {
+      regex: /\bos\.system\s*\(/g,
+      severity: 'critical',
+      type: 'injection',
+      description: 'Use of os.system() — potential command injection',
+      suggestion: 'Use subprocess with an argument list and shell=False',
+      cweId: 'CWE-78',
+      confidence: 0.85,
+    },
+    {
+      regex: /\bsubprocess\.\w+\([^)]*shell\s*=\s*True/g,
+      severity: 'high',
+      type: 'injection',
+      description: 'subprocess call with shell=True — potential command injection',
+      suggestion: 'Pass an argument list and use shell=False',
+      cweId: 'CWE-78',
+      confidence: 0.8,
+    },
+    {
+      regex: /(?<![.\w>:])(?:shell_exec|passthru|proc_open|popen)\s*\(/g,
+      severity: 'critical',
+      type: 'injection',
+      description: 'Use of a shell-execution function — potential command injection',
+      suggestion: 'Avoid shell execution of untrusted input; use safe APIs with argument arrays',
+      cweId: 'CWE-78',
+      confidence: 0.8,
+    },
+    {
+      regex: /(?<![.\w>:])(?<!\bdef\s)(?<!\bfunction\s)system\s*\(/g,
+      severity: 'high',
+      type: 'injection',
+      description: 'Use of system() — potential command injection',
+      suggestion: 'Avoid passing untrusted input to system(); use safe execution APIs',
+      cweId: 'CWE-78',
+      confidence: 0.65,
+    },
+    {
+      regex: /Runtime\.getRuntime\(\)\s*\.\s*exec\s*\(/g,
+      severity: 'critical',
+      type: 'injection',
+      description: 'Runtime.exec() — potential command injection',
+      suggestion: 'Use ProcessBuilder with an argument list and validate inputs',
+      cweId: 'CWE-78',
+      confidence: 0.8,
+    },
+    // --- SQL injection (formatting/concatenation in DB calls) ----------------
+    {
+      regex: /\b(?:execute|query|raw|prepare|executemany)\s*\(\s*f['"]/g,
+      severity: 'high',
+      type: 'injection',
+      description: 'Potential SQL injection — f-string in a database call',
+      suggestion: 'Use parameterized queries; never build SQL with f-strings',
+      cweId: 'CWE-89',
+      confidence: 0.75,
+    },
+    {
+      regex: /\b(?:execute|query|raw|prepare)\s*\([^)]*\.format\s*\(/g,
+      severity: 'high',
+      type: 'injection',
+      description: 'Potential SQL injection — .format() building a query',
+      suggestion: 'Use parameterized queries instead of str.format()',
+      cweId: 'CWE-89',
+      confidence: 0.7,
+    },
+    {
+      regex: /\b(?:execute|query|raw)\s*\([^)]*\+/g,
+      severity: 'high',
+      type: 'injection',
+      description: 'Potential SQL injection — string concatenation in a query call',
+      suggestion: 'Use parameterized queries instead of string concatenation',
+      cweId: 'CWE-89',
+      confidence: 0.7,
+    },
+    // --- Insecure deserialization -------------------------------------------
+    // --- Insecure deserialization (low severity: real but commonly intentional
+    // in framework internals; triage with --fail-on) ------------------------
+    {
+      regex: /\bpickle\.loads?\s*\(/g,
+      severity: 'low',
+      type: 'injection',
+      description: 'Insecure deserialization — pickle.load(s) (unsafe on untrusted data)',
+      suggestion: 'Never unpickle untrusted data; use a safe format such as JSON',
+      cweId: 'CWE-502',
+      confidence: 0.6,
+    },
+    {
+      regex: /\byaml\.load\s*\(/g,
+      severity: 'low',
+      type: 'injection',
+      description: 'Insecure deserialization — yaml.load() without SafeLoader',
+      suggestion: 'Use yaml.safe_load() instead of yaml.load()',
+      cweId: 'CWE-502',
+      confidence: 0.6,
+    },
+    {
+      regex: /(?<![.\w>:])unserialize\s*\(/g,
+      severity: 'low',
+      type: 'injection',
+      description: 'Insecure deserialization — unserialize() (unsafe on untrusted data)',
+      suggestion: 'Avoid unserialize() on untrusted input; use JSON',
+      cweId: 'CWE-502',
+      confidence: 0.6,
+    },
+    // --- Weak cryptography (low: often used for non-security checksums) -------
+    {
+      regex: /\bhashlib\.(?:md5|sha1)\s*\(|createHash\s*\(\s*['"](?:md5|sha1)['"]/g,
+      severity: 'low',
+      type: 'injection',
+      description: 'Weak cryptographic hash (MD5/SHA-1) detected',
+      suggestion: 'Use SHA-256+ (or bcrypt/argon2 for passwords) instead of MD5/SHA-1',
+      cweId: 'CWE-327',
+      confidence: 0.5,
     },
   ];
 

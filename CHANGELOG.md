@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.36] - 2026-07-10
+
+`security` の**検知漏れ（recall）を検証**（意図的な脆弱性フィクスチャで測定）し、主要な脆弱性クラスの検出を追加。フィクスチャで検出が 3 → 20 件に向上。
+
+### Added（検知カバレッジ）
+
+- **プロバイダートークン形式** — GitHub（`ghp_`/`gho_`/…）、Slack（`xox[baprs]-`）、Stripe（`sk_live_`/`rk_live_`）、Google API（`AIza…`）。従来は `_`/`-` を含むため長文字列パターンで取りこぼしていた
+- **接続文字列内の資格情報** — `scheme://user:pass@host`（プレースホルダ `user:password@`・`${...}`・`<pass>` は除外）
+- **コマンドインジェクション** — `os.system()`、`subprocess(…, shell=True)`、PHP `shell_exec`/`passthru`/`proc_open`/`popen`/`system`、Java `Runtime.exec()`
+- **SQL インジェクション（拡張）** — DB 呼び出し内の f-string・`.format()`・文字列連結（`execute`/`query`/`raw`/`prepare`）
+- **安全でないデシリアライズ** — `pickle.load(s)`、`yaml.load()`、PHP `unserialize()`（**低**重大度：フレームワーク内部で多用されるため）
+- **脆弱な暗号ハッシュ** — `hashlib.md5/sha1`、`createHash('md5'/'sha1')`（**低**重大度）
+
+### Notes（精度とのバランス）
+
+- デシリアライズ・弱い暗号は**低重大度の助言**として報告（実プロジェクトで多用され、多くは意図的なため）。`--fail-on high` 等で CI 用にフィルタ可能
+- `%` 文字列フォーマットによる SQLi 検出は追加後に不採用 — パラメータ化クエリ（`%s` プレースホルダ）と区別できず誤検知が多いため（Django で 43 件の偽陽性）。f-string／連結／`.format()` のより明確なパターンを採用
+
+### Validation
+
+- 脆弱性フィクスチャ（約22件）: 検出 3 → **20**（secrets 8/8、コマンドインジェクション 6/6、デシリアライズ 2/2、弱い暗号 2/2、SQLi 3/4）
+- 実プロジェクトの CRITICAL/HIGH は真陽性を維持（Django 8、Laravel 5）。ノイズになりやすい実在パターンは LOW 助言に整理
+
+### Tests
+
+- security: プロバイダートークン、接続文字列、コマンドインジェクション、f-string/連結 SQLi、デシリアライズ/弱い暗号（低重大度）を検証（33 → 40）
+
 ## [0.5.35] - 2026-07-10
 
 `security` パッケージを実プロジェクト（Django/Laravel/Rails/ripgrep）で dogfooding し、**誤検知（false positive）を大幅削減**。

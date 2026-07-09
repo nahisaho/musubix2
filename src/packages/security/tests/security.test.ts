@@ -104,6 +104,32 @@ describe('DES-COD-003: SecretDetector', () => {
     const findings = detector.scan(code, 'formula.rb');
     expect(findings.filter((f) => f.type === 'secret-leak')).toHaveLength(0);
   });
+
+  // v0.5.36 — recall: provider token formats and connection-string credentials.
+  // Tokens are assembled at runtime so no literal secret exists in source (which
+  // would otherwise trip GitHub push protection); the scanner sees the full value.
+  it('detects provider token formats (GitHub/Slack/Stripe/Google)', () => {
+    const f = (n: number) => 'a1B2c3'.repeat(Math.ceil(n / 6)).slice(0, n);
+    const cases: Array<[string, string]> = [
+      ['GitHub', `const t = "ghp_${f(36)}";`],
+      ['Slack', `const t = "xoxb-000000000000-000000000000-${f(24)}";`],
+      ['Stripe', `const t = "sk_live_${f(24)}";`],
+      ['Google', `const t = "AIza${f(35)}";`],
+    ];
+    for (const [name, code] of cases) {
+      const findings = detector.scan(code, 'config.js');
+      expect(findings.some((x) => x.description.includes(name)), name).toBe(true);
+    }
+  });
+
+  it('detects credentials embedded in a connection URL', () => {
+    const pw = 'S3cret' + 'P4ss'; // assembled — no literal credential in source
+    const findings = detector.scan(`DB_URL = "postgres://admin:${pw}@db.example.com/prod"`, 'settings.py');
+    expect(findings.some((x) => x.type === 'hardcoded-credential')).toBe(true);
+    // …but not a placeholder example URL.
+    const doc = 'DB_URL = "postgres://user:password@localhost/db"';
+    expect(detector.scan(doc, 'README.md').filter((x) => x.type === 'hardcoded-credential')).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -159,6 +185,29 @@ describe('DES-COD-003: TaintAnalyzer', () => {
     expect(analyzer.analyze("el.innerHTML = '<b>ok</b>';", 'ui.js')).toHaveLength(0);
     // but a dynamic assignment is still flagged
     expect(analyzer.analyze('el.innerHTML = userInput;', 'ui.js').length).toBeGreaterThan(0);
+  });
+
+  // v0.5.36 — recall: command injection, deserialization, weak crypto.
+  it('detects command-injection sinks', () => {
+    expect(analyzer.analyze('os.system("rm -rf " + x)', 'a.py').length).toBeGreaterThan(0);
+    expect(analyzer.analyze('subprocess.run(cmd, shell=True)', 'a.py').length).toBeGreaterThan(0);
+    expect(analyzer.analyze("shell_exec($_GET['c'])", 'a.php').length).toBeGreaterThan(0);
+    expect(analyzer.analyze('Runtime.getRuntime().exec(cmd)', 'A.java').length).toBeGreaterThan(0);
+  });
+
+  it('detects f-string / concatenation SQL building', () => {
+    expect(analyzer.analyze('cursor.execute(f"SELECT * FROM t WHERE n={n}")', 'db.py').length).toBeGreaterThan(0);
+    expect(analyzer.analyze('db.query("SELECT " + cols)', 'db.js').length).toBeGreaterThan(0);
+  });
+
+  it('flags deserialization and weak crypto at low severity', () => {
+    const pickle = analyzer.analyze('data = pickle.loads(buf)', 'a.py');
+    expect(pickle.length).toBeGreaterThan(0);
+    expect(pickle[0]!.severity).toBe('low');
+    expect(analyzer.analyze('$x = unserialize($blob);', 'a.php').length).toBeGreaterThan(0);
+    const md5 = analyzer.analyze('h = hashlib.md5(pw).hexdigest()', 'a.py');
+    expect(md5.length).toBeGreaterThan(0);
+    expect(md5[0]!.severity).toBe('low');
   });
 
   it('ignores injection patterns inside comments and string literals', () => {
