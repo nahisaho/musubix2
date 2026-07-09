@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.13] - 2026-07-09
+
+実世界コードベース（Moodle 5.x, 50k+ PHP ファイル）での CodeGraph 脆弱性分析ドッグフーディングで発見した課題を改修。
+
+### Fixed
+
+- **`cg index` が永続化されず `cg search` / `cg stats` が常に 0 になる問題を修正** — 索引したグラフをメモリに構築するだけで保存していなかったため、「索引 → 検索/統計」という CodeGraph 分析の基本ワークフローが別プロセス間で成立しなかった。`.musubix/codegraph.json` に永続化し、`search`/`stats` は保存済みグラフを読み込むよう変更（`cg search` は一致ノードをファイルパス付きで表示）。Moodle 認証系 782 ノードの索引→`search password` で 43 関数を特定できることを確認
+- **secret detector が長い低エントロピー文字列を誤検知する問題を修正** — 32文字以上の英数字文字列を無条件に「秘密鍵疑い」としていたため、識別子や i18n 言語キー（例: Moodle の `verifyagedigitalconsentnotpossible`）を誤検知していた。エントロピー＋文字種チェック（`isLikelySecret`）を追加し、真に高エントロピー・混在文字種の文字列のみ検出
+- **hardcoded-password ルールが書式マーカーを誤検知する問題を修正** — `$extpassword = '{MD5}' . ...`（LDAP のハッシュ種別マーカー）を「ハードコードパスワード」と誤検知していた。`{MD5}`/`{SHA}` 等の書式マーカー・極短リテラルを除外（`isNotFormatMarker`）
+
+### Tests
+
+- cg 永続化（index→stats→search ラウンドトリップ）、secret 精度（言語キー/書式マーカーを非検知・真の秘密は検知）のテストを追加。全ワークスペース 1697 テスト green
+
 ## [0.5.12] - 2026-07-09
 
 MCP stdio トランスポートのリクエスト直列化。エンドツーエンド統合を検証。

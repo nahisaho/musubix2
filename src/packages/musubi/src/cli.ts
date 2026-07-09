@@ -869,6 +869,34 @@ export function toIdentifier(name: string): string {
   return /^[A-Za-z_]/.test(cleaned) ? cleaned : `_${cleaned}`;
 }
 
+const CODEGRAPH_STATE_FILE = '.musubix/codegraph.json';
+
+/** Load a persisted code graph into a fresh engine (empty if none saved). */
+function loadCodeGraph(): ReturnType<typeof createGraphEngine> {
+  const engine = createGraphEngine();
+  try {
+    if (existsSync(CODEGRAPH_STATE_FILE)) {
+      const data = JSON.parse(readFileSync(CODEGRAPH_STATE_FILE, 'utf-8')) as {
+        nodes?: Array<Parameters<typeof engine.addNode>[0]>;
+        edges?: Array<Parameters<typeof engine.addEdge>[0]>;
+      };
+      for (const node of data.nodes ?? []) engine.addNode(node);
+      for (const edge of data.edges ?? []) engine.addEdge(edge);
+    }
+  } catch {
+    // Corrupt/unreadable — start empty.
+  }
+  return engine;
+}
+
+function saveCodeGraph(
+  nodes: Array<Parameters<ReturnType<typeof createGraphEngine>['addNode']>[0]>,
+  edges: Array<Parameters<ReturnType<typeof createGraphEngine>['addEdge']>[0]> = [],
+): void {
+  mkdirSync(dirnamePath(CODEGRAPH_STATE_FILE), { recursive: true });
+  writeFileSync(CODEGRAPH_STATE_FILE, JSON.stringify({ nodes, edges }, null, 2), 'utf-8');
+}
+
 export async function handleCodegraph(
   sub: string | undefined,
   args: string[],
@@ -893,6 +921,7 @@ export async function handleCodegraph(
           console.error(`❌ No indexable source files found under: ${targetPath}`);
           return ExitCode.GENERAL_ERROR;
         }
+        const savedNodes: Array<Parameters<typeof engine.addNode>[0]> = [];
         let indexedFiles = 0;
         for (const file of files) {
           const ext = file.split('.').pop() ?? '';
@@ -901,22 +930,27 @@ export async function handleCodegraph(
           const content = readFileSync(file, 'utf-8');
           const nodes = parser.parse(content, lang);
           for (const node of nodes) {
-            engine.addNode({
+            const entry = {
               id: `${file}:${node.name}`,
               name: node.name,
               kind: node.kind,
               filePath: file,
               language: lang,
-              startLine: 0,
-              endLine: 0,
-            });
+              startLine: node.startLine ?? 0,
+              endLine: node.endLine ?? 0,
+            };
+            engine.addNode(entry);
+            savedNodes.push(entry);
           }
           indexedFiles++;
         }
+        // Persist so `cg search` / `cg stats` can operate on the indexed graph.
+        saveCodeGraph(savedNodes);
         const stats = engine.getStats();
         console.log(
           `✅ Indexed ${targetPath}: ${indexedFiles} file(s), ${stats.nodeCount} nodes, ${stats.edgeCount} edges`,
         );
+        console.log(`   Saved to ${CODEGRAPH_STATE_FILE}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`❌ ${msg}`);
@@ -930,14 +964,18 @@ export async function handleCodegraph(
         console.error('❌ Usage: musubix cg search <query>');
         return ExitCode.GENERAL_ERROR;
       }
-      const engine = createGraphEngine();
+      const engine = loadCodeGraph();
       const search = new GraphRAGSearch(engine);
       const results = search.globalSearch(query);
       console.log(`Results for "${query}": ${results.length} found`);
+      for (const r of results.slice(0, 20)) {
+        const node = (r as { node?: { name?: string; filePath?: string } }).node ?? (r as { name?: string; filePath?: string });
+        if (node?.name) console.log(`  ${node.name}${node.filePath ? ` (${node.filePath})` : ''}`);
+      }
       return ExitCode.SUCCESS;
     }
     case 'stats': {
-      const engine = createGraphEngine();
+      const engine = loadCodeGraph();
       const stats = engine.getStats();
       console.log(`Nodes: ${stats.nodeCount}`);
       console.log(`Edges: ${stats.edgeCount}`);

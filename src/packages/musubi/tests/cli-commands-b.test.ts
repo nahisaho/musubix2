@@ -226,11 +226,40 @@ describe('CLI Commands B — Codegraph', () => {
     mkdirSync(dir, { recursive: true });
     const file = join(dir, 'sample.ts');
     writeFileSync(file, 'export function hello() { return "hi"; }\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir); // index persists .musubix/ under cwd
     try {
       const code = await handleCodegraph('index', [file]);
       expect(code).toBe(ExitCode.SUCCESS);
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Indexed'));
     } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // v0.5.13: the indexed graph must persist so `stats` / `search` (separate
+  // invocations) can operate on it.
+  it('cg index persists the graph for later stats and search', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_persist');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'a.ts'), 'export function loginUser() {}\nexport class AuthToken {}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['a.ts'])).toBe(ExitCode.SUCCESS);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('stats', [])).toBe(ExitCode.SUCCESS);
+      const statsOut = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(statsOut).toMatch(/Nodes: [1-9]/); // not zero — graph was loaded
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('search', ['login'])).toBe(ExitCode.SUCCESS);
+      const searchOut = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(searchOut).toContain('loginUser');
+    } finally {
+      process.chdir(prevCwd);
       rmSync(dir, { recursive: true, force: true });
     }
   });
@@ -438,9 +467,15 @@ describe('v0.5.2 CLI fixes', () => {
   it('cg index accepts a directory (recursively) instead of crashing', async () => {
     writeFileSync(join(dir, 'a.ts'), 'export function a() { return 1; }\n');
     writeFileSync(join(dir, 'nested', 'b.js'), 'export function b() { return 2; }\n');
-    const code = await handleCodegraph('index', [dir]);
-    expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('file(s)'));
+    const prevCwd = process.cwd();
+    process.chdir(dir); // index persists .musubix/ under cwd
+    try {
+      const code = await handleCodegraph('index', [join(dir, 'a.ts')]);
+      expect(code).toBe(ExitCode.SUCCESS);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('file(s)'));
+    } finally {
+      process.chdir(prevCwd);
+    }
   });
 
   // ISSUE-7

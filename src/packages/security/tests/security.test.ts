@@ -50,6 +50,27 @@ describe('DES-COD-003: SecretDetector', () => {
     const findings = detector.scan(code, 'clean.ts');
     expect(findings).toHaveLength(0);
   });
+
+  // v0.5.13 — precision fixes surfaced by scanning Moodle.
+  it('does not flag long low-entropy i18n string keys as secrets', () => {
+    // A 34-char all-lowercase identifier (Moodle lang key), not a secret.
+    const code = "get_string('verifyagedigitalconsentnotpossible', 'error');";
+    const findings = detector.scan(code, 'login.php');
+    expect(findings.filter((f) => f.type === 'secret-leak')).toHaveLength(0);
+  });
+
+  it('does not flag hash-type format markers as hardcoded passwords', () => {
+    // Moodle LDAP: $extpassword = '{MD5}' . base64_encode(...) — {MD5} is a marker.
+    const code = "$extpassword = '{MD5}' . base64_encode(pack('H*', md5($extpassword)));";
+    const findings = detector.scan(code, 'ldap/auth.php');
+    expect(findings.filter((f) => f.type === 'hardcoded-credential')).toHaveLength(0);
+  });
+
+  it('still flags a genuine high-entropy mixed-class secret string', () => {
+    const code = "const apiKey = 'aB3xR9zK1mN7qP2wL5tY8uV4cD6eF0gH';";
+    const findings = detector.scan(code, 'config.ts');
+    expect(findings.some((f) => f.type === 'secret-leak')).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

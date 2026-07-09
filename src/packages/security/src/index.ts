@@ -95,6 +95,45 @@ interface DetectorPattern {
   suggestion: string;
   cweId?: string;
   confidence: number;
+  /** Optional post-match filter; when it returns false the match is ignored. */
+  validate?: (matchText: string) => boolean;
+}
+
+/** Shannon entropy (bits per character) of a string. */
+function shannonEntropy(s: string): number {
+  if (s.length === 0) return 0;
+  const freq = new Map<string, number>();
+  for (const ch of s) freq.set(ch, (freq.get(ch) ?? 0) + 1);
+  let h = 0;
+  for (const n of freq.values()) {
+    const p = n / s.length;
+    h -= p * Math.log2(p);
+  }
+  return h;
+}
+
+/**
+ * Heuristic to distinguish a real high-entropy secret from a long but
+ * non-random string (identifiers, i18n string keys, dictionary words).
+ * Requires a mix of character classes AND sufficient entropy, so an
+ * all-lowercase token like `verifyagedigitalconsentnotpossible` is not flagged.
+ */
+export function isLikelySecret(raw: string): boolean {
+  const s = raw.replace(/^['"]|['"]$/g, '');
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/].filter((re) => re.test(s)).length;
+  return classes >= 2 && shannonEntropy(s) >= 3.0;
+}
+
+/**
+ * Reject `password = '...'` matches whose literal is a hash/format marker
+ * (`{MD5}`, `{SHA}`, …) or an empty/placeholder value — these are not
+ * hardcoded credentials.
+ */
+export function isNotFormatMarker(matchText: string): boolean {
+  const lit = matchText.match(/['"]([^'"]*)['"]\s*$/)?.[1] ?? '';
+  if (/^\{[^}]*\}$/.test(lit)) return false; // {MD5}, {SHA}, {CRYPT}, ...
+  if (lit.trim().length < 3) return false; // empty / trivial placeholders
+  return true;
 }
 
 function runPatterns(
@@ -107,6 +146,7 @@ function runPatterns(
     const regex = new RegExp(p.regex.source, p.regex.flags);
     let match: RegExpExecArray | null;
     while ((match = regex.exec(code)) !== null) {
+      if (p.validate && !p.validate(match[0])) continue;
       const line = getLineNumber(code, match.index);
       findings.push({
         type: p.type,
@@ -158,6 +198,10 @@ export class SecretDetector {
       suggestion: 'Use environment variables or a secrets manager instead of hardcoded passwords',
       cweId: 'CWE-798',
       confidence: 0.8,
+      // Ignore format markers like `{MD5}` / `{SHA}` and empty/placeholder
+      // literals — a variable named *password* concatenated with a hash-type
+      // prefix is not a hardcoded credential.
+      validate: isNotFormatMarker,
     },
     {
       regex: /eyJ[A-Za-z0-9\-_]+\.eyJ[A-Za-z0-9\-_]+/g,
@@ -176,6 +220,9 @@ export class SecretDetector {
       suggestion: 'Verify whether this is a secret and move it to environment variables if so',
       cweId: 'CWE-798',
       confidence: 0.6,
+      // Only flag genuinely high-entropy, mixed-class strings — not long
+      // identifiers or i18n string keys (which are all-lowercase words).
+      validate: isLikelySecret,
     },
   ];
 
