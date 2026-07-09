@@ -344,30 +344,27 @@ export class McpConfigGenerator {
 
 ---
 
-### DES-INS-006: postinstall 自動初期化
+### DES-INS-006: install ライフサイクルスクリプト非依存
 
 **トレーサビリティ**: REQ-INS-006
-**パッケージ**: `musubix2`（`scripts/`, `interface/cli`）
+**パッケージ**: `musubix2`
 
 **設計概要**:
-パッケージ配布時に `package.json` の `scripts.postinstall` へ `node ./dist/postinstall-bootstrap.js` を追加し、`MUSUBIX_AUTO_INIT=1` の時だけ内部的に `musubix2 init --platform auto` 相当の処理を起動する。postinstall は常に best-effort とし、失敗を警告にダウングレードする。ログは対象ワークスペースルートの `musubix-init.log` に追記する。非対話環境では `ConfirmationResolver` が候補プラットフォームを自動確定せず、警告のみ出して終了する。
-
-```typescript
-export class WorkspaceRootResolver {
-  resolveFromLifecycle(env: NodeJS.ProcessEnv, cwd: string): string;
-}
-
-export class PostinstallBootstrap {
-  run(env: NodeJS.ProcessEnv, cwd: string): Promise<{ attempted: boolean; success: boolean; workspaceRoot?: string }>;
-}
-```
+npm の install ライフサイクルスクリプト（preinstall / postinstall）を一切使用しない。
+`package.json` の `scripts` から `postinstall` を除去し、セットアップは `npx musubix2 init` の
+明示的実行のみで完結させる。`init` はカレントディレクトリを workspace root とみなして
+プラットフォーム検出（DES-INS-001）から設定ファイル生成（DES-INS-003/004）までを実行する。
 
 **パッケージ契約**:
-- `scripts.postinstall = "node ./dist/postinstall-bootstrap.js"`
-- `dist/postinstall-bootstrap.js` は `WorkspaceRootResolver` で `INIT_CWD` → `npm_config_local_prefix` → `cwd` の順に workspace root を解決し、そのパスへ `InitCommandHandler` を適用する
-- postinstall は終了コード 0 を維持し、失敗詳細は `musubix-init.log` へ記録する
+- `scripts` に `preinstall` / `postinstall` を含めない
+- `files` に lifecycle スクリプト用ファイルを含めない
+- `npm install musubix2` はパッケージ展開以外の副作用を持たない
 
-**CLI契約**: `MUSUBIX_AUTO_INIT=1 npm install musubix2`
+**CLI契約**: `npm install musubix2 && npx musubix2 init --platform auto`
+
+> 改訂履歴: v0.6 で「postinstall 自動初期化（`PostinstallBootstrap` + `WorkspaceRootResolver`、
+> `MUSUBIX_AUTO_INIT=1` オプトイン）」を廃止し本設計に置換。npm の install ライフサイクル
+> スクリプト非推奨化への対応。
 
 ---
 
@@ -683,7 +680,6 @@ export interface WriteSummary {
 | テンプレート・資産カタログ | `src/packages/musubi/src/infrastructure/templates/`, `src/packages/musubi/src/infrastructure/assets/` | 配布資産の解決を集約 |
 | ワークスペース書き込み/ロールバック | `src/packages/musubi/src/infrastructure/workspace/` | I/O と安全性制御を隔離 |
 | mcp ランチャー | `src/packages/musubi/src/interface/cli/` | `musubix2 mcp` 入口 |
-| postinstall bootstrap | `src/packages/musubi/src/interface/cli/postinstall-bootstrap.ts` | npm postinstall から内部サービスを呼び出す |
 | MCP 実サーバー | `src/packages/mcp-server/src/` | 既存 MCP 実装再利用 |
 
 ---
@@ -728,6 +724,7 @@ export interface WriteSummary {
 
 | バージョン | 日付 | 変更内容 | 著者 |
 |-----------|------|---------|------|
+| 0.6 | 2026-07-09 | DES-INS-006 改訂: postinstall 自動初期化を廃止し、install ライフサイクルスクリプト非依存に置換（PostinstallBootstrap / WorkspaceRootResolver 削除） | MUSUBIX2 |
 | 0.5 | 2026-04-05 | 再レビュー反映: 共有型定義 (WorkspaceSnapshot, GeneratedFile, GeneratedDirectory, WorkspaceWriter, WriteSummary) をデータモデルに追加 | MUSUBIX2 |
 | 0.4 | 2026-04-05 | 再レビュー反映: postinstall の workspace root 解決、init 後方互換モード、package root 解決器を追加 | MUSUBIX2 |
 | 0.3 | 2026-04-05 | 再レビュー反映: InstallPlanner設計追加、シーケンス図に確認フロー追加、重複changelog修正 | MUSUBIX2 |

@@ -15,13 +15,13 @@
 
 ### 1.1 目的
 
- musubix2 npm パッケージを `npm install` と `npx musubix2 init` の最小 2 ステップ、または `MUSUBIX_AUTO_INIT=1` を用いた自動初期化で、GitHub Copilot（VS Code Agent Mode）と Claude Code の両方に導入可能にする。ユーザーが手動でファイルをコピーしたり、プラットフォーム固有の設定を行う必要をなくす。
+ musubix2 npm パッケージを `npm install` と `npx musubix2 init` の最小 2 ステップで、GitHub Copilot（VS Code Agent Mode）と Claude Code の両方に導入可能にする。ユーザーが手動でファイルをコピーしたり、プラットフォーム固有の設定を行う必要をなくす。npm の install ライフサイクルスクリプト（preinstall / postinstall）には依存しない。
 
 ### 1.2 スコープ
 
 | 対象 | 内容 |
 |------|------|
-| IN | npm パッケージ配布物の拡張、postinstall 自動セットアップ、CLAUDE.md 生成、.mcp.json 生成、.claude/ スキル同梱 |
+| IN | npm パッケージ配布物の拡張、`init` によるセットアップ完結、CLAUDE.md 生成、.mcp.json 生成、.claude/ スキル同梱 |
 | OUT | VS Code 拡張機能としての配布、Cursor 固有対応、Web UI |
 
 ### 1.3 背景
@@ -141,17 +141,20 @@ Claude Code 向けには `CLAUDE.md`（プロジェクト指示）、`.mcp.json`
 
 ---
 
-#### REQ-INS-006: postinstall 自動セットアップ
+#### REQ-INS-006: install ライフサイクルスクリプト非依存
 
-**EARS パターン**: EVENT-DRIVEN
+**EARS パターン**: UNWANTED
 **優先度**: P1
 
-> WHEN npm install 時に `MUSUBIX_AUTO_INIT=1` が設定されている時、THE システム SHALL postinstall フックで `musubix2 init --platform auto` を実行する。
+> THE システム SHALL NOT npm の install ライフサイクルスクリプト（preinstall / postinstall）でセットアップ処理を実行しない。すべてのセットアップは `npx musubix2 init` で完結する。
 
 **受入基準**:
-- `MUSUBIX_AUTO_INIT` 未設定時は postinstall で設定ファイル生成を行わない
-- postinstall 失敗時は install 自体を失敗させず、警告ログのみを出力する
-- postinstall 実行結果を `musubix-init.log` に記録する
+- `package.json` の `scripts` に `preinstall` / `postinstall` が存在しない
+- `npm install musubix2` はファイル生成・環境変更を一切行わない
+- `npx musubix2 init` 単体でプラットフォーム検出からファイル生成まで完結する
+
+> 改訂履歴: v1.1 で「postinstall 自動セットアップ（`MUSUBIX_AUTO_INIT=1` オプトイン）」から本要件に置換。
+> npm が install ライフサイクルスクリプトを非推奨化したことに伴う変更。
 
 ---
 
@@ -398,6 +401,7 @@ Claude Code 向けには `CLAUDE.md`（プロジェクト指示）、`.mcp.json`
 
 | バージョン | 日付 | 変更内容 | 著者 |
 |-----------|------|---------|------|
+| 1.1 | 2026-07-09 | REQ-INS-006 改訂: postinstall 自動セットアップを廃止し「install ライフサイクルスクリプト非依存」（UNWANTED）に置換、目的/スコープから auto-init を除去 | MUSUBIX2 |
 | 0.7 | 2026-04-05 | 再レビュー反映: 目的を install+init / auto-init に整合化、REQ-INS-002 に auto フラグ追加、Claude候補検出時の初期返却値を明確化 | MUSUBIX2 |
 | 0.6 | 2026-04-05 | 再々レビュー反映: アトミック中断条件をI/O失敗に限定、MCP設定のマージ動作追加、SKL-001にマージ動作追加、SAF-001の追記/マージ除外明記、INS-005の曖昧表現修正 | MUSUBIX2 |
 | 0.5 | 2026-04-05 | 再レビュー反映: Claude検出の誤検知抑制、REQ-INS-004のアトミック失敗条件明確化、REQ-INS-005/REQ-CFG-003のcommand/args整合化 | MUSUBIX2 |

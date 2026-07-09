@@ -3,8 +3,7 @@
  * Tests: Domain types, PlatformDetector, McpLaunchResolver, McpConfigGenerator,
  *        InstallPlanner, WorkspaceMergeService, ClaudeSkillIndexBuilder,
  *        InitModeResolver, ConfirmationResolver, DryRunReporter,
- *        WorkspaceRootResolver, PackageRootLocator, WorkspaceWriter,
- *        TemplateRenderer.
+ *        PackageRootLocator, WorkspaceWriter, TemplateRenderer.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
@@ -252,26 +251,6 @@ describe('ClaudeSkillIndexBuilder', () => {
   it('returns empty string for empty items', () => {
     const builder = new ClaudeSkillIndexBuilder();
     expect(builder.build([])).toBe('');
-  });
-});
-
-// ── WorkspaceRootResolver ──────────────────────────────────────────────────
-
-import { WorkspaceRootResolver } from '../src/infrastructure/workspace/workspace-root-resolver.js';
-
-describe('WorkspaceRootResolver', () => {
-  const resolver = new WorkspaceRootResolver();
-
-  it('prefers INIT_CWD', () => {
-    expect(resolver.resolveFromLifecycle({ INIT_CWD: '/a' }, '/b')).toBe('/a');
-  });
-
-  it('falls back to npm_config_local_prefix', () => {
-    expect(resolver.resolveFromLifecycle({ npm_config_local_prefix: '/c' }, '/b')).toBe('/c');
-  });
-
-  it('falls back to cwd', () => {
-    expect(resolver.resolveFromLifecycle({}, '/b')).toBe('/b');
   });
 });
 
