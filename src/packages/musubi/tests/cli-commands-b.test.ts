@@ -558,6 +558,32 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.32: Python builtin globals must not resolve to same-named user defs.
+  it('cg does not resolve Python builtin names to user definitions', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_pybuiltin');
+    mkdirSync(dir, { recursive: true });
+    // lib.py defines a real helper AND (unluckily) a `type` — both unique.
+    writeFileSync(join(dir, 'lib.py'), 'def my_unique_helper():\n    return 1\ndef type():\n    return 2\n');
+    writeFileSync(
+      join(dir, 'app.py'),
+      'from lib import my_unique_helper\ndef run(x):\n    return my_unique_helper() + type(x) + len(x)\n',
+    );
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      const graph = JSON.parse(readFileSync(join(dir, '.musubix', 'codegraph.json'), 'utf-8'));
+      const callTargets = graph.edges.filter((e: { kind: string }) => e.kind === 'calls')
+        .map((e: { to: string }) => e.to);
+      expect(callTargets).toContain('my_unique_helper'); // real cross-file call resolves
+      expect(callTargets).not.toContain('type'); // builtin — suppressed
+      expect(callTargets).not.toContain('len'); // builtin — suppressed
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.31: candidates cycle penalty + path --all.
   it('cg candidates penalises files in a dependency cycle', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_cyc_pen');

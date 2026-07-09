@@ -970,6 +970,21 @@ const BUILTIN_CALL_NAMES = new Set<string>([
   // Python container / string built-in methods
   'append', 'extend', 'insert', 'remove', 'count', 'update', 'items',
   'setdefault', 'strip', 'lstrip', 'rstrip', 'format', 'encode', 'decode',
+  // Python global built-in functions (a user `def super`/`type`/… otherwise
+  // captures every builtin call across the codebase — 17% of Django's edges).
+  'super', 'type', 'len', 'str', 'int', 'float', 'bool', 'dict', 'list',
+  'tuple', 'frozenset', 'bytes', 'bytearray', 'complex', 'object', 'range',
+  'isinstance', 'issubclass', 'hasattr', 'getattr', 'setattr', 'delattr',
+  'property', 'staticmethod', 'classmethod', 'repr', 'print', 'input',
+  'enumerate', 'zip', 'sorted', 'reversed', 'min', 'max', 'sum', 'abs',
+  'round', 'iter', 'vars', 'dir', 'hash', 'callable', 'any', 'all',
+  'chr', 'ord', 'hex', 'oct', 'bin', 'divmod', 'pow', 'globals', 'locals',
+  // Python str/bytes methods (lowercase — distinct from the camelCase JS ones)
+  'upper', 'lower', 'title', 'capitalize', 'swapcase', 'casefold',
+  'startswith', 'endswith', 'splitlines', 'zfill', 'ljust', 'rjust', 'center',
+  'expandtabs', 'translate', 'partition', 'rpartition', 'rsplit', 'rfind',
+  'rindex', 'isdigit', 'isalpha', 'isalnum', 'isspace', 'islower', 'isupper',
+  'istitle', 'isidentifier', 'isnumeric', 'isdecimal',
 ]);
 
 /**

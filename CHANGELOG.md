@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.32] - 2026-07-10
+
+Django（908 Python ファイル）での dogfooding により、Python の**組み込みグローバル関数の誤解決**バグを発見・修正。
+
+### Fixed
+
+- **Python 組み込み名の誤ったコールエッジ** — `super`/`type`/`dict`/`min`/`max` 等の組み込みグローバル関数が、同名のユーザー `def`（例: Django の `loader_tags.py` にある `def super`）に対して**コーパス全体の呼び出しから誤ってエッジ化**されていた。Django では calls エッジの **17.2%（2,896 中 499）が偽陽性**で、`super`（265）が「最も呼ばれる関数」に浮上していた
+  - 組み込み denylist に **Python グローバル組み込み関数**（super/type/len/str/int/float/bool/dict/list/tuple/isinstance/property/enumerate/zip/sorted/min/max/sum/abs 等）と **Python 文字列メソッド**（upper/lower/title/startswith/endswith/isdigit 等、小文字系で JS の camelCase とは別）を追加
+  - denylist は従来どおり**非 C 定義名に限定**して適用するため、C の同名関数エッジには無影響（カーネルコア calls 8,474 で不変）
+  - `open`/`next`/`id` 等、正当なユーザーメソッド名になりやすいものは意図的に除外
+
+### Impact
+
+- Django 再インデックスで calls エッジが 2,896 → 2,481（偽エッジ 415 除去）、組み込み標的エッジ 0 に。「最も呼ばれる関数」が `_lazy_re_compile`/`import_string`/`Migration` 等の実 Django シンボルに正常化。`cg candidates` も `regex_helper.py`/`smartif.py` 等の自己完結モジュールを正しく上位提示
+
+### Tests
+
+- musubi: Python 組み込み名（`type`/`len`）がユーザー `def` に解決されず、実ヘルパー呼び出しは解決されることを検証（75 → 76）
+
 ## [0.5.31] - 2026-07-10
 
 残バックログ 4 件をまとめて対応。
