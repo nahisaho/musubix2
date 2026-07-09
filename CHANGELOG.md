@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.23] - 2026-07-10
+
+CodeGraph に**グラフ出力 `cg export`** を追加。依存グラフを外部ツールで可視化・解析できるようにした。
+
+### Added
+
+- **`cg export [path-fragment] [--format dot|json] [--out <file>]`** — シンボルエッジをファイル→ファイルに解決した**ファイルレベル依存グラフ**を出力
+  - `--format dot`（既定）: Graphviz DOT。ノードはファイル（ラベルは basename）、`imports` は破線・`calls` は実線で区別
+  - `--format json`: `{ files: [...], edges: [{from,to,kind}] }` の正規化 JSON
+  - `--out <file>` でファイル書き込み（省略時は標準出力）。`path-fragment` で部分グラフに限定（大規模グラフのサブセット可視化に有用）
+
+### Impact
+
+- Linux カーネルコアで `cg export cmdline.c` が 25 ファイル / 26 エッジの部分グラフ（`cmdline.c → string.c/ctype.c` は破線 import、呼び出し元 → `cmdline.c` は実線 call）を出力。全体は 914 ファイル / 7,036 エッジの DOT を生成
+
+### Tests
+
+- musubi: DOT/JSON 出力構造、`--out` ファイル書き込み、不正フォーマット拒否を検証（62 → 63）
+
 ## [0.5.22] - 2026-07-09
 
 CodeGraph の使い勝手を 3 点強化。

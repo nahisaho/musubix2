@@ -12,7 +12,7 @@ import {
   handleStatus,
 } from '../src/cli.js';
 import { ExitCode } from '@musubix2/core';
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ── Traceability ───────────────────────────────────────────────────────────
@@ -436,6 +436,48 @@ describe('CLI Commands B — Codegraph', () => {
       const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
       expect(out).toContain('caller.c'); // global call resolves to global.c
       expect(out).not.toContain('other.c'); // static homonym binds locally, not to global.c
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // v0.5.23: cg export — file-level dependency graph as DOT / JSON.
+  it('cg export emits DOT and JSON file-level graphs', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_export');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'lib.c'), 'int helper_fn(int x)\n{\n\treturn x + 1;\n}\n');
+    writeFileSync(join(dir, 'app.c'), 'int run(void)\n{\n\treturn helper_fn(41);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('export', ['--format', 'dot'])).toBe(ExitCode.SUCCESS);
+      const dot = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(dot).toContain('digraph codegraph {');
+      expect(dot).toContain(' -> '); // at least one edge (app.c -> lib.c)
+      expect(dot.trimEnd().endsWith('}')).toBe(true);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('export', ['--format', 'json'])).toBe(ExitCode.SUCCESS);
+      const jsonStr = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      const parsed = JSON.parse(jsonStr);
+      expect(Array.isArray(parsed.files)).toBe(true);
+      expect(Array.isArray(parsed.edges)).toBe(true);
+      expect(parsed.edges.some((e: { kind: string }) => e.kind === 'calls')).toBe(true);
+
+      // --out writes a file and reports counts.
+      const outFile = join(dir, 'graph.dot');
+      logSpy.mockClear();
+      expect(await handleCodegraph('export', ['--out', outFile])).toBe(ExitCode.SUCCESS);
+      const msg = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(msg).toContain('Exported');
+      expect(readFileSync(outFile, 'utf-8')).toContain('digraph');
+
+      // Unknown format is rejected.
+      expect(await handleCodegraph('export', ['--format', 'yaml'])).toBe(ExitCode.VALIDATION_ERROR);
     } finally {
       process.chdir(prevCwd);
       rmSync(dir, { recursive: true, force: true });

@@ -153,8 +153,8 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'オントロジー管理',
   },
   cg: {
-    usage: 'musubix cg <index|search|stats|deps|impact|candidates|languages> [args]',
-    description: 'コードグラフ分析 (impact に --direct、candidates は書き換え候補ランキング)',
+    usage: 'musubix cg <index|search|stats|deps|impact|candidates|export|languages> [args]',
+    description: 'コードグラフ分析 (impact に --direct/--depth、candidates は書き換え候補、export は DOT/JSON 出力)',
   },
   security: {
     usage: 'musubix security <path> [--fail-on critical|high|medium|low|info] [--exclude-tests]',
@@ -996,6 +996,11 @@ const CG_SUBCOMMAND_HELP: Record<string, string> = {
     '  Rank files by suitability for an isolated rewrite (e.g. to Rust):\n' +
     '  score = (functions + dependents) / (1 + external deps). Test files are\n' +
     '  excluded. N limits the number of rows (default 15).',
+  export:
+    'musubix cg export [path-fragment] [--format dot|json] [--out <file>]\n' +
+    '  Export the file-level dependency graph (symbol edges resolved to\n' +
+    '  file → file). Default format dot (Graphviz), or json. Writes to <file>\n' +
+    '  with --out, else stdout. A path-fragment limits it to a subgraph.',
   languages:
     'musubix cg languages\n' +
     '  List the source languages the parser supports.',
@@ -1388,6 +1393,83 @@ export async function handleCodegraph(
       );
       return ExitCode.SUCCESS;
     }
+    case 'export': {
+      // Export a file-level dependency graph (symbol edges resolved to
+      // file → file) as Graphviz DOT or JSON, to stdout or a file.
+      let format = 'dot';
+      let outPath: string | undefined;
+      let filter: string | undefined;
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a === '--format') { format = (args[++i] ?? 'dot').toLowerCase(); continue; }
+        if (a === '--out') { outPath = args[++i]; continue; }
+        if (!a.startsWith('--') && filter === undefined) filter = a;
+      }
+      if (format !== 'dot' && format !== 'json') {
+        console.error(`❌ Unknown format '${format}'. Use dot or json.`);
+        return ExitCode.VALIDATION_ERROR;
+      }
+      const { nodes, edges } = loadCodeGraphData();
+      if (nodes.length === 0) {
+        console.log('No indexed graph. Run `musubix cg index <path>` first.');
+        return ExitCode.SUCCESS;
+      }
+      // Resolution maps (same rules as `cg impact`).
+      const defFiles = new Map<string, Set<string>>();
+      const filesByBasename = new Map<string, Set<string>>();
+      for (const n of nodes) {
+        const isResolvable =
+          n.kind === 'class' || n.kind === 'interface' || (n.kind === 'function' && !n.isStatic);
+        if (isResolvable) {
+          const set = defFiles.get(n.name) ?? new Set<string>();
+          set.add(n.filePath);
+          defFiles.set(n.name, set);
+        }
+        const base = (n.filePath.split(/[\\/]/).pop() ?? '').replace(/\.[a-z]+$/i, '');
+        if (base) {
+          const set = filesByBasename.get(base) ?? new Set<string>();
+          set.add(n.filePath);
+          filesByBasename.set(base, set);
+        }
+      }
+      // Resolve symbol edges to unique file → file edges.
+      const fileEdges = new Map<string, { from: string; to: string; kind: string }>();
+      for (const e of edges) {
+        for (const to of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
+          if (to === e.from) continue;
+          if (filter && !e.from.includes(filter) && !to.includes(filter)) continue;
+          fileEdges.set(`${e.from} ${to} ${e.kind}`, { from: e.from, to, kind: e.kind });
+        }
+      }
+      const rels = [...fileEdges.values()];
+      const fileSet = new Set<string>();
+      for (const r of rels) { fileSet.add(r.from); fileSet.add(r.to); }
+
+      let output: string;
+      if (format === 'json') {
+        output = JSON.stringify({ files: [...fileSet].sort(), edges: rels }, null, 2);
+      } else {
+        const label = (f: string) => (f.split(/[\\/]/).pop() ?? f).replace(/"/g, '');
+        const lines = ['digraph codegraph {', '  rankdir=LR;', '  node [shape=box, fontsize=10];'];
+        for (const f of [...fileSet].sort()) lines.push(`  "${f}" [label="${label(f)}"];`);
+        for (const r of rels) {
+          const style = r.kind === 'imports' ? ' [style=dashed]' : '';
+          lines.push(`  "${r.from}" -> "${r.to}"${style};`);
+        }
+        lines.push('}');
+        output = lines.join('\n');
+      }
+
+      if (outPath) {
+        writeFileSync(outPath, output, 'utf-8');
+        console.log(
+          `✅ Exported ${fileSet.size} file(s), ${rels.length} edge(s) as ${format} to ${outPath}`,
+        );
+      } else {
+        console.log(output);
+      }
+      return ExitCode.SUCCESS;
+    }
     case 'languages': {
       const parser = createASTParser();
       const langs = parser.getSupportedLanguages();
@@ -1398,7 +1480,7 @@ export async function handleCodegraph(
       return ExitCode.SUCCESS;
     }
     default:
-      console.log(showHelp('cg'));
+      console.log(cgSubcommandHelp(sub));
       return ExitCode.SUCCESS;
   }
 }
@@ -2892,6 +2974,8 @@ export function getDefaultCommands(): CLICommand[] {
         // Forward recognised flags so handleCodegraph can parse them uniformly.
         if (args['direct'] === true) positionalArgs.push('--direct');
         if (args['depth'] !== undefined) positionalArgs.push('--depth', String(args['depth']));
+        if (args['format'] !== undefined) positionalArgs.push('--format', String(args['format']));
+        if (args['out'] !== undefined) positionalArgs.push('--out', String(args['out']));
         return await handleCodegraph(sub, positionalArgs);
       },
     },
