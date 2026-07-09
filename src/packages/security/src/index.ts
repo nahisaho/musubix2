@@ -118,10 +118,33 @@ function shannonEntropy(s: string): number {
  * Requires a mix of character classes AND sufficient entropy, so an
  * all-lowercase token like `verifyagedigitalconsentnotpossible` is not flagged.
  */
+/** True if `s` contains a long run of consecutive characters (abcdef, 012345). */
+function hasSequentialRun(s: string, len = 6): boolean {
+  let run = 1;
+  for (let i = 1; i < s.length; i++) {
+    if (s.charCodeAt(i) === s.charCodeAt(i - 1) + 1) {
+      if (++run >= len) return true;
+    } else {
+      run = 1;
+    }
+  }
+  return false;
+}
+
 export function isLikelySecret(raw: string): boolean {
   const s = raw.replace(/^['"]|['"]$/g, '');
-  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/].filter((re) => re.test(s)).length;
-  return classes >= 2 && shannonEntropy(s) >= 3.0;
+  // Real keys/tokens mix letters AND digits. Requiring a digit rejects long
+  // CamelCase/snake_case identifier strings (e.g. C-API symbol names like
+  // "GDALGetRasterColorInterpretation") that are not secrets.
+  if (!/[0-9]/.test(s) || !/[a-zA-Z]/.test(s)) return false;
+  if (shannonEntropy(s) < 3.0) return false;
+  // Character-set / alphabet constants (e.g. RANDOM_STRING_CHARS = "abc…XYZ0-9")
+  // have high entropy but are not secrets — they contain long sequential runs.
+  if (hasSequentialRun(s)) return false;
+  // Pure lowercase-hex strings of a hash length (MD5/SHA-1/256/512) are almost
+  // always integrity checksums (package formulas, lockfiles), not secrets.
+  if (/^[0-9a-f]{32}$|^[0-9a-f]{40}$|^[0-9a-f]{64}$|^[0-9a-f]{128}$/.test(s)) return false;
+  return true;
 }
 
 /**
@@ -133,13 +156,60 @@ export function isNotFormatMarker(matchText: string): boolean {
   const lit = matchText.match(/['"]([^'"]*)['"]\s*$/)?.[1] ?? '';
   if (/^\{[^}]*\}$/.test(lit)) return false; // {MD5}, {SHA}, {CRYPT}, ...
   if (lit.trim().length < 3) return false; // empty / trivial placeholders
+  // Format/template strings with placeholders are not literal passwords, e.g.
+  // `ALTER USER %(user)s IDENTIFIED BY "%(password)s"` or `pwd={0}` / `${pw}`.
+  if (/%\(?\w*\)?[sd]|%[sd]|\$\{[^}]*\}|#\{[^}]*\}|\{\d*\}|:\w+\b/.test(lit)) return false;
+  // CLI-flag fragments like `--password=` (value comes from a variable).
+  if (/^--?[\w-]+=?$/.test(lit.trim())) return false;
+  // Variable interpolation / concatenation (`$connection[…]`, `.$var`) — the
+  // regex spanned a concatenation, so the value is not a literal password.
+  if (/\$\w|\.\$/.test(lit)) return false;
   return true;
+}
+
+/**
+ * Blank out comments and string-literal interiors while preserving byte offsets
+ * and line breaks, so injection patterns (eval/exec/innerHTML/…) don't match
+ * inside a docblock (`* @method … eval()`) or a string literal (`'eval()'`).
+ * Line numbers of real matches are unaffected because length is preserved.
+ * `#` is only treated as a comment for languages that use it.
+ */
+export function blankNonCode(code: string, hashComments: boolean): string {
+  const out = code.split('');
+  const n = code.length;
+  const blank = (from: number, to: number) => {
+    for (let k = from; k < to && k < n; k++) if (out[k] !== '\n') out[k] = ' ';
+  };
+  let i = 0;
+  while (i < n) {
+    const c = code[i];
+    const next = i + 1 < n ? code[i + 1] : '';
+    if (c === '/' && next === '/') {
+      let j = i; while (j < n && code[j] !== '\n') j++; blank(i, j); i = j; continue;
+    }
+    if (hashComments && c === '#') {
+      let j = i; while (j < n && code[j] !== '\n') j++; blank(i, j); i = j; continue;
+    }
+    if (c === '/' && next === '*') {
+      let j = i + 2; while (j < n && !(code[j] === '*' && code[j + 1] === '/')) j++;
+      j = Math.min(j + 2, n); blank(i, j); i = j; continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      const q = c; let j = i + 1;
+      while (j < n && code[j] !== q) { if (code[j] === '\\') j++; j++; }
+      blank(i + 1, j); // keep the quotes, blank the interior
+      i = j + 1; continue;
+    }
+    i++;
+  }
+  return out.join('');
 }
 
 function runPatterns(
   patterns: DetectorPattern[],
   code: string,
   filePath: string,
+  snippetSource: string = code,
 ): SecurityFinding[] {
   const findings: SecurityFinding[] = [];
   for (const p of patterns) {
@@ -154,7 +224,7 @@ function runPatterns(
         location: {
           file: filePath,
           line,
-          snippet: getSnippet(code, line),
+          snippet: getSnippet(snippetSource, line),
         },
         description: p.description,
         suggestion: p.suggestion,
@@ -238,7 +308,10 @@ export class SecretDetector {
 export class TaintAnalyzer {
   private readonly patterns: DetectorPattern[] = [
     {
-      regex: /\beval\s*\(/g,
+      // Bare builtin eval( only — not member access `x.eval` / `x->eval` /
+      // `X::eval` (method calls, e.g. Redis `->eval`), nor `def`/`function`
+      // definitions of one's own eval.
+      regex: /(?<![.\w>:])(?<!\bdef\s)(?<!\bfunction\s)(?<!\bfn\s)eval\s*\(/g,
       severity: 'critical',
       type: 'injection',
       description: 'Use of eval() detected — potential code injection',
@@ -248,7 +321,9 @@ export class TaintAnalyzer {
       confidence: 0.9,
     },
     {
-      regex: /\.innerHTML\s*=/g,
+      // Flag dynamic assignments only — `innerHTML = "static"` / `= ''` (clearing
+      // or a constant) is not an XSS sink; a variable/expression RHS is.
+      regex: /\.innerHTML\s*=\s*[^\s'"=]/g,
       severity: 'high',
       type: 'xss',
       description: 'Direct innerHTML assignment — potential XSS vulnerability',
@@ -266,7 +341,9 @@ export class TaintAnalyzer {
       confidence: 0.85,
     },
     {
-      regex: /\bexec\s*\(/g,
+      // Bare exec( only — not member access `re.exec` / `$schedule->exec` /
+      // `X::exec` (method calls) nor `def exec(...)` definitions.
+      regex: /(?<![.\w>:])(?<!\bdef\s)(?<!\bfunction\s)(?<!\bfn\s)exec\s*\(/g,
       severity: 'critical',
       type: 'injection',
       description: 'Use of exec() detected — potential command injection',
@@ -304,7 +381,10 @@ export class TaintAnalyzer {
   ];
 
   analyze(code: string, filePath: string): SecurityFinding[] {
-    return runPatterns(this.patterns, code, filePath);
+    // Injection patterns describe *code*, so ignore matches inside comments and
+    // string literals (e.g. `* @method … eval()`, `'eval()\'d code'`).
+    const hashComments = /\.(py|rb|sh|php|pl|yaml|yml|r)$/i.test(filePath);
+    return runPatterns(this.patterns, blankNonCode(code, hashComments), filePath, code);
   }
 }
 

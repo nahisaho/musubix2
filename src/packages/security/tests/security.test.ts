@@ -71,6 +71,39 @@ describe('DES-COD-003: SecretDetector', () => {
     const findings = detector.scan(code, 'config.ts');
     expect(findings.some((f) => f.type === 'secret-leak')).toBe(true);
   });
+
+  // v0.5.35 — precision fixes surfaced by scanning Django.
+  it('does not flag a character-set alphabet constant as a secret', () => {
+    const code = 'RANDOM_STRING_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"';
+    const findings = detector.scan(code, 'crypto.py');
+    expect(findings.filter((f) => f.type === 'secret-leak')).toHaveLength(0);
+  });
+
+  it('does not flag a long CamelCase identifier string as a secret', () => {
+    // A C-API symbol name (no digits) — not a secret.
+    const code = 'std_call("GDALGetRasterColorInterpretation")';
+    const findings = detector.scan(code, 'raster.py');
+    expect(findings.filter((f) => f.type === 'secret-leak')).toHaveLength(0);
+  });
+
+  it('does not flag a SQL/format-template as a hardcoded password', () => {
+    const code = 'set_password = \'ALTER USER %(user)s IDENTIFIED BY "%(password)s"\'';
+    const findings = detector.scan(code, 'creation.py');
+    expect(findings.filter((f) => f.type === 'hardcoded-credential')).toHaveLength(0);
+  });
+
+  it('does not flag Ruby-interpolated or variable password values', () => {
+    const rb = "where(\"password = '#{password}'\")"; // #{...} interpolation
+    expect(detector.scan(rb, 'base.rb').filter((f) => f.type === 'hardcoded-credential')).toHaveLength(0);
+    const php = "'password' => '--password='.$connection['password']";
+    expect(detector.scan(php, 'db.php').filter((f) => f.type === 'hardcoded-credential')).toHaveLength(0);
+  });
+
+  it('does not flag SHA-256/hash checksums as secrets', () => {
+    const code = 'sha256 "64811cb24e77cac3057d6c40b63ac9becf9082eedd54ca411b475b755d334882"';
+    const findings = detector.scan(code, 'formula.rb');
+    expect(findings.filter((f) => f.type === 'secret-leak')).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -103,6 +136,41 @@ describe('DES-COD-003: TaintAnalyzer', () => {
     const code = 'const sum = (a: number, b: number) => a + b;\n';
     const findings = analyzer.analyze(code, 'utils.ts');
     expect(findings).toHaveLength(0);
+  });
+
+  // v0.5.35: precision fixes found by dogfooding the scanner on Django.
+  it('does not flag method calls or definitions named eval/exec', () => {
+    const code = [
+      'x.eval(context)', // method call
+      'def eval(self, ctx):', // Python method definition
+      'result = re.exec(pattern)', // method call
+    ].join('\n');
+    const findings = analyzer.analyze(code, 'smartif.py');
+    expect(findings.filter((f) => f.type === 'injection')).toHaveLength(0);
+  });
+
+  it('still flags a bare builtin eval()/exec()', () => {
+    expect(analyzer.analyze('return eval(code, {}, {})', 'q.py').length).toBeGreaterThan(0);
+    expect(analyzer.analyze('exec(user_code)', 'shell.py').length).toBeGreaterThan(0);
+  });
+
+  it('does not flag static/empty innerHTML assignments', () => {
+    expect(analyzer.analyze('box.innerHTML = "";', 'ui.js')).toHaveLength(0);
+    expect(analyzer.analyze("el.innerHTML = '<b>ok</b>';", 'ui.js')).toHaveLength(0);
+    // but a dynamic assignment is still flagged
+    expect(analyzer.analyze('el.innerHTML = userInput;', 'ui.js').length).toBeGreaterThan(0);
+  });
+
+  it('ignores injection patterns inside comments and string literals', () => {
+    // PHPDoc block comment mentioning eval/exec — not real code.
+    const doc = '/**\n * @method static mixed eval(string $script)\n */';
+    expect(analyzer.analyze(doc, 'Redis.php')).toHaveLength(0);
+    // eval inside a string literal — not a call.
+    expect(analyzer.analyze("str_contains($t, 'eval()\\'d code')", 'Once.php')).toHaveLength(0);
+    // # comment in Python — not real code.
+    expect(analyzer.analyze('# be careful with eval(x)', 'a.py')).toHaveLength(0);
+    // a real eval on a code line is still flagged.
+    expect(analyzer.analyze('eval(var_export($v, true))', 'Cache.php').length).toBeGreaterThan(0);
   });
 });
 

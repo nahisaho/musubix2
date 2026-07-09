@@ -2043,6 +2043,16 @@ export function isTestFile(file: string): boolean {
   );
 }
 
+/** Third-party / generated files that shouldn't be audited as the user's code. */
+export function isVendorOrMinified(file: string): boolean {
+  const p = file.replace(/\\/g, '/').toLowerCase();
+  return (
+    /\.min\.(js|css|mjs)$/.test(p) ||
+    /\.bundle\.(js|css)$/.test(p) ||
+    /(^|\/)(node_modules|vendor|third_party|third-party|bower_components|dist|build)(\/)/.test(p)
+  );
+}
+
 export async function handleSecurity(
   filePath: string,
   failOn?: string,
@@ -2057,8 +2067,11 @@ export async function handleSecurity(
     const taint = new TaintAnalyzer();
     const deps = new DependencyScanner();
 
-    // Accept a single file or a directory (recursively scanned).
-    const allFiles = collectFiles(filePath, (ext) => ext in EXT_TO_LANG);
+    // Accept a single file or a directory (recursively scanned). Vendored and
+    // minified third-party files are always skipped (they aren't the user's code
+    // and dominate the noise, e.g. bundled jquery/select2).
+    const allFiles = collectFiles(filePath, (ext) => ext in EXT_TO_LANG)
+      .filter((f) => !isVendorOrMinified(f));
     const files = excludeTests ? allFiles.filter((f) => !isTestFile(f)) : allFiles;
     const skipped = allFiles.length - files.length;
     const findings: SecurityFinding[] = [];

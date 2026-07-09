@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.35] - 2026-07-10
+
+`security` パッケージを実プロジェクト（Django/Laravel/Rails/ripgrep）で dogfooding し、**誤検知（false positive）を大幅削減**。
+
+### Fixed（security 精度）
+
+- **eval/exec のメソッド呼び出し・定義・コメント・文字列の誤検知** — `x.eval()`/`$redis->eval()`/`X::exec()`（メソッド呼び出し）、`def eval(...)`（定義）、PHPDoc の `* @method … eval()`（コメント）、`'eval()'`（文字列リテラル）を実際の組み込み `eval(`/`exec(` と誤検知していた。メンバーアクセス演算子（`.`/`->`/`::`）の除外と、**コメント・文字列を位置保存でブランク化**する処理（TaintAnalyzer のみ、行番号は不変）を追加
+- **`innerHTML = ""` / 定数代入** — 静的文字列の innerHTML 代入（XSS リスクなし）を除外し、動的代入のみ検知
+- **文字セット定数の秘密誤検知** — `RANDOM_STRING_CHARS = "abc…XYZ0-9"`（連続文字列）を除外
+- **CamelCase 識別子の秘密誤検知** — `"GDALGetRasterColorInterpretation"`（C-API シンボル名、数字なし）を除外。秘密判定に「数字を含む」要件を追加
+- **ハッシュ/チェックサムの秘密誤検知** — SHA-256/1/MD5 等の 32/40/64/128 桁小文字 16 進（Homebrew formula の `sha256` 等）を除外
+- **テンプレート/変数のパスワード誤検知** — `%(password)s`/`${pw}`/`#{password}`（Ruby 補間）/`--password=`（CLI フラグ）/`.$var`（連結）を除外
+- **ベンダー/圧縮ファイルのスキャン除外** — `.min.js`/`.bundle.js`/`node_modules`/`vendor`/`dist` 等を常にスキップ（jquery/select2 のノイズ源）
+
+### Impact / Validation（誤検知削減）
+
+- **Django**: 約 40 件 → **4 件**（全て実在の `eval`/`exec` 組み込み呼び出し）
+- **Laravel**: 44 件 → **3 件**（全て実在の `exec`/`eval`）
+- **Rails**: 1 件 → **0 件**
+- **ripgrep**: 2 件 → **0 件**
+- いずれも真陽性のみが残存、明確な偽陽性はゼロに
+
+### Tests
+
+- security: eval/exec のメソッド/コメント/文字列除外、静的 innerHTML、文字セット/識別子/ハッシュ/テンプレート秘密の除外を検証（22 → 33）
+
 ## [0.5.34] - 2026-07-10
 
 PHP（Laravel）・Ruby（Rails）での dogfooding。Ruby の**ネストした class/module 未検出**バグを発見・修正。
