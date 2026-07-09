@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-07-09
+
+v0.5.3 の再ドッグフーディングで、成功表示するのに実体が伴わない/クラッシュするコマンドを改修。
+
+### Fixed
+
+- **`scaffold package` / `scaffold skill` がファイルを生成していなかった問題を修正** — 「✅ Scaffolded」とツリーを表示するだけで実ファイルを一切作成していなかった。`package.json`/`tsconfig.json`/`src`/`tests`（package）、`skill.json`/`index.ts`/`tests`（skill）を実際に生成するよう実装（既存ディレクトリは上書き拒否）
+- **`learn analyze <dir>` がディレクトリで EISDIR クラッシュする問題を修正** — `readFileSync` 直呼びだった。v0.5.2 で追加した `collectFiles()` を用い、ディレクトリ配下を再帰解析
+- **`workflow` の承認・遷移状態が CLI 呼び出し間で永続化されない問題を修正** — `handleWorkflow` が毎回新規 `StateTracker` を生成し、`approve`/`transition` の結果を保存していなかった（`status` は常に未承認表示）。`StateTracker` に `toJSON()`/`restore()` を追加し、`.musubix/workflow-state.json` に永続化。`status` 表示もこの状態を読み込む
+
+### Tests
+
+- 上記のリグレッションテスト（scaffold 実ファイル生成・上書き拒否、learn ディレクトリ、workflow 永続化、StateTracker シリアライズ）を追加。全ワークスペース 1654 テスト green
+
 ## [0.5.3] - 2026-07-09
 
 v0.5.2 の再ドッグフーディングで、CLI 状態が呼び出し間で永続化されない課題を発見・改修。

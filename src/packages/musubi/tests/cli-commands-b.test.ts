@@ -269,15 +269,24 @@ describe('CLI Commands B — Security', () => {
 describe('CLI Commands B — Workflow', () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errSpy: ReturnType<typeof vi.spyOn>;
+  let wfDir: string;
+  let prevCwd: string;
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Isolate cwd — approve/transition persist to .musubix/ in the cwd.
+    wfDir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_wf');
+    mkdirSync(wfDir, { recursive: true });
+    prevCwd = process.cwd();
+    process.chdir(wfDir);
   });
 
   afterEach(() => {
+    process.chdir(prevCwd);
     logSpy.mockRestore();
     errSpy.mockRestore();
+    rmSync(wfDir, { recursive: true, force: true });
   });
 
   it('workflow status returns SUCCESS', async () => {
@@ -310,6 +319,16 @@ describe('CLI Commands B — Workflow', () => {
   it('workflow default shows help', async () => {
     const code = await handleWorkflow(undefined, []);
     expect(code).toBe(ExitCode.SUCCESS);
+  });
+
+  // ISSUE-14: approval must persist to a later, separate status call.
+  it('persists approvals across separate handler calls', async () => {
+    await handleWorkflow('approve', ['requirements']);
+    logSpy.mockClear();
+    const code = await handleWorkflow('status', []);
+    expect(code).toBe(ExitCode.SUCCESS);
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('✅ requirements');
   });
 });
 

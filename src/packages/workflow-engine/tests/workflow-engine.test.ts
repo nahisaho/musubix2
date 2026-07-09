@@ -69,6 +69,28 @@ describe('DES-SDD-001: StateTracker', () => {
     expect(event.toPhase).toBe('design');
     expect(event.timestamp).toBeInstanceOf(Date);
   });
+
+  // v0.5.4: state must survive serialization for cross-invocation persistence.
+  it('toJSON/restore round-trips approvals and phase', () => {
+    const tracker = new StateTracker();
+    tracker.approve('requirements');
+    tracker.setPhase('design');
+    tracker.addArtifact('design', 'arch.md');
+    const json = JSON.parse(JSON.stringify(tracker.toJSON()));
+
+    const restored = new StateTracker();
+    restored.restore(json);
+    expect(restored.isApproved('requirements')).toBe(true);
+    expect(restored.getState().currentPhase).toBe('design');
+    expect(restored.getArtifacts('design')).toContain('arch.md');
+  });
+
+  it('restore ignores malformed input', () => {
+    const tracker = new StateTracker();
+    tracker.restore(null);
+    tracker.restore('nonsense');
+    expect(tracker.getState().currentPhase).toBe('requirements');
+  });
 });
 
 // ── DES-SDD-001: PhaseController ───────────────────────────────────────────

@@ -164,6 +164,52 @@ export class StateTracker {
   onStateChange(handler: (event: PhaseChangeEvent) => void): void {
     this.listeners.push(handler);
   }
+
+  /**
+   * Serialize the tracker state to a plain JSON-safe object so it can be
+   * persisted between CLI invocations. Maps and Dates are converted.
+   */
+  toJSON(): unknown {
+    return {
+      currentPhase: this.state.currentPhase,
+      phaseHistory: this.state.phaseHistory.map((h) => ({
+        phase: h.phase,
+        enteredAt: h.enteredAt.toISOString(),
+        exitedAt: h.exitedAt ? h.exitedAt.toISOString() : undefined,
+      })),
+      artifacts: Object.fromEntries(this.state.artifacts),
+      approvals: Object.fromEntries(this.state.approvals),
+    };
+  }
+
+  /** Restore tracker state produced by {@link toJSON}. Ignores malformed input. */
+  restore(data: unknown): void {
+    if (!data || typeof data !== 'object') return;
+    const d = data as Record<string, unknown>;
+    if (typeof d.currentPhase === 'string') {
+      this.state.currentPhase = d.currentPhase as WorkflowPhase;
+    }
+    if (Array.isArray(d.phaseHistory)) {
+      this.state.phaseHistory = d.phaseHistory.map((h) => {
+        const e = h as Record<string, unknown>;
+        return {
+          phase: e.phase as WorkflowPhase,
+          enteredAt: new Date(e.enteredAt as string),
+          exitedAt: e.exitedAt ? new Date(e.exitedAt as string) : undefined,
+        };
+      });
+    }
+    if (d.artifacts && typeof d.artifacts === 'object') {
+      this.state.artifacts = new Map(
+        Object.entries(d.artifacts as Record<string, string[]>) as [WorkflowPhase, string[]][],
+      );
+    }
+    if (d.approvals && typeof d.approvals === 'object') {
+      this.state.approvals = new Map(
+        Object.entries(d.approvals as Record<string, boolean>) as [WorkflowPhase, boolean][],
+      );
+    }
+  }
 }
 
 // ── PhaseController ────────────────────────────────────────────────────────

@@ -15,6 +15,7 @@ import {
 } from '../src/cli.js';
 import { ExitCode } from '@musubix2/core';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -227,15 +228,23 @@ describe('CLI Commands C — REPL', () => {
 describe('CLI Commands C — Scaffold', () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errSpy: ReturnType<typeof vi.spyOn>;
+  let dir: string;
+  let prevCwd: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Isolate the working directory — scaffold writes real files.
+    dir = await mkdtemp(join(tmpdir(), 'musubix2-scaffold-'));
+    prevCwd = process.cwd();
+    process.chdir(dir);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    process.chdir(prevCwd);
     logSpy.mockRestore();
     errSpy.mockRestore();
+    await rm(dir, { recursive: true, force: true });
   });
 
   it('scaffold project returns SUCCESS with name', async () => {
@@ -244,16 +253,26 @@ describe('CLI Commands C — Scaffold', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('my-project'));
   });
 
-  it('scaffold package returns SUCCESS with name', async () => {
+  // ISSUE-12: package/skill must write real files, not just print a tree.
+  it('scaffold package writes real files', async () => {
     const code = await handleScaffold('package', ['my-pkg']);
     expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('my-pkg'));
+    expect(existsSync(join(dir, 'packages/my-pkg/package.json'))).toBe(true);
+    expect(existsSync(join(dir, 'packages/my-pkg/src/index.ts'))).toBe(true);
+    expect(existsSync(join(dir, 'packages/my-pkg/tests/index.test.ts'))).toBe(true);
   });
 
-  it('scaffold skill returns SUCCESS with name', async () => {
+  it('scaffold skill writes real files', async () => {
     const code = await handleScaffold('skill', ['my-skill']);
     expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('my-skill'));
+    expect(existsSync(join(dir, 'skills/my-skill/skill.json'))).toBe(true);
+    expect(existsSync(join(dir, 'skills/my-skill/index.ts'))).toBe(true);
+  });
+
+  it('scaffold refuses to overwrite an existing target', async () => {
+    await handleScaffold('package', ['dup']);
+    const second = await handleScaffold('package', ['dup']);
+    expect(second).toBe(ExitCode.GENERAL_ERROR);
   });
 
   it('scaffold project returns GENERAL_ERROR without name', async () => {
@@ -325,6 +344,21 @@ describe('CLI Commands C — Learn', () => {
   it('learn analyze returns GENERAL_ERROR without path', async () => {
     const code = await handleLearn('analyze', []);
     expect(code).toBe(ExitCode.GENERAL_ERROR);
+  });
+
+  // ISSUE-13: analyzing a directory must not crash with EISDIR.
+  it('learn analyze accepts a directory', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'musubix2-learn-'));
+    try {
+      mkdirSync(join(dir, 'sub'), { recursive: true });
+      writeFileSync(join(dir, 'a.ts'), 'export function a() { return 1; }\n');
+      writeFileSync(join(dir, 'sub', 'b.js'), 'export function b() { return 2; }\n');
+      const code = await handleLearn('analyze', [dir]);
+      expect(code).toBe(ExitCode.SUCCESS);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('file(s)'));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('learn unknown subcommand shows usage', async () => {
@@ -414,15 +448,24 @@ describe('CLI Commands C — Watch', () => {
 describe('CLI Commands C — Dispatch integration', () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errSpy: ReturnType<typeof vi.spyOn>;
+  let dir: string;
+  let prevCwd: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Isolate cwd — some dispatched commands (scaffold/knowledge/decision)
+    // write state relative to the working directory.
+    dir = await mkdtemp(join(tmpdir(), 'musubix2-dispatch-'));
+    prevCwd = process.cwd();
+    process.chdir(dir);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    process.chdir(prevCwd);
     logSpy.mockRestore();
     errSpy.mockRestore();
+    await rm(dir, { recursive: true, force: true });
   });
 
   it('dispatches skills list', async () => {

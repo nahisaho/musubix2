@@ -367,8 +367,8 @@ import {
   type WorkflowPhase,
   PHASE_ORDER,
 } from '@musubix2/workflow-engine';
-import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
-import { join as joinPath } from 'node:path';
+import { readFileSync, existsSync, statSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join as joinPath, dirname as dirnamePath } from 'node:path';
 
 /**
  * Parse a simple markdown task file into TaskInfo objects.
@@ -707,6 +707,32 @@ export function collectFiles(target: string, extFilter?: (ext: string) => boolea
   return out;
 }
 
+/**
+ * Write a set of files under a base directory, creating parent dirs. Refuses to
+ * overwrite the base directory if it already exists. Returns created paths.
+ */
+export function writeScaffold(baseDir: string, files: Record<string, string>): string[] {
+  if (existsSync(baseDir)) {
+    throw new Error(`Target already exists: ${baseDir}`);
+  }
+  const created: string[] = [];
+  for (const [rel, content] of Object.entries(files)) {
+    const full = joinPath(baseDir, rel);
+    mkdirSync(dirnamePath(full), { recursive: true });
+    writeFileSync(full, content, 'utf-8');
+    created.push(full);
+  }
+  return created;
+}
+
+/** Convert an arbitrary name into a valid JS identifier. */
+export function toIdentifier(name: string): string {
+  const cleaned = name.replace(/[^A-Za-z0-9]+(.)?/g, (_, c: string | undefined) =>
+    c ? c.toUpperCase() : '',
+  );
+  return /^[A-Za-z_]/.test(cleaned) ? cleaned : `_${cleaned}`;
+}
+
 export async function handleCodegraph(
   sub: string | undefined,
   args: string[],
@@ -871,11 +897,31 @@ export async function handleSecurity(
 
 // ── Workflow handler ───────────────────────────────────────────────────────
 
+const WORKFLOW_STATE_FILE = '.musubix/workflow-state.json';
+
+/** Load persisted workflow state into a tracker (no-op if none saved). */
+function loadWorkflowState(tracker: ReturnType<typeof createStateTracker>): void {
+  try {
+    if (existsSync(WORKFLOW_STATE_FILE)) {
+      tracker.restore(JSON.parse(readFileSync(WORKFLOW_STATE_FILE, 'utf-8')));
+    }
+  } catch {
+    // Corrupt/unreadable state — start fresh.
+  }
+}
+
+/** Persist workflow state so approvals/transitions survive across invocations. */
+function saveWorkflowState(tracker: ReturnType<typeof createStateTracker>): void {
+  mkdirSync(dirnamePath(WORKFLOW_STATE_FILE), { recursive: true });
+  writeFileSync(WORKFLOW_STATE_FILE, JSON.stringify(tracker.toJSON(), null, 2), 'utf-8');
+}
+
 export async function handleWorkflow(
   sub: string | undefined,
   args: string[],
 ): Promise<ExitCodeValue> {
   const tracker = createStateTracker();
+  loadWorkflowState(tracker);
   const controller = createPhaseController(tracker);
 
   switch (sub) {
@@ -897,6 +943,7 @@ export async function handleWorkflow(
         return ExitCode.GENERAL_ERROR;
       }
       tracker.approve(phase);
+      saveWorkflowState(tracker);
       console.log(`✅ Approved: ${phase}`);
       return ExitCode.SUCCESS;
     }
@@ -908,6 +955,7 @@ export async function handleWorkflow(
       }
       const result = await controller.transitionTo(phase);
       if (result.success) {
+        saveWorkflowState(tracker);
         console.log(`✅ Transitioned: ${result.fromPhase} → ${result.toPhase}`);
       } else {
         console.error(`❌ Transition failed: ${result.errors.join(', ')}`);
@@ -925,6 +973,7 @@ export async function handleWorkflow(
 
 export async function handleStatus(): Promise<ExitCodeValue> {
   const tracker = createStateTracker();
+  loadWorkflowState(tracker);
   const controller = createPhaseController(tracker);
 
   console.log('=== MUSUBIX2 Project Status ===\n');
@@ -1641,12 +1690,33 @@ export async function handleScaffold(
         console.error('❌ Usage: musubix scaffold package <name>');
         return ExitCode.GENERAL_ERROR;
       }
-      console.log(`✅ Scaffolded package: ${name}`);
-      console.log(`  packages/${name}/`);
-      console.log(`  ├── package.json`);
-      console.log(`  ├── tsconfig.json`);
-      console.log(`  ├── src/index.ts`);
-      console.log(`  └── tests/`);
+      try {
+        const created = writeScaffold(`packages/${name}`, {
+          'package.json': JSON.stringify(
+            {
+              name: `@musubix2/${name}`,
+              version: '0.1.0',
+              type: 'module',
+              main: 'dist/index.js',
+              scripts: { build: 'tsc -p tsconfig.json', test: 'vitest run' },
+            },
+            null,
+            2,
+          ) + '\n',
+          'tsconfig.json': JSON.stringify(
+            { extends: '../../tsconfig.base.json', compilerOptions: { outDir: 'dist', rootDir: 'src' }, include: ['src'] },
+            null,
+            2,
+          ) + '\n',
+          'src/index.ts': `/**\n * @musubix2/${name}\n */\nexport const name = '${name}';\n`,
+          'tests/index.test.ts': `import { describe, it, expect } from 'vitest';\nimport { name } from '../src/index.js';\n\ndescribe('${name}', () => {\n  it('exports its name', () => {\n    expect(name).toBe('${name}');\n  });\n});\n`,
+        });
+        console.log(`✅ Scaffolded package: ${name}`);
+        for (const f of created) console.log(`  ${f}`);
+      } catch (err) {
+        console.error(`❌ ${err instanceof Error ? err.message : String(err)}`);
+        return ExitCode.GENERAL_ERROR;
+      }
       return ExitCode.SUCCESS;
     }
     case 'skill': {
@@ -1655,11 +1725,22 @@ export async function handleScaffold(
         console.error('❌ Usage: musubix scaffold skill <name>');
         return ExitCode.GENERAL_ERROR;
       }
-      console.log(`✅ Scaffolded skill: ${name}`);
-      console.log(`  skills/${name}/`);
-      console.log(`  ├── skill.json`);
-      console.log(`  ├── index.ts`);
-      console.log(`  └── tests/`);
+      try {
+        const created = writeScaffold(`skills/${name}`, {
+          'skill.json': JSON.stringify(
+            { name, description: `${name} skill`, version: '0.1.0' },
+            null,
+            2,
+          ) + '\n',
+          'index.ts': `/**\n * ${name} skill\n */\nexport function ${toIdentifier(name)}(): string {\n  return '${name}';\n}\n`,
+          'tests/index.test.ts': `import { describe, it, expect } from 'vitest';\nimport { ${toIdentifier(name)} } from '../index.js';\n\ndescribe('${name}', () => {\n  it('runs', () => {\n    expect(${toIdentifier(name)}()).toBe('${name}');\n  });\n});\n`,
+        });
+        console.log(`✅ Scaffolded skill: ${name}`);
+        for (const f of created) console.log(`  ${f}`);
+      } catch (err) {
+        console.error(`❌ ${err instanceof Error ? err.message : String(err)}`);
+        return ExitCode.GENERAL_ERROR;
+      }
       return ExitCode.SUCCESS;
     }
     default:
@@ -1719,9 +1800,19 @@ export async function handleLearn(
         return ExitCode.GENERAL_ERROR;
       }
       try {
-        const content = readFileSync(path, 'utf-8');
-        const patterns = learner.learn([content]);
-        console.log(`Analyzed: ${path}`);
+        if (!existsSync(path)) {
+          console.error(`❌ Path not found: ${path}`);
+          return ExitCode.GENERAL_ERROR;
+        }
+        // Accept a single file or a directory (recursively analyzed).
+        const files = collectFiles(path, (ext) => ext in EXT_TO_LANG);
+        if (files.length === 0) {
+          console.error(`❌ No analyzable source files found under: ${path}`);
+          return ExitCode.GENERAL_ERROR;
+        }
+        const contents = files.map((f) => readFileSync(f, 'utf-8'));
+        const patterns = learner.learn(contents);
+        console.log(`Analyzed: ${path} (${files.length} file(s))`);
         console.log(`Patterns found: ${patterns.length}`);
         for (const p of patterns) {
           console.log(`  - ${p.name}: ${p.abstraction}`);
