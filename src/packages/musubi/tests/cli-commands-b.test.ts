@@ -6,6 +6,7 @@ import {
   handlePolicy,
   handleOntology,
   handleCodegraph,
+  cgSubcommandHelp,
   handleSecurity,
   handleWorkflow,
   handleStatus,
@@ -318,6 +319,69 @@ describe('CLI Commands B — Codegraph', () => {
 
   it('cg impact requires a target argument', async () => {
     expect(await handleCodegraph('impact', [])).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
+  // v0.5.22: --depth bounds the transitive BFS.
+  it('cg impact --depth N bounds transitive reach', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_depth');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'base.ts'), 'export class UniqueBaseZzz {}\n');
+    writeFileSync(join(dir, 'mid.ts'), "import { UniqueBaseZzz } from './base';\nexport class MidZzz {}\n");
+    writeFileSync(join(dir, 'top.ts'), "import { MidZzz } from './mid';\nexport class TopZzz {}\n");
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['base.ts', '--depth', '1'])).toBe(ExitCode.SUCCESS);
+      const d1 = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(d1).toContain('mid.ts'); // depth-1 dependent
+      expect(d1).not.toContain('← ' + join(dir, 'top.ts')); // beyond depth 1
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['base.ts', '--depth', '2'])).toBe(ExitCode.SUCCESS);
+      const d2 = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(d2).toContain('mid.ts');
+      expect(d2).toContain('top.ts'); // now within depth 2
+      expect(d2).toContain('within depth 2');
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // v0.5.22: candidates works across languages (not just C).
+  it('cg candidates ranks TypeScript files too', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_ts_cand');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'core.ts'),
+      'export function coreParse(s: string): number { return s.length; }\n' +
+        'export function coreCheck(s: string): boolean { return coreParse(s) > 0; }\n',
+    );
+    writeFileSync(join(dir, 'app.ts'), "import { coreParse } from './core';\nexport function run() { return coreParse('x'); }\n");
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('candidates', [])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('core.ts'); // TS file ranked as a candidate
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // v0.5.22: per-subcommand help.
+  it('cgSubcommandHelp returns subcommand-specific text', () => {
+    expect(cgSubcommandHelp('impact')).toContain('--depth');
+    expect(cgSubcommandHelp('candidates')).toContain('rewrite');
+    expect(cgSubcommandHelp('index')).toContain('code graph');
+    // Unknown/absent subcommand → general help listing subcommands.
+    expect(cgSubcommandHelp(undefined)).toContain('Subcommands:');
   });
 
   // v0.5.18: cross-file call-graph edges — impact/deps see calls, not just #include.

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.22] - 2026-07-09
+
+CodeGraph の使い勝手を 3 点強化。
+
+### Added
+
+- **`cg impact <path> --depth N`** — 逆到達解析（推移）を N ホップに制限。`--depth 1` は `--direct` と等価。出力に `within depth N` を明示し、深さ別に影響範囲を絞り込める（コアユーティリティの巨大な推移閉包を段階的に調査可能）
+- **サブコマンド個別 `--help`** — `cg <sub> --help` で各サブコマンド（index/search/stats/deps/impact/candidates/languages）の詳細な使い方・オプションを表示。`cg --help` はサブコマンド一覧を提示
+
+### Validated
+
+- **`cg candidates` / `cg stats` の言語横断動作を確認**（従来 C 中心）。TypeScript・Python プロジェクトで関数検出・コールグラフ・書き換え候補ランキング・最多呼び出し関数が正しく機能することをテストで担保
+
+### Impact
+
+- Linux カーネルコアで `cg impact lib/cmdline.c --depth 1/2` が 21 / 265 ファイル、無制限で 829 ファイルと段階表示。TS/Python の小規模プロジェクトで `cg candidates` が中核ファイル（`core.ts`/`lib.py`）を正しく上位提示
+
+### Tests
+
+- musubi: `--depth` の境界、TS での candidates、サブコマンド help を検証（59 → 62）
+
 ## [0.5.21] - 2026-07-09
 
 CodeGraph のコールグラフ解決を **C の `static`（内部リンケージ）認識**に対応。0.5.18 は「コーパス全体で一意な名前」のみをエッジ化していたため、カーネルに多い同名 `static` ヘルパー（`show`/`open`/`probe` 等）は一切エッジ化されず、また同名 `static` を持つ一意グローバル関数も誤って除外されていた。

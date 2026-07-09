@@ -328,9 +328,13 @@ export class CLIDispatcher {
 
     const parsed = parseArgs(argv);
 
-    // Per-command --help
+    // Per-command --help (and per-subcommand for `cg`).
     if (parsed.flags['help'] === true || parsed.flags['h'] === true) {
-      console.log(showHelp(parsed.command));
+      if (parsed.command === 'cg') {
+        console.log(cgSubcommandHelp(parsed.subcommand));
+      } else {
+        console.log(showHelp(parsed.command));
+      }
       return ExitCode.SUCCESS;
     }
 
@@ -964,6 +968,50 @@ function resolveImportToFiles(
   return max > 0 ? scored.filter((s) => s.score === max).map((s) => s.f) : candidates;
 }
 
+/** Detailed per-subcommand help for `cg`. */
+const CG_SUBCOMMAND_HELP: Record<string, string> = {
+  index:
+    'musubix cg index <path>\n' +
+    '  Index a file or directory into the code graph (.musubix/codegraph.json).\n' +
+    '  Extracts functions, structs/classes, imports and cross-file call edges.',
+  search:
+    'musubix cg search <query>\n' +
+    '  Find indexed symbols whose name contains <query> (case-insensitive).',
+  stats:
+    'musubix cg stats\n' +
+    '  Summary of the indexed graph: node/edge counts, kind breakdowns, file\n' +
+    '  count, and the most-called functions.',
+  deps:
+    'musubix cg deps [path-fragment]\n' +
+    '  List outgoing dependencies (→ #include targets and function calls) per\n' +
+    '  file. Call edges are annotated `name() [call]`.',
+  impact:
+    'musubix cg impact <path-fragment> [--direct] [--depth N]\n' +
+    '  Reverse reachability: which files are affected if the target changes.\n' +
+    '  Splits direct (depth-1) from indirect dependents.\n' +
+    '    --direct     show only immediate (depth-1) dependents\n' +
+    '    --depth N    limit transitive expansion to N hops',
+  candidates:
+    'musubix cg candidates [N]\n' +
+    '  Rank files by suitability for an isolated rewrite (e.g. to Rust):\n' +
+    '  score = (functions + dependents) / (1 + external deps). Test files are\n' +
+    '  excluded. N limits the number of rows (default 15).',
+  languages:
+    'musubix cg languages\n' +
+    '  List the source languages the parser supports.',
+};
+
+/** Help text for `cg` — subcommand-specific when a known sub is given. */
+export function cgSubcommandHelp(sub: string | undefined): string {
+  if (sub && CG_SUBCOMMAND_HELP[sub]) return CG_SUBCOMMAND_HELP[sub];
+  return (
+    showHelp('cg') +
+    '\n\nSubcommands: ' +
+    Object.keys(CG_SUBCOMMAND_HELP).join(', ') +
+    '\nRun `musubix cg <subcommand> --help` for details.'
+  );
+}
+
 export async function handleCodegraph(
   sub: string | undefined,
   args: string[],
@@ -1231,10 +1279,22 @@ export async function handleCodegraph(
       // if the target file changes / is compromised. `--direct` limits output to
       // depth-1 (immediate) dependents, which is the actionable set for core
       // utilities whose transitive closure spans most of the codebase.
-      const directOnly = args.includes('--direct');
-      const filter = args.find((a) => !a.startsWith('--'));
+      let directOnly = args.includes('--direct');
+      let maxDepth = Infinity;
+      let filter: string | undefined;
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a === '--direct') continue;
+        if (a === '--depth') {
+          const v = Number(args[++i]);
+          if (Number.isFinite(v) && v >= 1) maxDepth = Math.floor(v);
+          continue;
+        }
+        if (!a.startsWith('--') && filter === undefined) filter = a;
+      }
+      if (maxDepth === 1) directOnly = true; // depth 1 == direct
       if (!filter) {
-        console.error('❌ Usage: musubix cg impact <path-fragment> [--direct]');
+        console.error('❌ Usage: musubix cg impact <path-fragment> [--direct] [--depth N]');
         return ExitCode.VALIDATION_ERROR;
       }
       const { nodes, edges } = loadCodeGraphData();
@@ -1285,15 +1345,20 @@ export async function handleCodegraph(
           if (!seedSet.has(dep)) direct.add(dep);
         }
       }
-      // BFS over reverse edges to find all transitively-affected files.
+      // BFS over reverse edges, bounded by --depth (default: unbounded). Each
+      // hop increases depth by one; seeds are depth 0, direct dependents depth 1.
       const affected = new Set<string>();
-      const queue = [...seeds];
+      const seen = new Set<string>(seeds);
+      const queue: Array<[string, number]> = seeds.map((s) => [s, 0]);
       while (queue.length > 0) {
-        const f = queue.shift()!;
+        const [f, d] = queue.shift()!;
+        if (d >= maxDepth) continue; // do not expand past the depth limit
         for (const dep of dependents.get(f) ?? []) {
-          if (!affected.has(dep) && !seedSet.has(dep)) {
-            affected.add(dep);
-            queue.push(dep);
+          if (seedSet.has(dep)) continue;
+          affected.add(dep);
+          if (!seen.has(dep)) {
+            seen.add(dep);
+            queue.push([dep, d + 1]);
           }
         }
       }
@@ -1313,11 +1378,13 @@ export async function handleCodegraph(
           console.log(`\n  (+${indirect.length} indirect; omitted — run without --direct to list)`);
         }
       } else if (indirect.length > 0) {
-        console.log(`\n  ${indirect.length} indirect (transitive) dependent(s):`);
+        const depthNote = Number.isFinite(maxDepth) ? ` (within depth ${maxDepth})` : '';
+        console.log(`\n  ${indirect.length} indirect (transitive) dependent(s)${depthNote}:`);
         for (const a of indirect.sort()) console.log(`    ← ${a}`);
       }
+      const scope = Number.isFinite(maxDepth) ? ` within depth ${maxDepth}` : '';
       console.log(
-        `\n  Total: ${affected.size} file(s) affected (${direct.size} direct, ${indirect.length} indirect).`,
+        `\n  Total: ${affected.size} file(s) affected${scope} (${direct.size} direct, ${indirect.length} indirect).`,
       );
       return ExitCode.SUCCESS;
     }
@@ -2816,14 +2883,15 @@ export function getDefaultCommands(): CLICommand[] {
       name: 'cg',
       description: 'Code graph analysis',
       action: async (args) => {
+        const sub = args['subcommand'] as string | undefined;
         if (args['help'] === true || args['h'] === true) {
-          console.log(showHelp('cg'));
+          console.log(cgSubcommandHelp(sub)); // subcommand-specific when a sub is given
           return;
         }
-        const sub = args['subcommand'] as string | undefined;
         const positionalArgs = [...((args['args'] as string[] | undefined) ?? [])];
         // Forward recognised flags so handleCodegraph can parse them uniformly.
         if (args['direct'] === true) positionalArgs.push('--direct');
+        if (args['depth'] !== undefined) positionalArgs.push('--depth', String(args['depth']));
         return await handleCodegraph(sub, positionalArgs);
       },
     },
