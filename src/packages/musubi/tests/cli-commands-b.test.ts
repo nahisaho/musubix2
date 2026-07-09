@@ -584,6 +584,35 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.33: Rust std methods suppressed per caller language; other langs keep the name.
+  it('cg suppresses Rust std method names only for Rust callers', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_rust');
+    mkdirSync(dir, { recursive: true });
+    // lib.rs defines a real helper AND (unluckily) `clone` and `as_ref`.
+    writeFileSync(
+      join(dir, 'lib.rs'),
+      'pub fn my_unique_rs_fn() -> i32 { 1 }\npub fn clone() -> i32 { 2 }\npub fn as_ref() -> i32 { 3 }\n',
+    );
+    writeFileSync(
+      join(dir, 'app.rs'),
+      'fn run(x: Foo) -> i32 { my_unique_rs_fn() + x.clone() + x.as_ref() }\n',
+    );
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      const graph = JSON.parse(readFileSync(join(dir, '.musubix', 'codegraph.json'), 'utf-8'));
+      const callTargets = graph.edges.filter((e: { kind: string }) => e.kind === 'calls')
+        .map((e: { to: string }) => e.to);
+      expect(callTargets).toContain('my_unique_rs_fn'); // real call resolves
+      expect(callTargets).not.toContain('clone'); // Rust std trait method — suppressed
+      expect(callTargets).not.toContain('as_ref'); // suppressed
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.31: candidates cycle penalty + path --all.
   it('cg candidates penalises files in a dependency cycle', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_cyc_pen');

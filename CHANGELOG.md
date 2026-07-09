@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.33] - 2026-07-10
+
+Go（Kubernetes）・Rust（ripgrep）・Java（Spring）での dogfooding により、コールグラフ解決の組み込み名 denylist を**呼び出し元の言語ごとにスコープ**する設計へ刷新。
+
+### Fixed
+
+- **Rust std メソッドの誤解決** — `clone`/`as_ref`/`unwrap`/`into` 等が、`#[derive(...)]` により明示 `fn clone` が稀で一意に定義されるため、全 `.clone()` 呼び出しを捕捉していた（ripgrep で calls エッジの **13.5%（446 中 60）が偽陽性**）。Rust 用の std トレイト/変換/Option-Result メソッド denylist を追加
+- **言語横断の過剰抑制** — 従来の単一 denylist は、ある言語の組み込み名（Rust `as_bytes`）が別言語の正当な同名メソッド（Django の `as_bytes` ヘルパー）まで抑制していた。denylist を **JS/TS・Python・Rust の言語別バケットに分割し、呼び出し元ファイルの言語で選択**する方式に変更。C/Go/Java はバケットを持たず影響なし（これらは命名規約や多重定義で自然に自己フィルタされる）
+
+### Changed
+
+- `nonCDefNames` スコープ（0.5.25/0.5.32）を廃し、`BUILTINS_BY_LANG`（呼び出し元言語 → 組み込み名集合）に置換。より正確でシンプル
+
+### Impact / Validation
+
+- **Rust (ripgrep)**: calls 446 → 386（`clone`/`as_ref` 偽エッジ除去、std 標的 0）
+- **Python (Django)**: `super` 265 → ~0、かつ `as_bytes` 等の**正当な Python メソッドエッジを復元**（従来は誤抑制）
+- **Go (k8s pkg/scheduler)**: `NewX`/`MakeX` 規約により元々クリーン、変更なし
+- **Java (Spring core)**: `equals`/`toString`/`hashCode` は多重定義で自己フィルタ、変更なし
+- **C (Linux kernel)**: calls 8,474 で不変
+
+### Tests
+
+- musubi: Rust std メソッド（`clone`/`as_ref`）が Rust 呼び出し元でのみ抑制され、実関数呼び出しは解決されることを検証（76 → 77）
+
 ## [0.5.32] - 2026-07-10
 
 Django（908 Python ファイル）での dogfooding により、Python の**組み込みグローバル関数の誤解決**バグを発見・修正。

@@ -944,12 +944,14 @@ function loadCodeGraphEdges(): StoredGraphEdge[] {
  * This is a heuristic: for colliding short names it may still over-match.
  */
 /**
- * Built-in / standard-library method and global names. These collide heavily
- * with user-defined method names (e.g. a unique `set()` method would otherwise
- * capture every `Map.set()` / `Set.add()` call), so they are never resolved to
- * user definitions when building the call graph.
+ * Standard-library method/global names that collide with user-defined names and
+ * would otherwise capture every stdlib call (e.g. a lone `def super` in Django
+ * absorbing every `super()`). Scoped PER CALLER LANGUAGE so a name that is a
+ * builtin in one language (Rust `as_bytes`) does not suppress a genuine method
+ * of the same name in another (a Python `as_bytes` helper). Resolution uses the
+ * calling file's language, so C — which has no bucket — is never affected.
  */
-const BUILTIN_CALL_NAMES = new Set<string>([
+const JS_BUILTINS = new Set<string>([
   // Array / iterable
   'map', 'filter', 'forEach', 'reduce', 'reduceRight', 'find', 'findIndex', 'some', 'every',
   'includes', 'indexOf', 'lastIndexOf', 'slice', 'splice', 'concat', 'join', 'push', 'pop',
@@ -964,28 +966,47 @@ const BUILTIN_CALL_NAMES = new Set<string>([
   'toUpperCase', 'toLowerCase', 'match', 'matchAll', 'search', 'repeat', 'normalize',
   // Object / function / misc
   'toString', 'valueOf', 'hasOwnProperty', 'call', 'apply', 'bind', 'assign', 'freeze',
-  'keys', 'values', 'entries', 'stringify', 'parse', 'now', 'test', 'exec',
-  // console / logging
-  'log', 'error', 'warn', 'info', 'debug', 'trace', 'assert',
-  // Python container / string built-in methods
-  'append', 'extend', 'insert', 'remove', 'count', 'update', 'items',
-  'setdefault', 'strip', 'lstrip', 'rstrip', 'format', 'encode', 'decode',
-  // Python global built-in functions (a user `def super`/`type`/… otherwise
-  // captures every builtin call across the codebase — 17% of Django's edges).
-  'super', 'type', 'len', 'str', 'int', 'float', 'bool', 'dict', 'list',
+  'stringify', 'parse', 'now', 'test', 'exec',
+  // console / logging + ES class
+  'log', 'error', 'warn', 'info', 'debug', 'trace', 'assert', 'super',
+]);
+const PY_BUILTINS = new Set<string>([
+  // container / string methods
+  'append', 'extend', 'insert', 'remove', 'count', 'update', 'items', 'keys', 'values',
+  'get', 'pop', 'setdefault', 'strip', 'lstrip', 'rstrip', 'format', 'encode', 'decode',
+  'join', 'split', 'replace', 'add', 'clear',
+  // global built-in functions
+  'super', 'type', 'len', 'str', 'int', 'float', 'bool', 'dict', 'list', 'set',
   'tuple', 'frozenset', 'bytes', 'bytearray', 'complex', 'object', 'range',
   'isinstance', 'issubclass', 'hasattr', 'getattr', 'setattr', 'delattr',
   'property', 'staticmethod', 'classmethod', 'repr', 'print', 'input',
   'enumerate', 'zip', 'sorted', 'reversed', 'min', 'max', 'sum', 'abs',
   'round', 'iter', 'vars', 'dir', 'hash', 'callable', 'any', 'all',
-  'chr', 'ord', 'hex', 'oct', 'bin', 'divmod', 'pow', 'globals', 'locals',
-  // Python str/bytes methods (lowercase — distinct from the camelCase JS ones)
+  'chr', 'ord', 'hex', 'oct', 'bin', 'divmod', 'pow', 'globals', 'locals', 'map', 'filter',
+  // str/bytes methods (lowercase)
   'upper', 'lower', 'title', 'capitalize', 'swapcase', 'casefold',
   'startswith', 'endswith', 'splitlines', 'zfill', 'ljust', 'rjust', 'center',
   'expandtabs', 'translate', 'partition', 'rpartition', 'rsplit', 'rfind',
   'rindex', 'isdigit', 'isalpha', 'isalnum', 'isspace', 'islower', 'isupper',
-  'istitle', 'isidentifier', 'isnumeric', 'isdecimal',
+  'istitle', 'isidentifier', 'isnumeric', 'isdecimal', 'find',
 ]);
+const RUST_BUILTINS = new Set<string>([
+  // trait / conversion / Option-Result methods. With #[derive(...)] an explicit
+  // `fn clone`/`as_ref` is rare, so it resolves uniquely and captures every
+  // `.clone()`/`.as_ref()` call (13% of ripgrep's edges).
+  'clone', 'clone_from', 'as_ref', 'as_mut', 'as_str', 'as_bytes', 'as_slice',
+  'as_path', 'as_os_str', 'to_string', 'to_owned', 'to_vec', 'into', 'into_iter',
+  'unwrap', 'unwrap_or', 'unwrap_or_else', 'unwrap_or_default', 'expect',
+  'borrow', 'borrow_mut', 'deref', 'deref_mut', 'collect', 'iter', 'iter_mut',
+  'contains', 'contains_key', 'starts_with', 'ends_with', 'is_empty', 'len',
+  'push', 'pop', 'insert', 'remove', 'get', 'get_mut', 'trim', 'trim_start', 'trim_end',
+]);
+const BUILTINS_BY_LANG: Record<string, Set<string>> = {
+  javascript: JS_BUILTINS,
+  typescript: JS_BUILTINS,
+  python: PY_BUILTINS,
+  rust: RUST_BUILTINS,
+};
 
 /**
  * Build the symbol→file resolution maps used by impact/export/cycles:
@@ -1251,17 +1272,12 @@ export async function handleCodegraph(
         const savedEdges: Array<Parameters<typeof engine.addEdge>[0]> = [];
         // For building the cross-file call graph in a second phase, once every
         // function definition across the corpus is known.
-        const fileCalls: Array<{ file: string; calls: string[] }> = [];
+        const fileCalls: Array<{ file: string; lang: string; calls: string[] }> = [];
         // Global (external-linkage) function name → defining files.
         const globalFnToFiles = new Map<string, Set<string>>();
         // Every function name a file defines (static or global) — a call to such
         // a name binds locally in C and must not create a cross-file edge.
         const fileDefines = new Map<string, Set<string>>();
-        // Names defined by a NON-C file (methods, or functions in TS/JS/Python/…).
-        // Used to scope the built-in denylist: a built-in-collision like a user
-        // `get()`/`map()` is dropped for these, while genuine C functions named
-        // `get`/`sort`/… keep their call edges.
-        const nonCDefNames = new Set<string>();
         let indexedFiles = 0;
         for (const file of files) {
           const ext = file.split('.').pop() ?? '';
@@ -1287,7 +1303,6 @@ export async function handleCodegraph(
               const defined = fileDefines.get(file) ?? new Set<string>();
               defined.add(node.name);
               fileDefines.set(file, defined);
-              if (lang !== 'c') nonCDefNames.add(node.name);
               if (!isStatic) {
                 const set = globalFnToFiles.get(node.name) ?? new Set<string>();
                 set.add(file);
@@ -1318,13 +1333,12 @@ export async function handleCodegraph(
               const defined = fileDefines.get(file) ?? new Set<string>();
               defined.add(child.name);
               fileDefines.set(file, defined);
-              nonCDefNames.add(child.name);
               const set = globalFnToFiles.get(child.name) ?? new Set<string>();
               set.add(file);
               globalFnToFiles.set(child.name, set);
             }
           }
-          fileCalls.push({ file, calls: parser.extractCalls(content, lang) });
+          fileCalls.push({ file, lang, calls: parser.extractCalls(content, lang) });
           indexedFiles++;
         }
         // Phase 2 — call-graph edges, resolved with C linkage rules:
@@ -1333,13 +1347,14 @@ export async function handleCodegraph(
         //    edge only when exactly ONE *global* (non-static) definition exists.
         // This binds file-local `static` homonyms correctly AND still captures
         // calls to unique globals that a static homonym elsewhere used to hide.
-        for (const { file, calls } of fileCalls) {
+        for (const { file, lang, calls } of fileCalls) {
           const localDefs = fileDefines.get(file);
+          // Standard-library names for the CALLER's language never resolve to a
+          // same-named user def (avoids `.clone()`/`super()`/`.map()` capture).
+          // Languages without a bucket (C/Go/Java) are unaffected.
+          const denylist = BUILTINS_BY_LANG[lang];
           for (const name of calls) {
-            // Built-in method/global names (Array/Map/Set/Promise/console, …)
-            // collide with user *method* names and would produce spurious edges.
-            // Scoped to method-defined names so C function edges are unaffected.
-            if (nonCDefNames.has(name) && BUILTIN_CALL_NAMES.has(name)) continue;
+            if (denylist?.has(name)) continue;
             if (localDefs?.has(name)) continue; // local binding (static/own def)
             const defs = globalFnToFiles.get(name);
             if (!defs || defs.size !== 1) continue; // undefined or ambiguous global
