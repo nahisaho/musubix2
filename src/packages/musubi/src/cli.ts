@@ -157,7 +157,7 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'コードグラフ分析',
   },
   security: {
-    usage: 'musubix security <path> [--fail-on critical|high|medium|low|info]',
+    usage: 'musubix security <path> [--fail-on critical|high|medium|low|info] [--exclude-tests]',
     description: 'セキュリティスキャン（ファイル/ディレクトリ対応）',
   },
   skills: {
@@ -1001,9 +1001,21 @@ export async function handleCodegraph(
 
 const SEVERITY_ORDER: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
+/** Heuristic: does this path look like test / fixture code rather than production? */
+export function isTestFile(file: string): boolean {
+  const p = file.replace(/\\/g, '/').toLowerCase();
+  return (
+    /(^|\/)(tests?|__tests__|spec|specs|fixtures?|phpunit|behat)(\/|$)/.test(p) ||
+    /(\.|_)(test|spec)\.[a-z]+$/.test(p) ||
+    /(^|\/)[a-z0-9_-]*_test\.[a-z]+$/.test(p) ||
+    /(^|\/)test[a-z0-9_-]*\.[a-z]+$/.test(p)
+  );
+}
+
 export async function handleSecurity(
   filePath: string,
   failOn?: string,
+  excludeTests?: boolean,
 ): Promise<ExitCodeValue> {
   try {
     if (!existsSync(filePath)) {
@@ -1015,7 +1027,9 @@ export async function handleSecurity(
     const deps = new DependencyScanner();
 
     // Accept a single file or a directory (recursively scanned).
-    const files = collectFiles(filePath, (ext) => ext in EXT_TO_LANG);
+    const allFiles = collectFiles(filePath, (ext) => ext in EXT_TO_LANG);
+    const files = excludeTests ? allFiles.filter((f) => !isTestFile(f)) : allFiles;
+    const skipped = allFiles.length - files.length;
     const findings: SecurityFinding[] = [];
     for (const file of files) {
       const code = readFileSync(file, 'utf-8');
@@ -1033,7 +1047,10 @@ export async function handleSecurity(
       bySeverity.set(f.severity, list);
     }
 
-    console.log(`Security scan: ${filePath} (${files.length} file(s))`);
+    console.log(
+      `Security scan: ${filePath} (${files.length} file(s)` +
+        (skipped > 0 ? `, ${skipped} test file(s) skipped` : '') + ')',
+    );
     console.log(`Total findings: ${findings.length}`);
 
     for (const sev of SEVERITY_ORDER) {
@@ -2480,10 +2497,14 @@ export function getDefaultCommands(): CLICommand[] {
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
         const filePath = (args['subcommand'] as string) ?? positionalArgs[0];
         if (!filePath) {
-          console.error('❌ Usage: musubix security <path> [--fail-on critical|high|medium|low|info]');
+          console.error('❌ Usage: musubix security <path> [--fail-on <sev>] [--exclude-tests]');
           return ExitCode.VALIDATION_ERROR;
         }
-        return await handleSecurity(filePath, args['fail-on'] as string | undefined);
+        return await handleSecurity(
+          filePath,
+          args['fail-on'] as string | undefined,
+          args['exclude-tests'] === true,
+        );
       },
     },
     {

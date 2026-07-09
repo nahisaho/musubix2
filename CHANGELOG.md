@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.14] - 2026-07-09
+
+Moodle 分析で判明した「テストファイルの指摘がノイズになる」問題に対応。
+
+### Added
+
+- **`security --exclude-tests`** — テスト/フィクスチャファイル（`tests/`・`__tests__/`・`*_test.*`・`*.spec.*`・`fixtures/`・`phpunit`・`behat` 等）をスキャン対象から除外するフラグ。スキップ件数を要約に表示。Moodle 認証系（144ファイル）では 22 テストファイルを除外し、本番コードの指摘が 11件（すべてテスト由来）→ **0件**にクリーン化（0.5.13 の偽陽性修正と併せ、Moodle 本番認証コードは検出項目ゼロ）
+
+### Tests
+
+- `isTestFile` 判定と `--exclude-tests` がテストファイルの指摘を除外することの検証テストを追加。全ワークスペース 1698 テスト green
+
 ## [0.5.13] - 2026-07-09
 
 実世界コードベース（Moodle 5.x, 50k+ PHP ファイル）での CodeGraph 脆弱性分析ドッグフーディングで発見した課題を改修。

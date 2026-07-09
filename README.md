@@ -183,7 +183,7 @@ npx musubix status              # Status display
 
 # Analysis & Verification
 npx musubix cg index <file|dir> # Code graph analysis (index|search|stats|languages)
-npx musubix security <file|dir> # Security scanning (--fail-on critical|high|medium|low|info)
+npx musubix security <file|dir> # Security scanning (--fail-on <sev>, --exclude-tests)
 npx musubix policy              # Policy verification
 npx musubix ontology add <s> <p> <o>      # Ontology management (add|list|validate|stats, persisted)
 

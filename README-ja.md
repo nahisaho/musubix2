@@ -181,7 +181,7 @@ npx musubix status              # ステータス表示
 
 # 分析・検証
 npx musubix cg index <file|dir> # コードグラフ解析（index|search|stats|languages）
-npx musubix security <file|dir> # セキュリティスキャン（--fail-on critical|high|medium|low|info）
+npx musubix security <file|dir> # セキュリティスキャン（--fail-on <sev>, --exclude-tests）
 npx musubix policy              # ポリシー検証
 npx musubix ontology add <s> <p> <o>      # オントロジー管理（add|list|validate|stats、永続化）
 

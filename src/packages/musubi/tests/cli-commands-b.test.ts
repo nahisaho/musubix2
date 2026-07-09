@@ -492,6 +492,16 @@ describe('v0.5.2 CLI fixes', () => {
     expect(failed).toBe(ExitCode.VALIDATION_ERROR);
   });
 
+  // v0.5.14: --exclude-tests skips test files so their fixtures don't add noise.
+  it('security --exclude-tests skips a leak that lives in a test file', async () => {
+    mkdirSync(join(dir, 'tests'), { recursive: true });
+    writeFileSync(join(dir, 'tests', 'leak_test.js'), 'const KEY = "AKIAIOSFODNN7EXAMPLE";\n');
+    // Without exclusion the test-file secret trips the gate...
+    expect(await handleSecurity(dir, 'critical')).toBe(ExitCode.VALIDATION_ERROR);
+    // ...with --exclude-tests it is skipped, so the gate passes.
+    expect(await handleSecurity(dir, 'critical', true)).toBe(ExitCode.SUCCESS);
+  });
+
   it('security --fail-on passes when no finding meets the threshold', async () => {
     writeFileSync(join(dir, 'clean.js'), 'export const n = 2;\n');
     const ok = await handleSecurity(dir, 'critical');
