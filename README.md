@@ -22,6 +22,8 @@ MUSUBIX2 is a **Specification Driven Development (SDD)** system that enforces a 
 - **Requirements Interview** — 1-question-at-a-time gathering of missing information before generating specs
 - **100% Traceability** — Full bidirectional tracing: Requirements ↔ Design ↔ Code ↔ Tests
 - **Quality Gates** — Automated verification at phase transitions
+- **Dual-Platform Setup** — One-command install for GitHub Copilot and Claude Code with auto-detection
+- **Agent Skills** — 8 bundled SDD skills (orchestrator, requirements, design, codegen, test, trace, policy, review)
 - **MCP Server** — Model Context Protocol with 61 tools, JSON-RPC 2.0, stdio/SSE transports
 - **Formal Verification** — EARS → SMT-LIB2 conversion for Z3 / Lean 4 verification
 - **Multi-Language AST** — Recursive descent parsers for Python, Java, Go, Rust, Ruby, PHP
@@ -37,6 +39,31 @@ npm install musubix2
 ```
 
 ## Quick Start
+
+Set up SDD in your project (installs instructions, Agent Skills, and MCP config for the detected platform):
+
+```bash
+npx musubix2 init --platform auto    # auto-detect GitHub Copilot / Claude Code
+npx musubix2 init --platform both    # set up both platforms
+npx musubix2 init --dry-run          # preview changes without writing files
+npx musubix2 init --update           # update existing setup (with .bak backups)
+```
+
+Generated per platform:
+
+| Platform | Files |
+|---|---|
+| GitHub Copilot | `.github/copilot-instructions.md`, `.github/skills/*`, `.vscode/mcp.json` |
+| Claude Code | `CLAUDE.md`, `.claude/skills/*`, `.mcp.json` |
+
+Start the MCP server directly:
+
+```bash
+npx musubix2 mcp                     # stdio transport (default)
+npx musubix2 mcp --transport sse     # HTTP/SSE transport
+```
+
+### Development (from source)
 
 ```bash
 git clone https://github.com/nahisaho/musubix2.git
@@ -61,6 +88,7 @@ musubix2/
 └── src/
     ├── packages/          # 26 workspace packages
     ├── steering/          # Project constitution, rules, ADRs
+    ├── storage/specs/     # SDD documents: requirements/ designs/ plans/ reviews/
     ├── package.json       # Root workspace definition
     ├── tsconfig.json      # TypeScript project references
     └── vitest.config.ts   # Test configuration
@@ -86,7 +114,7 @@ musubix2/
 | `lean` | Lean 4 EARS → Lean conversion and hybrid verification |
 | `library-learner` | Library learning using E-graphs and structural similarity |
 | `mcp-server` | MCP server with 61 tools, JSON-RPC 2.0, stdio/SSE transports |
-| `musubi` | Lightweight core SDD wrapper, CLI (28 commands), skill packaging |
+| `musubi` | Lightweight core SDD wrapper, CLI (29 commands), dual-platform installer, skill packaging |
 | `neural-search` | TF-IDF embedding-based similarity search engine |
 | `ontology-mcp` | N3 triple store, rule engine, consistency verification |
 | `pattern-mcp` | AST pattern extraction and MCP server |
@@ -119,6 +147,9 @@ Quality gates are applied at each phase transition — progress is blocked until
 | IV | **EARS Format** — 6 structured requirement patterns |
 | V | **Traceability** — 100% tracing across Requirements ↔ Design ↔ Code ↔ Tests |
 | VI | **Project Memory** — `steering/` as the single source of truth |
+| VII | **Design Pattern Documentation** — Document rationale whenever a design pattern is applied |
+| VIII | **ADR Records** — Record significant design decisions as Architecture Decision Records |
+| IX | **Quality Gates** — Phase transitions are blocked until gates pass |
 
 ---
 
@@ -128,16 +159,18 @@ Quality gates are applied at each phase transition — progress is blocked until
 npx musubix --help              # Show help
 
 # SDD Workflow
-npx musubix init                # Initialize SDD project
+npx musubix init                # Initialize SDD project (--platform auto|copilot|claude|both)
 npx musubix req                 # Requirements validation
 npx musubix req:wizard          # Requirements creation wizard
 npx musubix req:interview       # 1-question-at-a-time requirements gathering
 npx musubix design              # Design generation
 npx musubix design:c4           # C4 diagram generation
 npx musubix design:verify       # Design verification
+npx musubix tasks               # Task breakdown management
 npx musubix codegen             # Code generation
 npx musubix test:gen            # Test generation
 npx musubix trace               # Traceability verification
+npx musubix trace:verify        # Detailed traceability verification
 npx musubix workflow            # Workflow management
 npx musubix status              # Status display
 
@@ -160,7 +193,27 @@ npx musubix skills              # Skill management
 npx musubix scaffold            # Project scaffolding
 npx musubix repl                # Interactive REPL
 npx musubix watch               # File watcher
+
+# MCP
+npx musubix mcp                 # Start MCP server (--transport stdio|sse, --port)
 ```
+
+---
+
+## Agent Skills
+
+`init` installs 8 SDD Agent Skills for GitHub Copilot (`.github/skills/`) and Claude Code (`.claude/skills/`):
+
+| Skill | Role |
+|---|---|
+| `orchestrator` | Routes tasks to skills, enforces phase transitions and quality gates |
+| `requirements-analyst` | EARS requirements creation, validation, and 1-question interview (Phase 1) |
+| `design-generator` | SOLID-compliant design docs, C4 diagrams, ADRs (Phase 2) |
+| `code-generator` | Template-based code generation with 4-layer architecture (Phase 4) |
+| `test-engineer` | Red → Green → Blue enforcement, test generation, coverage gates |
+| `traceability-auditor` | Trace matrix generation, gap detection, impact analysis |
+| `constitution-enforcer` | Validates the 9 constitutional articles (CONST-001–009) |
+| `review-orchestrator` | Cross-model alternating review and consensus checks |
 
 ---
 

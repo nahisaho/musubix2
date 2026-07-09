@@ -5,7 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2026-07-25
+## [Unreleased]
+
+### Removed
+
+- **postinstall フックを廃止** — npm の install ライフサイクルスクリプト非推奨化に対応し、`postinstall.cjs` / `PostinstallBootstrap` / `WorkspaceRootResolver`（`MUSUBIX_AUTO_INIT=1` オプトイン自動初期化）を削除。セットアップは `npm install musubix2` + `npx musubix2 init` の2ステップで完結（REQ-INS-006 / DES-INS-006 を改訂）
+
+### Changed
+
+- **Agent Skills 最適化** — `orchestrator` SKILL.md を 565 → 454 行に削減（WHEN/DO 表と重複するタスク分類ツリー、実態と乖離した「同梱スキル12種」を含むパッケージング節、JSON-RPC 定型表を削除。ニューロシンボリック3テーブルと使用パッケージ一覧を統合テーブルに集約）
+- **`requirements-analyst` SKILL.md 構成修正** — 品質ゲート後に迷い込んでいたインタビュー節をワークフロー内へ移動、二重記載のフロー説明を統合、description / triggers に1問1答ヒアリングを追加
+- **README (EN/JA) を v0.4.4 対応に更新** — デュアルプラットフォームセットアップ手順、Agent Skills 一覧（8種）、憲法9条（VII〜IX 追記）、`tasks` / `trace:verify` / `mcp` コマンド、`storage/specs/` 構成を反映
+
+## [0.4.4] - 2026-04-05
+
+### Added
+
+- **specs ディレクトリ標準化** — `storage/specs/{requirements,designs,plans,reviews}` の4分類構成
+- **SpecsConfig** — `MuSubixConfig` に追加（既存設定との後方互換マージ対応）
+- 全テンプレート（minimal / default / full）が4つの spec サブディレクトリを生成
+- SDD 文書（REQ / DES / PLAN / レビュー）を分類別ディレクトリに整理
+
+### Changed
+
+- テスト数: 1630 → **1633**（94 ファイル）
+
+## [0.4.3] - 2026-04-05
+
+### Fixed
+
+- **CLI 起動不能を修正** — `bin/musubix.mjs` が tree-shake 済みの `dist/index.js` ではなく `dist/cli.js` を import するよう変更、ディスパッチャー呼び出しを `dispatcher.run(args)` に簡素化
+
+## [0.4.2] - 2026-04-05
+
+### Fixed
+
+- **postinstall 失敗を修正** — `dist/postinstall-bootstrap.js` を CJS ラッパー `postinstall.cjs` に置換（`npm install` を失敗させない設計、`files` に追加）
+
+## [0.4.1] - 2026-04-05
+
+### Fixed
+
+- **`npm install` 失敗を修正** — 公開パッケージの dependencies から解決不能な `workspace:*` 参照（`@musubix2/mcp-server`）を除去
+
+## [0.4.0] - 2026-04-05
 
 ### Added
 
@@ -26,6 +69,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - テスト数: 1588 → **1630**（94 ファイル、+42 テスト）
 - CLI `init` コマンド: `--platform`, `--dry-run`, `--update` フラグ追加
 - `package.json`: `.claude` を `files` に追加、`postinstall` スクリプト追加
+
+## [0.3.8] - 2026-04-05
+
+### Added
+
+- **SDD Phase 5 完了** — 77/77 タスク完了、69/69 DES トレーサビリティ（100%）、憲法9条準拠
+- `testing/` 共通ヘルパー・フィクスチャ（P0-02）
+- 16 仮想プロジェクト（P0-06）
+
+### Changed
+
+- テスト数: 92 ファイル、**1588** テスト全 PASS
+- カバレッジ: Stmts 83.4% / Branch 82.31% / Funcs 94.62%
+
+### Fixed
+
+- `prepublishOnly` でビルドを実行し、npm tarball に esbuild バンドルを確実に同梱
+
+## [0.3.1]–[0.3.7] - 2026-04-03
+
+### Fixed
+
+- npm パッケージングの反復修正 — dist バンドル再生成、`bin` エントリ調整
+- Agent Skills 同梱の改善 — 各スキルへの `scripts/` 追加（0.3.4）、SKILL.md 更新（0.3.5 / 0.3.7）、`copilot-instructions.md` 更新（0.3.7）
 
 ## [0.3.0] - 2026-04-03
 

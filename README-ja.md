@@ -23,6 +23,8 @@ MUSUBIX2 は **Specification Driven Development (SDD)** を実現するシステ
 - **要件ヒアリング** — 情報不足時の1問1答による情報収集 → 要件定義書自動生成
 - **100% トレーサビリティ** — 要件 ↔ 設計 ↔ コード ↔ テスト間の完全な追跡
 - **品質ゲート** — フェーズ遷移時の自動検証
+- **デュアルプラットフォームセットアップ** — GitHub Copilot / Claude Code を自動検出し、ワンコマンドでセットアップ
+- **Agent Skills** — 8つの SDD スキルを同梱（オーケストレーション、要件、設計、コード生成、テスト、トレース、憲法、レビュー）
 - **MCP サーバー** — 61 ツール、JSON-RPC 2.0、stdio/SSE トランスポート対応
 - **形式検証** — EARS → SMT-LIB2 変換による Z3 / Lean 4 検証
 - **多言語 AST パーサー** — Python, Java, Go, Rust, Ruby, PHP の再帰降下パーサー
@@ -38,6 +40,31 @@ npm install musubix2
 ```
 
 ## クイックスタート
+
+プロジェクトに SDD をセットアップします（検出されたプラットフォーム向けにインストラクション・Agent Skills・MCP 設定を生成）:
+
+```bash
+npx musubix2 init --platform auto    # GitHub Copilot / Claude Code を自動検出
+npx musubix2 init --platform both    # 両プラットフォームをセットアップ
+npx musubix2 init --dry-run          # ファイルを書き込まずに変更計画をプレビュー
+npx musubix2 init --update           # 既存設定を更新（.bak バックアップ付き）
+```
+
+プラットフォームごとの生成ファイル:
+
+| プラットフォーム | ファイル |
+|---|---|
+| GitHub Copilot | `.github/copilot-instructions.md`, `.github/skills/*`, `.vscode/mcp.json` |
+| Claude Code | `CLAUDE.md`, `.claude/skills/*`, `.mcp.json` |
+
+MCP サーバーの直接起動:
+
+```bash
+npx musubix2 mcp                     # stdio トランスポート（デフォルト）
+npx musubix2 mcp --transport sse     # HTTP/SSE トランスポート
+```
+
+### 開発（ソースから）
 
 ```bash
 git clone https://github.com/nahisaho/musubix2.git
@@ -62,6 +89,7 @@ musubix2/
 └── src/
     ├── packages/          # 26 ワークスペースパッケージ
     ├── steering/          # プロジェクト憲法・ルール・ADR
+    ├── storage/specs/     # SDD 文書: requirements/ designs/ plans/ reviews/
     ├── package.json       # ルートワークスペース定義
     ├── tsconfig.json      # TypeScript プロジェクト参照
     └── vitest.config.ts   # テスト設定
@@ -87,7 +115,7 @@ musubix2/
 | `lean` | Lean 4 EARS → Lean 変換・ハイブリッド検証 |
 | `library-learner` | E-graph と構造類似性を使ったライブラリ学習 |
 | `mcp-server` | 61 ツール・JSON-RPC 2.0・stdio/SSE トランスポート対応 MCP サーバー |
-| `musubi` | コア SDD ラッパー・CLI（28 コマンド）・スキルパッケージング |
+| `musubi` | コア SDD ラッパー・CLI（29 コマンド）・デュアルプラットフォームインストーラー・スキルパッケージング |
 | `neural-search` | TF-IDF 埋め込みベースの類似検索エンジン |
 | `ontology-mcp` | N3 トリプルストア・ルールエンジン・一貫性検証 |
 | `pattern-mcp` | AST パターン抽出と MCP サーバー機能 |
@@ -121,6 +149,9 @@ Requirements ──▶ Design ──▶ Task Breakdown ──▶ Implementation 
 | Article IV | **EARS 形式** — 6 パターンで構造化された要件記述 |
 | Article V | **トレーサビリティ** — 要件 ↔ 設計 ↔ コード ↔ テスト間の 100% 追跡 |
 | Article VI | **プロジェクトメモリ** — `steering/` を唯一の信頼できる情報源とする |
+| Article VII | **デザインパターン文書化** — パターン適用時は選定理由を文書化 |
+| Article VIII | **ADR 記録** — 重要な設計決定は ADR として記録 |
+| Article IX | **品質ゲート** — ゲートを通過しないフェーズ遷移はブロック |
 
 ---
 
@@ -130,16 +161,18 @@ Requirements ──▶ Design ──▶ Task Breakdown ──▶ Implementation 
 npx musubix --help              # ヘルプ表示
 
 # SDD ワークフロー
-npx musubix init                # プロジェクト初期化
+npx musubix init                # プロジェクト初期化（--platform auto|copilot|claude|both）
 npx musubix req                 # 要件検証
 npx musubix req:wizard          # 要件作成ウィザード
 npx musubix req:interview       # 1問1答ヒアリング → 要件定義書生成
 npx musubix design              # 設計生成
 npx musubix design:c4           # C4 ダイアグラム生成
 npx musubix design:verify       # 設計検証
+npx musubix tasks               # タスク分解管理
 npx musubix codegen             # コード生成
 npx musubix test:gen            # テスト生成
 npx musubix trace               # トレーサビリティ検証
+npx musubix trace:verify        # トレーサビリティ詳細検証
 npx musubix workflow            # ワークフロー管理
 npx musubix status              # ステータス表示
 
@@ -162,7 +195,27 @@ npx musubix skills              # スキル管理
 npx musubix scaffold            # プロジェクトスキャフォールド
 npx musubix repl                # 対話型 REPL
 npx musubix watch               # ファイル監視
+
+# MCP
+npx musubix mcp                 # MCP サーバー起動（--transport stdio|sse, --port）
 ```
+
+---
+
+## Agent Skills
+
+`init` 実行時に、8つの SDD Agent Skills が GitHub Copilot（`.github/skills/`）と Claude Code（`.claude/skills/`）向けにインストールされます:
+
+| スキル | 役割 |
+|---|---|
+| `orchestrator` | タスクのスキルルーティング、フェーズ遷移・品質ゲートの強制 |
+| `requirements-analyst` | EARS 要件の作成・検証・1問1答ヒアリング（Phase 1） |
+| `design-generator` | SOLID 準拠設計書・C4 ダイアグラム・ADR（Phase 2） |
+| `code-generator` | 4層アーキテクチャ準拠のテンプレートベースコード生成（Phase 4） |
+| `test-engineer` | Red → Green → Blue の強制、テスト生成、カバレッジゲート |
+| `traceability-auditor` | トレーサビリティマトリクス生成、ギャップ検出、影響分析 |
+| `constitution-enforcer` | 9条憲法（CONST-001〜009）の準拠検証 |
+| `review-orchestrator` | 複数 AI モデルによる交互レビューと合意チェック |
 
 ---
 
