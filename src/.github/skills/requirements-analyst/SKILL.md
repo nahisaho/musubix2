@@ -2,17 +2,21 @@
 name: requirements-analyst
 description: >
   EARS形式で要件を分析・作成・検証する。MarkdownEARSParser による構文検証、
-  EARSValidator による信頼度スコア算出、対話的要件ウィザードを提供。
+  EARSValidator による信頼度スコア算出、対話的要件ウィザード、
+  1問1答ヒアリング（RequirementsInterviewer）を提供。
   Use when creating requirements, validating EARS compliance, analyzing
-  requirement documents, or starting SDD Phase 1.
+  requirement documents, interviewing for missing information,
+  or starting SDD Phase 1.
 license: MIT
-version: "1.0.0"
+version: "1.0.1"
 triggers:
   - 要件を作成
   - 要件を分析
+  - 要件ヒアリング
   - EARS 検証
   - Phase 1 開始
   - requirements
+  - interview
 ---
 
 # Requirements Analyst
@@ -67,7 +71,32 @@ WHEN ユーザーが新規要件の作成を要求する:
 
 **CLI**: `npx musubix req:wizard`
 
-### 3. 要件検索
+### 3. 要件インタビュー（1問1答フロー）
+
+```
+WHEN ユーザーが要件仕様書の生成を要求する（情報不足時）:
+1. RequirementsInterviewer にユーザーの入力テキストを渡す
+2. extractFromInput() でキーワードマッチングにより既知情報を抽出
+3. 不足している必須項目を1問ずつ質問（1問1答、日本語メイン・英語サブ）
+   - 必須項目: プロジェクト名、概要、システム種別、対象ユーザー、主要機能
+   - 任意項目: ステークホルダー、ユースケース、パフォーマンス、セキュリティ等
+4. 回答をコンテキストに格納し、完了率を更新
+5. 全必須項目が揃ったら RequirementsDocGenerator で EARS 準拠仕様書を生成
+6. EARSValidator で生成結果を検証
+```
+
+**CLI**:
+```
+npx musubix req:interview <input-text>             # 入力分析 → 最初の質問
+npx musubix req:interview --answer <id> <response>  # 質問に回答
+npx musubix req:interview --state                    # 現在の状態表示
+npx musubix req:interview --generate                 # 仕様書生成
+npx musubix req:interview --reset                    # リセット
+```
+
+**MCP Tools**: `sdd.requirements.interview.start` / `.answer` / `.state` / `.generate`
+
+### 4. 要件検索
 
 ```
 WHEN ユーザーが要件の検索を要求する:
@@ -103,42 +132,6 @@ THE システム SHALL...
 - [ ] 受入基準がチェックリスト形式
 - [ ] トレーサビリティフィールドが存在
 - [ ] パッケージフィールドが存在
-
-## 4. 要件インタビュー（1問1答フロー）
-
-```
-WHEN ユーザーが要件仕様書の生成を要求する:
-1. RequirementsInterviewer にユーザーの入力テキストを渡す
-2. extractFromInput() でキーワードマッチングにより既知情報を抽出
-3. 不足している必須項目を1問ずつ質問（1問1答）
-4. 必須項目: プロジェクト名、概要、システム種別、対象ユーザー、主要機能
-5. 任意項目: ステークホルダー、ユースケース、パフォーマンス、セキュリティ等
-6. 全必須項目が揃ったら RequirementsDocGenerator で EARS 準拠仕様書を生成
-7. EARSValidator で生成結果を検証
-```
-
-### インタビューフロー詳細
-
-1. **入力分析**: ユーザーの自由記述からプロジェクト名・機能・技術スタック等を自動抽出
-2. **不足情報特定**: 必須フィールド（projectName, projectDescription, projectDomain, targetUsers, features）の充足チェック
-3. **1問1答**: 不足フィールドごとに1問ずつ質問（日本語メイン、英語サブ）
-4. **回答適用**: 回答をコンテキストに格納し、完了率を更新
-5. **仕様書生成**: 全必須項目充足後、EARS形式の要件仕様書を自動生成
-
-**CLI**:
-```
-npx musubix req:interview <input-text>             # 入力分析 → 最初の質問
-npx musubix req:interview --answer <id> <response>  # 質問に回答
-npx musubix req:interview --state                    # 現在の状態表示
-npx musubix req:interview --generate                 # 仕様書生成
-npx musubix req:interview --reset                    # リセット
-```
-
-**MCP Tools**:
-- `sdd.requirements.interview.start` — インタビュー開始
-- `sdd.requirements.interview.answer` — 質問に回答
-- `sdd.requirements.interview.state` — 状態取得
-- `sdd.requirements.interview.generate` — 仕様書生成
 
 ## Gotchas
 

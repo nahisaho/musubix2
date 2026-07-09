@@ -7,7 +7,7 @@ description: >
   running the full SDD workflow, invoking neurosymbolic capabilities,
   or serving tools via MCP protocol.
 license: MIT
-version: "3.0.0"
+version: "3.0.1"
 triggers:
   - ワークフロー
   - フェーズ遷移
@@ -129,50 +129,9 @@ SDD（Specification Driven Development）ワークフローのルーティング
 | ADR・アーキテクチャ決定を記録する | → `@musubix2/decisions` |
 | ドメイン分類・ドリフト分析する | → `@musubix2/assistant-axis` |
 | Git 履歴から知識を抽出する | → `@musubix2/git-knowledge` |
-| MCP ツールを一覧・呼出する | → `@musubix2/mcp-server` |
-| MCP プロンプト・リソースを取得する | → `@musubix2/mcp-server` |
+| MCP ツール呼出・プロンプト・リソース取得する | → `@musubix2/mcp-server` |
 | 多言語 AST 解析する（Python/Java/Go/Rust 等） | → `@musubix2/codegraph` (MultiLanguageParser) |
 | SDD ワークフロー全体を実行する | → `orchestrator`（Phase 遷移ルール参照） |
-
-### タスク分類ツリー
-
-```
-ユーザー入力
-├── 仕様関連?
-│   ├── 要件? → requirements-analyst
-│   ├── 要件ヒアリング（情報不足）? → requirements-analyst (1問1答 Interview)
-│   └── 設計? → design-generator
-├── 実装関連?
-│   ├── コード生成? → code-generator
-│   ├── テスト? → test-engineer
-│   └── プログラム合成? → @musubix2/synthesis
-├── 品質関連?
-│   ├── トレーサビリティ? → traceability-auditor
-│   ├── ポリシー? → constitution-enforcer
-│   ├── レビュー / 合意チェック? → review-orchestrator
-│   ├── 形式検証 (SMT/Z3)? → @musubix2/formal-verify
-│   └── 定理証明 (Lean 4)? → @musubix2/lean
-├── 分析関連?
-│   ├── AST / コードグラフ? → @musubix2/codegraph
-│   ├── データフロー / CFG? → @musubix2/dfg
-│   ├── セキュリティ? → @musubix2/security
-│   └── ドメイン分類? → @musubix2/assistant-axis
-├── 知識関連?
-│   ├── 知識グラフ? → @musubix2/knowledge
-│   ├── Git 履歴知識抽出? → @musubix2/git-knowledge
-│   ├── オントロジー / 推論? → @musubix2/ontology-mcp
-│   ├── リサーチ / 調査? → @musubix2/deep-research
-│   └── ADR / 決定記録? → @musubix2/decisions
-├── 学習関連?
-│   ├── ニューラル検索? → @musubix2/neural-search
-│   ├── パターン学習? → @musubix2/library-learner
-│   └── Wake-Sleep サイクル? → @musubix2/wake-sleep
-├── MCP 関連?
-│   ├── ツール呼出・一覧? → @musubix2/mcp-server (MCPToolRegistry)
-│   ├── プロンプトテンプレート? → @musubix2/mcp-server (PromptRegistry)
-│   └── リソース取得? → @musubix2/mcp-server (ResourceRegistry)
-└── ワークフロー? → orchestrator（Phase 遷移ルール）
-```
 
 ## Phase 遷移ルール
 
@@ -293,32 +252,40 @@ SDD ワークフローの各フェーズでニューロシンボリック機能�
 
 ### ニューラル側（学習・検索・パターン認識）
 
-| パッケージ | 機能 | SDD での利用場面 |
-|-----------|------|-----------------|
-| `neural-search` | TF-IDF 埋込み + コサイン類似度検索 | 類似要件検索、既存設計の参照、コード重複検出 |
-| `wake-sleep` | N-gram + PMI 統計パターン抽出、Jaccard クラスタリング | コードパターンの自動学習、設計パターン発見 |
-| `library-learner` | E-graph 等価クラス + 構造類似性マージ | ライブラリ抽象化の発見、リファクタリング候補 |
-| `deep-research` | 反復リサーチ + 証拠チェーン + 戦略ベース探索 | 技術調査、ベストプラクティス収集 |
+| パッケージ | 主要クラス | 機能 / SDD での利用場面 |
+|-----------|-----------|------------------------|
+| `neural-search` | `TfIdfEmbeddingModel`, `NeuralSearchEngine` | TF-IDF 埋込み + コサイン類似度検索 — 類似要件検索、既存設計の参照、コード重複検出 |
+| `wake-sleep` | `WakePhase`, `SleepPhase`, `CycleManager` | N-gram + PMI 統計パターン抽出 — コードパターンの自動学習、設計パターン発見 |
+| `library-learner` | `EGraphEngine`, `LibraryLearner` | E-graph 等価クラス + 構造類似性マージ — ライブラリ抽象化の発見、リファクタリング候補 |
+| `deep-research` | `ResearchEngine`, `DepthFirstStrategy`, `BreadthFirstStrategy` | 反復リサーチ + 証拠チェーン — 技術調査、ベストプラクティス収集 |
 
 ### シンボリック側（論理・検証・推論）
 
-| パッケージ | 機能 | SDD での利用場面 |
-|-----------|------|-----------------|
-| `formal-verify` | EARS → SMT-LIB2 変換、Z3 サブプロセス検証 | 要件の形式的一貫性検証、矛盾検出 |
-| `lean` | Lean 4 定理変換 + 証明実行 | 安全性要件の定理証明、ハイブリッド検証 |
-| `codegraph` | TS Compiler API + MultiLanguageParser (6言語) + GraphRAG | 多言語コード構造分析、影響範囲分析 |
-| `dfg` | DFG/CFG 構築 + 到達定義 + 使用連鎖 | データフロー分析、セキュリティ汚染解析 |
-| `ontology-mcp` | N3 トリプルストア + ルールエンジン + 一貫性検証 | ドメインモデル推論、制約検証 |
-| `knowledge` | エンティティ関係グラフ + サブグラフ抽出 | プロジェクト知識管理、関係探索 |
-| `git-knowledge` | Git log/blame パーサー + 共変更分析 + 著者エキスパート | Git 履歴からの知識自動抽出 |
+| パッケージ | 主要クラス | 機能 / SDD での利用場面 |
+|-----------|-----------|------------------------|
+| `formal-verify` | `EarsToSmtConverter`, `Z3Adapter`, `PreconditionVerifier` | EARS → SMT-LIB2 変換 + Z3 検証 — 要件の形式的一貫性検証、矛盾検出 |
+| `lean` | `LeanProofRunner`, `EarsToLeanConverter`, `HybridVerifier` | Lean 4 定理変換 + 証明実行 — 安全性要件の定理証明、ハイブリッド検証 |
+| `codegraph` | `ASTParser`, `MultiLanguageParser`, `GraphEngine`, `GraphRAGSearch` | 多言語 AST 解析（6言語）+ GraphRAG — コード構造分析、影響範囲分析 |
+| `dfg` | `DataFlowAnalyzer` | DFG/CFG 構築 + 到達定義 — データフロー分析、セキュリティ汚染解析 |
+| `ontology-mcp` | `N3Store`, `RuleEngine`, `ConsistencyValidator` | N3 トリプルストア + 推論 — ドメインモデル推論、制約検証 |
+| `knowledge` | `FileKnowledgeStore` | エンティティ関係グラフ — プロジェクト知識管理、関係探索 |
+| `git-knowledge` | `GitLogParser`, `GitKnowledgeBuilder` | Git log/blame + 共変更分析 — Git 履歴からの知識自動抽出 |
 
-### 統合側（合成・変換）
+### 統合・制御側（合成・変換・ワークフロー）
 
-| パッケージ | 機能 | SDD での利用場面 |
-|-----------|------|-----------------|
-| `synthesis` | DSL ビルダー（16変換）+ 合成戦略 + バージョンスペース | コード変換自動化、例示プログラミング |
-| `pattern-mcp` | AST パターン抽出 + MCP ツール | パターンカタログ管理 |
-| `sdd-ontology` | SDD ドメイン概念 + Turtle 定義 | SDD ワークフロー意味モデル |
+| パッケージ | 主要クラス | 機能 / SDD での利用場面 |
+|-----------|-----------|------------------------|
+| `synthesis` | `DSLBuilder`, `SynthesisEngine`, `VersionSpaceManager` | DSL ビルダー（16変換）— コード変換自動化、例示プログラミング |
+| `security` | `SecurityScanner`, `TaintAnalyzer` | 脆弱性スキャン、汚染解析 |
+| `decisions` | `DecisionManager` | ADR 記録・管理 |
+| `assistant-axis` | `DomainClassifier`, `DriftAnalyzer` | ドメイン分類・ドリフト分析 |
+| `pattern-mcp` | — | AST パターン抽出 — パターンカタログ管理 |
+| `sdd-ontology` | — | SDD ドメイン概念 + Turtle 定義 — ワークフロー意味モデル |
+| `workflow-engine` | `PhaseController`, `StateTracker`, `TaskBreakdownManager` | Phase 遷移制御・タスク分解 |
+| `agent-orchestrator` | `SubagentDispatcher`, `ReviewOrchestrator` | サブエージェント振り分け・交互レビュー |
+| `policy` | `PolicyEngine`, `QualityGateRunner` | 憲法検証・品質ゲート実行 |
+| `mcp-server` | `MCPServer`, `MCPToolRegistry`, `StdioTransport`, `SSETransport` | MCP プロトコルでのツール提供 |
+| `skill-manager` | `SkillRegistry`, `SkillManager`, `SkillExecutor` | スキル登録・実行 |
 
 ### Phase 別ニューロシンボリック活用マップ
 
@@ -381,19 +348,9 @@ SDD 成果物の品質保証には `review-orchestrator` スキルを使用す�
 
 ## MCP サーバー統合
 
-### アーキテクチャ
-
-```
-クライアント (Claude Code / Copilot / Cursor)
-    │
-    ├── stdio ──→ StdioTransport ──→ MCPServer
-    └── HTTP  ──→ SSETransport   ──→ MCPServer
-                                       │
-                    ┌──────────────────┤
-                    │                  │                  │
-             MCPToolRegistry    PromptRegistry     ResourceRegistry
-             (61 tools)         (4 prompts)        (3 resources)
-```
+クライアント（Claude Code / Copilot / Cursor）は stdio（`StdioTransport`）または
+HTTP/SSE（`SSETransport`）経由で `MCPServer` に接続する。
+レジストリは 3 種: `MCPToolRegistry`（61 tools）、`PromptRegistry`（4 prompts）、`ResourceRegistry`（3 resources）。
 
 ### ツールカテゴリ（13カテゴリ / 61ツール）
 
@@ -430,19 +387,6 @@ SDD 成果物の品質保証には `review-orchestrator` スキルを使用す�
 | `musubix://ears-patterns` | EARS パターンリファレンス |
 | `musubix://workflow-phases` | SDD ワークフローフェーズ定義 |
 
-### JSON-RPC メソッド
-
-| メソッド | 説明 |
-|---------|------|
-| `initialize` | サーバー情報・ケイパビリティ返却 |
-| `tools/list` | 全ツール一覧 |
-| `tools/call` | ツール実行 |
-| `prompts/list` | プロンプト一覧 |
-| `prompts/get` | プロンプト取得・実行 |
-| `resources/list` | リソース一覧 |
-| `resources/read` | リソース読取 |
-| `ping` | ヘルスチェック |
-
 ## CLI コマンドマッピング
 
 | CLI コマンド | パッケージ | 説明 |
@@ -476,31 +420,6 @@ SDD 成果物の品質保証には `review-orchestrator` スキルを使用す�
 | `musubix synthesis` | synthesis | プログラム合成 (dsl/fromExamples) |
 | `musubix watch` | core | ファイル監視・自動再検証 |
 
-## スキルパッケージング
-
-npm publish 時に `.github/skills/` と `.github/copilot-instructions.md` を自動同梱する。
-
-- `prepublishOnly`: `scripts/copy-github-assets.mjs` が `src/.github/` からパッケージ内にコピー
-- `postpublish`: `scripts/clean-github-assets.mjs` がコピーを削除
-- `.gitignore` でコピー先を除外（コミット防止）
-
-### 同梱されるスキル（12種）
-
-| スキル | 説明 |
-|--------|------|
-| `code-generator` | コード生成 |
-| `constitution-enforcer` | 憲法準拠検証 |
-| `description-optimizer` | 記述最適化 |
-| `design-generator` | 設計生成 |
-| `gotchas-curator` | 注意点キュレーション |
-| `harness-auditor` | ハーネス監査 |
-| `orchestrator` | オーケストレーション (本ファイル) |
-| `orchestrator-designer` | オーケストレーター設計 |
-| `purpose-discovery` | 目的発見 |
-| `requirements-analyst` | 要件分析 |
-| `skill-scaffolder` | スキルスキャフォールド |
-| `test-engineer` | テスト設計 |
-
 ## 禁止事項
 
 - Phase をスキップしてはならない
@@ -519,36 +438,6 @@ npm publish 時に `.github/skills/` と `.github/copilot-instructions.md` を�
 | 🟡 Major | テストカバレッジ不足 → test-engineer で補完後に進行 |
 | 🟡 Major | セキュリティ脆弱性検出 → security で修正後に進行 |
 | 🟢 Minor | ドキュメント不備 → 次回レビューで対応可 |
-
-## 使用パッケージ
-
-### コア制御
-- `@musubix2/workflow-engine` — `PhaseController`, `StateTracker`, `TaskBreakdownManager`
-- `@musubix2/agent-orchestrator` — `SubagentDispatcher`, `ReviewOrchestrator`
-- `@musubix2/policy` — `PolicyEngine`, `QualityGateRunner`
-- `@musubix2/mcp-server` — `MCPServer`, `MCPToolRegistry`, `StdioTransport`, `SSETransport`
-
-### ニューラル
-- `@musubix2/neural-search` — `TfIdfEmbeddingModel`, `NeuralSearchEngine`
-- `@musubix2/wake-sleep` — `WakePhase`, `SleepPhase`, `CycleManager`
-- `@musubix2/library-learner` — `EGraphEngine`, `LibraryLearner`
-- `@musubix2/deep-research` — `ResearchEngine`, `DepthFirstStrategy`, `BreadthFirstStrategy`
-
-### シンボリック
-- `@musubix2/formal-verify` — `EarsToSmtConverter`, `Z3Adapter`, `PreconditionVerifier`
-- `@musubix2/lean` — `LeanProofRunner`, `EarsToLeanConverter`, `HybridVerifier`
-- `@musubix2/codegraph` — `ASTParser`, `MultiLanguageParser`, `GraphEngine`, `GraphRAGSearch`
-- `@musubix2/dfg` — `DataFlowAnalyzer`
-- `@musubix2/ontology-mcp` — `N3Store`, `RuleEngine`, `ConsistencyValidator`
-- `@musubix2/knowledge` — `FileKnowledgeStore`
-- `@musubix2/git-knowledge` — `GitLogParser`, `GitKnowledgeBuilder`
-
-### 統合
-- `@musubix2/synthesis` — `DSLBuilder`, `SynthesisEngine`, `VersionSpaceManager`
-- `@musubix2/security` — `SecurityScanner`, `TaintAnalyzer`
-- `@musubix2/decisions` — `DecisionManager`
-- `@musubix2/assistant-axis` — `DomainClassifier`, `DriftAnalyzer`
-- `@musubix2/skill-manager` — `SkillRegistry`, `SkillManager`, `SkillExecutor`
 
 ## スクリプト
 
