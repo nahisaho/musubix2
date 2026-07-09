@@ -35,10 +35,11 @@ if (existsSync(githubSkills)) {
 }
 
 // Add .musubix-managed marker for circular detection (REQ-INS-002)
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
+const pkgVersion = JSON.parse(readFileSync(resolve(pkgDir, 'package.json'), 'utf-8')).version;
 writeFileSync(
   resolve(destClaude, '.musubix-managed'),
-  JSON.stringify({ generator: 'musubix2', version: '0.4.0', timestamp: new Date().toISOString() }),
+  JSON.stringify({ generator: 'musubix2', version: pkgVersion, timestamp: new Date().toISOString() }),
 );
 
 console.log('✓ Copied .github and .claude assets for packaging');

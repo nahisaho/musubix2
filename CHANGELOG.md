@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-07-09
+
+### Fixed
+
+- **公開バンドルの陳腐化を修正** — `bundle.mjs` が tsc 出力を同一ファイルへ上書きバンドルするため、増分ビルドでは依存パッケージの新コードが取り込まれない問題（0.4.0〜0.4.4 の dist が同一で、specs 標準化コードが未同梱だった原因）。`prepublishOnly` に `npm run clean` を追加しクリーンビルドを強制
+- **`skills-manifest.json` 未生成を修正** — `generate-manifest.mjs` が `createHash` を `node:fs` から import しておりクラッシュ、かつビルドチェーンから呼ばれていなかった。このため公開版の `init` はスキルを1つもインストールできなかった。import を修正し `prepublishOnly` に組み込み
+- **`.musubix-managed` マーカーのバージョン固定を修正** — `0.4.0` ハードコードを package.json からの動的読込に変更
 
 ### Removed
 

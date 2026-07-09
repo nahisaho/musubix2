@@ -2,7 +2,7 @@
  * P0-05 / DES-SKL-001: Generate skills-manifest.json from .github/skills and .claude/skills.
  * Runs during build to produce dist/assets/skills-manifest.json.
  */
-import { readdirSync, existsSync, readFileSync, mkdirSync, writeFileSync, createHash } from 'node:fs';
+import { readdirSync, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash as cryptoHash } from 'node:crypto';
