@@ -64,10 +64,10 @@ npx musubix2 mcp --transport sse     # HTTP/SSE transport
 ```
 
 The stdio server stays alive for the client session and exposes 61 tools across
-13 categories (`tools/list`). Most tool groups — `sdd-core`, `knowledge`,
-`security`, `code-analysis`, `ontology`, `synthesis`, `decisions`, `research`,
-`neural`, and `workflow` — run against real package APIs; `skills`,
-`formal-verify`, and `lean` are being wired incrementally.
+all 13 categories (`tools/list`), each backed by a real package API — SDD core,
+knowledge, security, code analysis, ontology, synthesis, decisions, research,
+neural, workflow, policy, formal verification, and skills. The `verify.z3.solve`
+and `verify.lean.run` tools additionally require a local Z3 / Lean toolchain.
 
 ### Development (from source)
 

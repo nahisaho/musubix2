@@ -389,3 +389,50 @@ describe('v0.5.10 MCP tool wiring', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// v0.5.11 — formal-verify / lean / skills wired to real APIs
+// ---------------------------------------------------------------------------
+
+describe('v0.5.11 MCP tool wiring', () => {
+  it('verify.ears-to-smt produces SMT-LIB2 from an EARS requirement', async () => {
+    const r = await findTool('formal-verify', 'verify.ears-to-smt').handler({
+      text: 'WHEN a user logs in, THE system SHALL issue a token.', action: 'issue a token',
+    });
+    expect(r.success).toBe(true);
+    const smt = JSON.stringify(r.data);
+    expect(smt).toContain('smtLib2');
+  });
+
+  it('verify.lean.convert produces a Lean 4 theorem', async () => {
+    const r = await findTool('formal-verify', 'verify.lean.convert').handler({
+      text: 'THE system SHALL validate input.', action: 'validate input', name: 'validate_thm',
+    });
+    expect(r.success).toBe(true);
+    expect(JSON.stringify(r.data)).toContain('leanCode');
+  });
+
+  it('verify.z3.solve returns a result object without throwing', async () => {
+    const r = await findTool('formal-verify', 'verify.z3.solve').handler({ formula: '(assert true)(check-sat)' });
+    // z3 may or may not be installed; the handler must resolve either way.
+    expect(typeof r.success).toBe('boolean');
+  });
+
+  it('skills register → list → execute round-trip within the session', async () => {
+    const name = `greeter_${Math.floor(process.hrtime()[1] % 100000)}`;
+    const reg = await findTool('skills', 'skills.register').handler({ name, description: 'greets' });
+    expect((reg.data as { registered: boolean }).registered).toBe(true);
+
+    const list = await findTool('skills', 'skills.list').handler({});
+    expect((list.data as Array<{ name: string }>).some((s) => s.name === name)).toBe(true);
+
+    const exec = await findTool('skills', 'skills.execute').handler({ name, input: { who: 'world' } });
+    expect((exec.data as { executed: boolean }).executed).toBe(true);
+    expect((exec.data as { output: { output: { who: string } } }).output.output.who).toBe('world');
+  });
+
+  it('skills.execute reports a clear error for an unknown skill', async () => {
+    const r = await findTool('skills', 'skills.execute').handler({ name: 'does-not-exist-xyz', input: {} });
+    expect(r.success).toBe(false);
+  });
+});

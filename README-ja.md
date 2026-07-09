@@ -64,7 +64,7 @@ npx musubix2 mcp                     # stdio トランスポート（デフォ�
 npx musubix2 mcp --transport sse     # HTTP/SSE トランスポート
 ```
 
-stdio サーバーはクライアントセッション中は常駐し、13カテゴリ 61 ツールを公開します（`tools/list`）。大半のカテゴリ（`sdd-core`・`knowledge`・`security`・`code-analysis`・`ontology`・`synthesis`・`decisions`・`research`・`neural`・`workflow`）は実パッケージ API で動作します（`skills`・`formal-verify`・`lean` は順次配線中）。
+stdio サーバーはクライアントセッション中は常駐し、全13カテゴリ 61 ツールを公開します（`tools/list`）。全カテゴリ（SDD コア・知識グラフ・セキュリティ・コード解析・オントロジー・合成・ADR・リサーチ・ニューラル・ワークフロー・ポリシー・形式検証・スキル）が実パッケージ API で動作します。`verify.z3.solve` / `verify.lean.run` は別途ローカルの Z3 / Lean ツールチェーンが必要です。
 
 ### 開発（ソースから）
 

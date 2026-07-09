@@ -1176,89 +1176,109 @@ function synthesisTools(): CatalogEntry[] {
 // Formal Verification tools (from @musubix2/formal-verify + @musubix2/lean)
 // ---------------------------------------------------------------------------
 
+// Build a {id,title,text,pattern,trigger,condition,action} spec from EARS text.
+// Both formal-verify's ParsedRequirement and lean's Specification share this shape.
+async function buildSpecFromParams(params: Record<string, unknown>) {
+  const text = (params['text'] as string) ?? (params['requirement'] as string) ?? (params['spec'] as string) ?? '';
+  let pattern = params['pattern'] as string | undefined;
+  if (!pattern) {
+    try {
+      const { createEARSValidator } = await import('@musubix2/core');
+      pattern = createEARSValidator().analyze(text).pattern;
+    } catch {
+      pattern = 'ubiquitous';
+    }
+  }
+  return {
+    id: (params['id'] as string) ?? 'REQ-XXX-001',
+    title: (params['name'] as string) ?? (params['title'] as string) ?? 'requirement',
+    text,
+    pattern: pattern as never,
+    trigger: params['trigger'] as string | undefined,
+    condition: params['condition'] as string | undefined,
+    action: (params['action'] as string) ?? text,
+  };
+}
+
 function formalVerifyTools(): CatalogEntry[] {
   return [
     tool(
       'verify.ears-to-smt',
-      'Convert EARS requirements to SMT-LIB2 format',
+      'Convert an EARS requirement to SMT-LIB2',
       'formal-verify',
-      [param('requirement', 'string', 'EARS requirement text')],
+      [
+        param('text', 'string', 'EARS requirement text'),
+        param('action', 'string', 'Requirement action clause', false),
+      ],
       async (params) => {
         try {
-          const fv = await import('@musubix2/formal-verify') as any;
-          const smt = fv.earsToSmt?.(params['requirement'] as string);
-          return ok(smt ?? { smtlib2: '', requirement: params['requirement'] });
+          const { createEarsToSmtConverter } = await import('@musubix2/formal-verify');
+          return ok(createEarsToSmtConverter().convert(await buildSpecFromParams(params) as never));
         } catch {
-          return ok({ smtlib2: '', requirement: params['requirement'] });
+          return fail('Formal-verify package not available');
         }
       },
     ),
     tool(
       'verify.z3.solve',
-      'Solve an SMT formula using Z3',
+      'Solve an SMT-LIB2 script with the Z3 adapter',
       'formal-verify',
-      [
-        param('formula', 'string', 'SMT-LIB2 formula'),
-        param('timeout', 'number', 'Timeout in milliseconds', false, 5000),
-      ],
+      [param('formula', 'string', 'SMT-LIB2 script')],
       async (params) => {
         try {
-          const fv = await import('@musubix2/formal-verify') as any;
-          const result = fv.z3Solve?.(params['formula'] as string, params['timeout'] as number ?? 5000);
-          return ok(result ?? { satisfiable: false, model: null });
-        } catch {
-          return ok({ satisfiable: false, model: null });
+          const { createZ3Adapter } = await import('@musubix2/formal-verify');
+          return ok(await createZ3Adapter().solve((params['formula'] as string) ?? ''));
+        } catch (err) {
+          return fail(`Z3 solve failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       },
     ),
     tool(
       'verify.lean.convert',
-      'Convert a specification to a Lean 4 theorem',
+      'Convert a requirement specification to a Lean 4 theorem',
       'formal-verify',
       [
-        param('spec', 'string', 'Specification to convert'),
+        param('text', 'string', 'Requirement text'),
+        param('action', 'string', 'Requirement action clause', false),
         param('name', 'string', 'Theorem name', false, 'spec_theorem'),
       ],
       async (params) => {
         try {
-          const lean = await import('@musubix2/lean') as any;
-          const result = lean.convertToLean?.(params['spec'] as string, params['name'] as string ?? 'spec_theorem');
-          return ok(result ?? { lean4: '', name: params['name'] ?? 'spec_theorem' });
+          const { createEarsToLeanConverter } = await import('@musubix2/lean');
+          return ok(createEarsToLeanConverter().convert(await buildSpecFromParams(params) as never));
         } catch {
-          return ok({ lean4: '', name: params['name'] ?? 'spec_theorem' });
+          return fail('Lean package not available');
         }
       },
     ),
     tool(
       'verify.lean.run',
-      'Run a Lean 4 proof',
+      'Run a Lean 4 proof (requires a Lean toolchain; reports availability otherwise)',
       'formal-verify',
       [param('proof', 'string', 'Lean 4 proof code')],
       async (params) => {
         try {
-          const lean = await import('@musubix2/lean') as any;
-          const result = lean.runProof?.(params['proof'] as string);
-          return ok(result ?? { verified: false, output: '' });
-        } catch {
-          return ok({ verified: false, output: '' });
+          const { createLeanProofRunner } = await import('@musubix2/lean');
+          return ok(await createLeanProofRunner().runProof((params['proof'] as string) ?? ''));
+        } catch (err) {
+          return fail(`Lean proof run failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       },
     ),
     tool(
       'verify.hybrid',
-      'Run hybrid verification combining Z3 and Lean',
+      'Run hybrid (Z3 + Lean) verification on a requirement specification',
       'formal-verify',
       [
-        param('spec', 'string', 'Specification to verify'),
-        param('strategy', 'string', 'Verification strategy: z3-first | lean-first | parallel', false, 'z3-first'),
+        param('text', 'string', 'Requirement text'),
+        param('action', 'string', 'Requirement action clause', false),
       ],
       async (params) => {
         try {
-          const fv = await import('@musubix2/formal-verify') as any;
-          const result = fv.hybridVerify?.(params['spec'] as string, params['strategy'] as string ?? 'z3-first');
-          return ok(result ?? { verified: false, strategy: params['strategy'] ?? 'z3-first' });
-        } catch {
-          return ok({ verified: false, strategy: params['strategy'] ?? 'z3-first' });
+          const { createHybridVerifier } = await import('@musubix2/lean');
+          return ok(await createHybridVerifier().verify(await buildSpecFromParams(params) as never));
+        } catch (err) {
+          return fail(`Hybrid verification failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       },
     ),
@@ -1447,49 +1467,72 @@ function decisionsTools(): CatalogEntry[] {
 // Skills tools (from @musubix2/skill-manager)
 // ---------------------------------------------------------------------------
 
+// Session-lifetime skill registry: skills registered in one MCP call are
+// visible to later execute/list calls within the same server process.
+let _skillManager: unknown = null;
+async function getSkillManager() {
+  if (!_skillManager) {
+    const { createSkillManager } = await import('@musubix2/skill-manager');
+    _skillManager = createSkillManager();
+  }
+  return _skillManager as {
+    loadFromMetadata: (m: unknown, e: (i: Record<string, unknown>) => Promise<Record<string, unknown>>) => { id: string; metadata: { name: string } };
+    getAvailableSkills: () => Array<{
+      id: string;
+      metadata: { name: string };
+      status: string;
+      execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    }>;
+  };
+}
+
 function skillsTools(): CatalogEntry[] {
   return [
     tool(
       'skills.list',
-      'List all registered skills',
+      'List skills registered in the current server session',
       'skills',
       [],
       async () => {
         try {
-          const sm = await import('@musubix2/skill-manager') as any;
-          const skills = sm.listSkills?.();
-          return ok(skills ?? []);
+          const mgr = await getSkillManager();
+          return ok(mgr.getAvailableSkills().map((s) => ({ id: s.id, name: s.metadata.name, status: s.status })));
         } catch {
-          return ok([]);
+          return fail('Skill-manager package not available');
         }
       },
     ),
     tool(
       'skills.register',
-      'Register a new skill',
+      'Register a skill (echo-executor) for this server session',
       'skills',
       [
         param('name', 'string', 'Skill name'),
-        param('description', 'string', 'Skill description'),
-        param('handler', 'string', 'Handler module path'),
+        param('description', 'string', 'Skill description', false, ''),
+        param('triggers', 'array', 'Trigger keywords', false),
       ],
       async (params) => {
         try {
-          const sm = await import('@musubix2/skill-manager') as any;
-          const result = sm.registerSkill?.({
-            name: params['name'] as string,
-            description: params['description'] as string,
-            handler: params['handler'] as string,
-          });
-          return ok(result ?? { name: params['name'], registered: true });
+          const mgr = await getSkillManager();
+          const name = (params['name'] as string) ?? 'skill';
+          const skill = mgr.loadFromMetadata(
+            {
+              name,
+              version: '1.0.0',
+              description: (params['description'] as string) ?? '',
+              triggers: (params['triggers'] as string[]) ?? [],
+            },
+            async (input: Record<string, unknown>) => ({ skill: name, output: input }),
+          );
+          return ok({ id: skill.id, name, registered: true });
         } catch {
-          return ok({ name: params['name'], registered: true });
+          return fail('Skill-manager package not available');
         }
       },
     ),
     tool(
       'skills.execute',
-      'Execute a registered skill by name',
+      'Execute a session skill by name (must be registered in this session first)',
       'skills',
       [
         param('name', 'string', 'Skill name to execute'),
@@ -1497,11 +1540,14 @@ function skillsTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const sm = await import('@musubix2/skill-manager') as any;
-          const result = sm.executeSkill?.(params['name'] as string, params['input']);
-          return ok(result ?? { executed: false, name: params['name'] });
+          const mgr = await getSkillManager();
+          const name = (params['name'] as string) ?? '';
+          const match = mgr.getAvailableSkills().find((s) => s.metadata.name === name);
+          if (!match) return fail(`Skill not registered in this session: ${name}`);
+          const output = await match.execute((params['input'] as Record<string, unknown>) ?? {});
+          return ok({ executed: true, name, output });
         } catch {
-          return ok({ executed: false, name: params['name'] });
+          return fail('Skill-manager package not available');
         }
       },
     ),

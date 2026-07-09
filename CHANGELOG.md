@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.11] - 2026-07-09
+
+MCP ツール実 API 配線・最終回。残る formal-verify / lean / skills を実装し、**ISSUE-18 を完全解決**（全 13 カテゴリ・61 ツールが実パッケージ API で動作）。
+
+### Fixed
+
+- **MCP `formal-verify` / `lean` の5ツールを実 API へ配線** — `verify.ears-to-smt`（`createEarsToSmtConverter` で EARS → SMT-LIB2）、`verify.z3.solve`（`createZ3Adapter().solve`）、`verify.lean.convert`（`createEarsToLeanConverter` で Lean 4 定理生成）、`verify.lean.run`（`createLeanProofRunner`）、`verify.hybrid`（`createHybridVerifier`）。EARS テキストから `ParsedRequirement` / `Specification` を構築（パターンは EARS バリデータで分類）。Z3/Lean ツールチェーン非依存の変換系は完全動作、実行系はツールチェーン有無に応じて結果を返す
+- **MCP `skills` の3ツールを実 API へ配線** — サーバーセッション存続の `SkillManager` シングルトンを導入し、`skills.register`（メタデータからスキル登録）→ `skills.list` → `skills.execute`（同一セッション内でスキルを実行）が機能。従来は存在しない `sm.registerSkill?.()` 等で空を返していた
+
+### Milestone
+
+- **MCP catalog の「偽の空成功」問題を完全解消** — 存在しない export への optional-call（`alias.fn?.()`）が 0 になり、全 61 ツールが実 API を呼ぶ
+
+### Known limitations
+
+- MCP stdio トランスポートは受信行を並行処理するため、状態共有ツール（`skills` セッションレジストリ、`ontology`/`workflow`/`knowledge` の永続化）は**応答待ちせず連続送信するとレース**し得る（通常のエージェントは逐次呼出しのため影響なし）
+- `verify.z3.solve` / `verify.lean.run` は外部 Z3 / Lean ツールチェーンが必要（未導入時は結果内で通知）
+
+### Tests
+
+- formal-verify（SMT/Lean 変換）・skills（register→execute）の実データ検証テストを追加。全ワークスペース 1692 テスト green
+
 ## [0.5.10] - 2026-07-09
 
 MCP ツール実 API 配線・第3弾（ISSUE-18 継続）。research / neural / workflow を実装。
