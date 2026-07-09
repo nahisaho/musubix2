@@ -309,6 +309,36 @@ describe('CLI Commands B — Codegraph', () => {
   it('cg impact requires a target argument', async () => {
     expect(await handleCodegraph('impact', [])).toBe(ExitCode.VALIDATION_ERROR);
   });
+
+  // v0.5.18: cross-file call-graph edges — impact/deps see calls, not just #include.
+  it('cg deps/impact follow C call-graph edges across files', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_calls');
+    mkdirSync(dir, { recursive: true });
+    // lib.c defines helper_fn (uniquely); app.c calls it WITHOUT #including lib.c.
+    writeFileSync(join(dir, 'lib.c'), 'int helper_fn(int x)\n{\n\treturn x + 1;\n}\n');
+    writeFileSync(
+      join(dir, 'app.c'),
+      'int run(void)\n{\n\treturn helper_fn(41);\n}\n',
+    );
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('deps', ['app.c'])).toBe(ExitCode.SUCCESS);
+      const depsOut = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(depsOut).toContain('helper_fn'); // call edge recorded, no #include present
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['lib.c'])).toBe(ExitCode.SUCCESS);
+      const impactOut = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(impactOut).toContain('app.c'); // caller is impacted by lib.c
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── Security ───────────────────────────────────────────────────────────────

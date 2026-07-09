@@ -988,6 +988,10 @@ export async function handleCodegraph(
         }
         const savedNodes: Array<Parameters<typeof engine.addNode>[0]> = [];
         const savedEdges: Array<Parameters<typeof engine.addEdge>[0]> = [];
+        // For building the cross-file call graph in a second phase, once every
+        // function definition across the corpus is known.
+        const fileCalls: Array<{ file: string; calls: string[] }> = [];
+        const fnToFiles = new Map<string, Set<string>>();
         let indexedFiles = 0;
         for (const file of files) {
           const ext = file.split('.').pop() ?? '';
@@ -1007,6 +1011,11 @@ export async function handleCodegraph(
             };
             engine.addNode(entry);
             savedNodes.push(entry);
+            if (node.kind === 'function' && node.name) {
+              const set = fnToFiles.get(node.name) ?? new Set<string>();
+              set.add(file);
+              fnToFiles.set(node.name, set);
+            }
             // Dependency edge: this file imports/uses the named module.
             if (node.kind === 'import' && node.name) {
               const edge = { from: file, to: node.name, kind: 'imports' as const };
@@ -1014,7 +1023,24 @@ export async function handleCodegraph(
               savedEdges.push(edge);
             }
           }
+          fileCalls.push({ file, calls: parser.extractCalls(content, lang) });
           indexedFiles++;
+        }
+        // Phase 2 — call-graph edges. Emit a `calls` edge only when the callee
+        // name resolves to exactly ONE defining file (unambiguous) and it is a
+        // different file (cross-file). This keeps precision high on codebases
+        // full of same-named `static` helpers (e.g. the kernel) while capturing
+        // the real dependencies that `#include` edges cannot see.
+        for (const { file, calls } of fileCalls) {
+          for (const name of calls) {
+            const defs = fnToFiles.get(name);
+            if (!defs || defs.size !== 1) continue; // undefined or ambiguous
+            const target = [...defs][0];
+            if (target === file) continue; // intra-file call
+            const edge = { from: file, to: name, kind: 'calls' as const };
+            engine.addEdge(edge);
+            savedEdges.push(edge);
+          }
         }
         // Persist so `cg search` / `cg stats` / `cg deps` operate on the graph.
         // Dedupe by node id / edge triple so the reported counts match exactly
@@ -1077,7 +1103,8 @@ export async function handleCodegraph(
       const byFile = new Map<string, string[]>();
       for (const e of matched) {
         const arr = byFile.get(e.from) ?? [];
-        arr.push(e.to);
+        // Annotate call-graph edges so they are distinguishable from #include.
+        arr.push(e.kind === 'calls' ? `${e.to}() [call]` : e.to);
         byFile.set(e.from, arr);
       }
       console.log(`Dependencies (${matched.length} edges across ${byFile.size} file(s)):`);

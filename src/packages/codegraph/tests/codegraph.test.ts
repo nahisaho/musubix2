@@ -178,6 +178,26 @@ describe('DES-CG-001: ASTParser', () => {
     const classes = nodes.filter((n) => n.kind === 'class').map((n) => n.name);
     expect(classes).toEqual(['real_def']);
   });
+
+  it('should extract C call sites, excluding keywords/comments/strings', () => {
+    const parser = createASTParser();
+    const src = [
+      'int caller(int n)',
+      '{',
+      '\tif (n)                 // calls foo() in a comment must be ignored',
+      '\t\treturn helper(n);',
+      '\tlog_msg("do_thing()"); // string literal must be ignored',
+      '\treturn compute(n);',
+      '}',
+    ].join('\n');
+    const calls = parser.extractCalls(src, 'c');
+    expect(calls).toContain('helper');
+    expect(calls).toContain('compute');
+    expect(calls).toContain('log_msg');
+    expect(calls).not.toContain('if'); // keyword
+    expect(calls).not.toContain('foo'); // inside a comment
+    expect(calls).not.toContain('do_thing'); // inside a string
+  });
 });
 
 // ---------------------------------------------------------------------------

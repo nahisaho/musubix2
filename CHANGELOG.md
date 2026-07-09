@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.18] - 2026-07-09
+
+CodeGraph にシンボルレベルの**コールグラフ（`calls`）エッジ抽出**を追加。0.5.17 で判明した「`cg impact`/`cg deps` が `#include` エッジしか辿らず、ヘッダー経由で多用途に呼ばれるモジュールを『孤立リーフ』と誤報告する」偽陰性を解消。
+
+### Added
+
+- **横断コールグラフエッジ** — インデックス時に各ファイルの関数呼び出し（`name(`）を抽出（コメント・文字列リテラルを除去、制御構文キーワードを除外）し、第2フェーズで「コーパス全体で**一意に定義**された関数名」への呼び出しのみを `calls` エッジ化。カーネルに多い同名 `static` ヘルパーによる過剰接続を避けつつ、`#include` では見えない真の依存を捕捉。ファイル内呼び出し（自己エッジ）は除外
+- **`ASTParser.extractCalls(source, language)`** — 呼び出し識別子の抽出 API。C 系のコメント/文字列除去を内蔵
+
+### Changed
+
+- **`cg deps`** — 呼び出しエッジを `name() [call]` と注記して `#include` 依存と区別
+- **`cg impact`** — 既存の「シンボル名→定義ファイル」解決を通じて `calls` エッジも自動的に逆到達解析へ反映（追加ロジック不要）
+
+### Impact
+
+- Linux カーネルコア再インデックスでエッジが 8,308（import のみ）→ 16,979（import + call）に増加
+- `cg impact lib/cmdline.c` が「依存なし」→ **836 ファイルが推移的に影響**と正しく報告。`cg deps lib/cmdline.c` が `simple_strtoull`/`simple_strtol`/`skip_spaces`/`strlen`/`strncmp` の呼び出し依存を提示
+
+### Known limitation (次バージョン候補)
+
+- `cg impact` は直接／推移の区別を出力しない（コアユーティリティでは推移閉包が広くなりがち）。深さ別・直接依存のみ表示オプションが次の改善候補
+- `calls` 解決は「一意定義名」に限定するため、同名 `static` 関数への呼び出しはエッジ化されない（安全側の取りこぼし）
+
+### Tests
+
+- codegraph: `extractCalls` のキーワード/コメント/文字列除外を検証（125 → 126）
+- musubi: `#include` なしで別ファイルの関数を呼ぶ C ケースで `cg deps`/`cg impact` が call エッジを辿ることを検証（55 → 56）
+
 ## [0.5.17] - 2026-07-09
 
 CodeGraph の C パーサーを全面修正（Linux カーネルコア dogfooding より）。実カーネルコード（`kernel/` + `lib/`、1018 ファイル）に対する検証で、関数定義がほぼ検出されず（1018 ファイルで 244 関数のみ）、`struct` の *使用箇所* を大量に誤ってノード化（44,786 個の偽 `class` ノード）していた問題を発見・修正。

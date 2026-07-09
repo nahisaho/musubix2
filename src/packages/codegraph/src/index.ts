@@ -242,6 +242,65 @@ const LANGUAGE_PATTERNS: Record<string, LanguagePatterns> = {
 // Copy typescript patterns for javascript
 LANGUAGE_PATTERNS['javascript'] = LANGUAGE_PATTERNS['typescript'];
 
+/** Keywords that are followed by `(` but are not function calls. */
+const CALL_KEYWORDS: Record<string, Set<string>> = {
+  default: new Set([
+    'if', 'for', 'while', 'switch', 'return', 'sizeof', 'catch', 'do',
+    'else', 'case', 'goto', 'typeof', 'await', 'defined',
+  ]),
+};
+CALL_KEYWORDS.c = CALL_KEYWORDS.default;
+CALL_KEYWORDS.cpp = CALL_KEYWORDS.default;
+
+/**
+ * Strip line/block comments and string/char literals so that identifiers inside
+ * them are not mistaken for calls. Language-agnostic C-family handling (also a
+ * safe superset for TS/JS/Java/Go/Rust). `#` line comments are handled for
+ * scripting languages.
+ */
+function stripCommentsAndStrings(source: string, language: SupportedLanguage): string {
+  const hashComments =
+    language === 'python' || language === 'ruby' || language === 'lua';
+  let out = '';
+  let i = 0;
+  const n = source.length;
+  while (i < n) {
+    const c = source[i];
+    const next = i + 1 < n ? source[i + 1] : '';
+    // line comment
+    if (c === '/' && next === '/') {
+      while (i < n && source[i] !== '\n') i++;
+      continue;
+    }
+    if (hashComments && c === '#') {
+      while (i < n && source[i] !== '\n') i++;
+      continue;
+    }
+    // block comment
+    if (c === '/' && next === '*') {
+      i += 2;
+      while (i < n && !(source[i] === '*' && source[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    // string / char literal
+    if (c === '"' || c === '\'' || c === '`') {
+      const quote = c;
+      i++;
+      while (i < n && source[i] !== quote) {
+        if (source[i] === '\\') i++; // skip escaped char
+        i++;
+      }
+      i++;
+      out += ' ';
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
 export class ASTParser {
   private enhancedParsing: boolean;
   private multiLangParser: MultiLanguageParser | null = null;
@@ -505,6 +564,28 @@ export class ASTParser {
   }
 
   // -- Regex fallback ---------------------------------------------------------
+
+  /**
+   * Extract the set of called identifier names (`name(`) from a source file.
+   *
+   * Comments and string literals are stripped first to avoid spurious matches.
+   * The result is deliberately permissive — control keywords are removed, but
+   * macro/undefined names are left in; callers resolve them against the set of
+   * actually-defined functions, so unknown names simply produce no edge. Used
+   * to build the cross-file call graph that `#include` edges alone cannot see.
+   */
+  extractCalls(source: string, language: SupportedLanguage): string[] {
+    const cleaned = stripCommentsAndStrings(source, language);
+    const KW = CALL_KEYWORDS[language] ?? CALL_KEYWORDS.default;
+    const re = /\b([A-Za-z_]\w*)\s*\(/g;
+    const out = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(cleaned)) !== null) {
+      const name = m[1];
+      if (!KW.has(name)) out.add(name);
+    }
+    return [...out];
+  }
 
   private parseWithRegex(source: string, language: SupportedLanguage): ASTNode[] {
     const patterns = LANGUAGE_PATTERNS[language];
