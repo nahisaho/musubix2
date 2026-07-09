@@ -442,6 +442,51 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.24: cg cycles — detect circular file dependencies (SCCs).
+  it('cg cycles detects mutual file dependencies', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_cycles');
+    mkdirSync(dir, { recursive: true });
+    // a_fn (in a.c) calls b_fn (in b.c) and vice-versa → a.c ↔ b.c cycle.
+    writeFileSync(join(dir, 'a.c'), 'int b_fn(int);\nint a_fn(int x)\n{\n\treturn b_fn(x);\n}\n');
+    writeFileSync(join(dir, 'b.c'), 'int a_fn(int);\nint b_fn(int x)\n{\n\treturn a_fn(x);\n}\n');
+    // standalone.c has no cycle.
+    writeFileSync(join(dir, 'standalone.c'), 'int s_fn(int x)\n{\n\treturn x;\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('cycles', [])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('dependency cycle');
+      expect(out).toContain('a.c');
+      expect(out).toContain('b.c');
+      expect(out).not.toContain('standalone.c'); // not part of any cycle
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('cg cycles reports a clean graph', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_nocycle');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'lib.c'), 'int helper(int x)\n{\n\treturn x;\n}\n');
+    writeFileSync(join(dir, 'app.c'), 'int helper(int);\nint run(void)\n{\n\treturn helper(1);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('cycles', [])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('No circular file dependencies');
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.23: cg export — file-level dependency graph as DOT / JSON.
   it('cg export emits DOT and JSON file-level graphs', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_export');

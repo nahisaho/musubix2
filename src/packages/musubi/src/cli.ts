@@ -153,8 +153,8 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'オントロジー管理',
   },
   cg: {
-    usage: 'musubix cg <index|search|stats|deps|impact|candidates|export|languages> [args]',
-    description: 'コードグラフ分析 (impact に --direct/--depth、candidates は書き換え候補、export は DOT/JSON 出力)',
+    usage: 'musubix cg <index|search|stats|deps|impact|candidates|cycles|export|languages> [args]',
+    description: 'コードグラフ分析 (impact に --direct/--depth、candidates 書き換え候補、cycles 循環依存、export DOT/JSON)',
   },
   security: {
     usage: 'musubix security <path> [--fail-on critical|high|medium|low|info] [--exclude-tests]',
@@ -943,6 +943,35 @@ function loadCodeGraphEdges(): StoredGraphEdge[] {
  * common class names like `provider` are disambiguated where possible.
  * This is a heuristic: for colliding short names it may still over-match.
  */
+/**
+ * Build the symbol→file resolution maps used by impact/export/cycles:
+ *  - defFiles: resolvable symbol name → defining files (static functions have
+ *    internal linkage and are excluded as cross-file targets)
+ *  - filesByBasename: file basename → paths (for path-style imports)
+ */
+function buildResolutionMaps(
+  nodes: StoredGraphNode[],
+): { defFiles: Map<string, Set<string>>; filesByBasename: Map<string, Set<string>> } {
+  const defFiles = new Map<string, Set<string>>();
+  const filesByBasename = new Map<string, Set<string>>();
+  for (const n of nodes) {
+    const isResolvable =
+      n.kind === 'class' || n.kind === 'interface' || (n.kind === 'function' && !n.isStatic);
+    if (isResolvable) {
+      const set = defFiles.get(n.name) ?? new Set<string>();
+      set.add(n.filePath);
+      defFiles.set(n.name, set);
+    }
+    const base = (n.filePath.split(/[\\/]/).pop() ?? '').replace(/\.[a-z]+$/i, '');
+    if (base) {
+      const set = filesByBasename.get(base) ?? new Set<string>();
+      set.add(n.filePath);
+      filesByBasename.set(base, set);
+    }
+  }
+  return { defFiles, filesByBasename };
+}
+
 function resolveImportToFiles(
   moduleName: string,
   defFilesByName: Map<string, Set<string>>,
@@ -996,6 +1025,11 @@ const CG_SUBCOMMAND_HELP: Record<string, string> = {
     '  Rank files by suitability for an isolated rewrite (e.g. to Rust):\n' +
     '  score = (functions + dependents) / (1 + external deps). Test files are\n' +
     '  excluded. N limits the number of rows (default 15).',
+  cycles:
+    'musubix cg cycles [path-fragment] [N]\n' +
+    '  Detect circular file dependencies (strongly-connected components of the\n' +
+    '  file-level graph with >1 member). N limits the number of cycles shown\n' +
+    '  (default 20); a path-fragment restricts to cycles touching those files.',
   export:
     'musubix cg export [path-fragment] [--format dot|json] [--out <file>]\n' +
     '  Export the file-level dependency graph (symbol edges resolved to\n' +
@@ -1393,6 +1427,98 @@ export async function handleCodegraph(
       );
       return ExitCode.SUCCESS;
     }
+    case 'cycles': {
+      // Detect circular file dependencies: strongly-connected components of the
+      // file-level graph with more than one member (Tarjan's algorithm).
+      let limit = 20;
+      let filter: string | undefined;
+      for (const a of args) {
+        if (/^\d+$/.test(a)) limit = Number(a);
+        else if (!a.startsWith('--') && filter === undefined) filter = a;
+      }
+      const { nodes, edges } = loadCodeGraphData();
+      if (nodes.length === 0) {
+        console.log('No indexed graph. Run `musubix cg index <path>` first.');
+        return ExitCode.SUCCESS;
+      }
+      const { defFiles, filesByBasename } = buildResolutionMaps(nodes);
+      // File-level adjacency (deduped).
+      const adj = new Map<string, Set<string>>();
+      for (const e of edges) {
+        for (const to of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
+          if (to === e.from) continue;
+          const set = adj.get(e.from) ?? new Set<string>();
+          set.add(to);
+          adj.set(e.from, set);
+        }
+      }
+      // Tarjan's strongly-connected components (iterative).
+      const index = new Map<string, number>();
+      const low = new Map<string, number>();
+      const onStack = new Set<string>();
+      const stack: string[] = [];
+      const sccs: string[][] = [];
+      let idx = 0;
+      const allNodes = new Set<string>([...adj.keys()]);
+      for (const set of adj.values()) for (const t of set) allNodes.add(t);
+      for (const start of allNodes) {
+        if (index.has(start)) continue;
+        // Explicit DFS stack of frames: [node, neighbour-iterator position].
+        const work: Array<{ v: string; it: Iterator<string>; }> = [];
+        const pushNode = (v: string) => {
+          index.set(v, idx);
+          low.set(v, idx);
+          idx++;
+          stack.push(v);
+          onStack.add(v);
+          work.push({ v, it: (adj.get(v) ?? new Set<string>()).values() });
+        };
+        pushNode(start);
+        while (work.length > 0) {
+          const frame = work[work.length - 1];
+          const next = frame.it.next();
+          if (!next.done) {
+            const w = next.value;
+            if (!index.has(w)) {
+              pushNode(w);
+            } else if (onStack.has(w)) {
+              low.set(frame.v, Math.min(low.get(frame.v)!, index.get(w)!));
+            }
+          } else {
+            // Done with frame.v — settle low-link into parent, close SCC if root.
+            if (low.get(frame.v) === index.get(frame.v)) {
+              const comp: string[] = [];
+              let w: string;
+              do {
+                w = stack.pop()!;
+                onStack.delete(w);
+                comp.push(w);
+              } while (w !== frame.v);
+              if (comp.length > 1) sccs.push(comp);
+            }
+            work.pop();
+            const parent = work[work.length - 1];
+            if (parent) low.set(parent.v, Math.min(low.get(parent.v)!, low.get(frame.v)!));
+          }
+        }
+      }
+      let cycles = sccs.sort((a, b) => b.length - a.length);
+      if (filter) cycles = cycles.filter((c) => c.some((f) => f.includes(filter!)));
+      if (cycles.length === 0) {
+        console.log(`No circular file dependencies found${filter ? ` matching '${filter}'` : ''}. ✅`);
+        return ExitCode.SUCCESS;
+      }
+      const shown = cycles.slice(0, limit);
+      const PER_CYCLE = 15; // cap files listed per cycle to keep output readable
+      console.log(`Found ${cycles.length} dependency cycle(s)${cycles.length > shown.length ? ` (showing ${shown.length})` : ''}:`);
+      shown.forEach((c, i) => {
+        const sorted = [...c].sort();
+        console.log(`\n  Cycle ${i + 1} (${c.length} files):`);
+        for (const f of sorted.slice(0, PER_CYCLE)) console.log(`    ↻ ${f}`);
+        if (sorted.length > PER_CYCLE) console.log(`    … and ${sorted.length - PER_CYCLE} more`);
+      });
+      return ExitCode.SUCCESS;
+    }
     case 'export': {
       // Export a file-level dependency graph (symbol edges resolved to
       // file → file) as Graphviz DOT or JSON, to stdout or a file.
@@ -1415,23 +1541,7 @@ export async function handleCodegraph(
         return ExitCode.SUCCESS;
       }
       // Resolution maps (same rules as `cg impact`).
-      const defFiles = new Map<string, Set<string>>();
-      const filesByBasename = new Map<string, Set<string>>();
-      for (const n of nodes) {
-        const isResolvable =
-          n.kind === 'class' || n.kind === 'interface' || (n.kind === 'function' && !n.isStatic);
-        if (isResolvable) {
-          const set = defFiles.get(n.name) ?? new Set<string>();
-          set.add(n.filePath);
-          defFiles.set(n.name, set);
-        }
-        const base = (n.filePath.split(/[\\/]/).pop() ?? '').replace(/\.[a-z]+$/i, '');
-        if (base) {
-          const set = filesByBasename.get(base) ?? new Set<string>();
-          set.add(n.filePath);
-          filesByBasename.set(base, set);
-        }
-      }
+      const { defFiles, filesByBasename } = buildResolutionMaps(nodes);
       // Resolve symbol edges to unique file → file edges.
       const fileEdges = new Map<string, { from: string; to: string; kind: string }>();
       for (const e of edges) {

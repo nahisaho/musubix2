@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.24] - 2026-07-10
+
+CodeGraph に**循環依存検出 `cg cycles`** を追加。ファイルレベルの強連結成分（SCC）を検出し、アーキテクチャ上の循環依存を可視化する。
+
+### Added
+
+- **`cg cycles [path-fragment] [N]`** — ファイルレベル依存グラフの強連結成分（メンバー2件以上）を Tarjan 法で検出し、循環依存として大きい順に表示。各サイクルのファイル一覧は 15 件で打ち切り（`… and X more`）、`N` で表示サイクル数を制限（既定20）、`path-fragment` で対象を限定。循環がなければ「No circular file dependencies found ✅」
+- 内部リファクタ: impact/export/cycles で共通の解決マップ構築を `buildResolutionMaps()` に集約
+
+### Impact
+
+- Linux カーネルコアで密結合な中核 SCC（417 ファイル）と、実際に修正候補となる小さな循環（`dma/direct↔mapping↔ops_helpers`、`mpi-add/div/mod`、`chacha` 系）を検出
+
+### Tests
+
+- musubi: 相互依存（a.c ↔ b.c）の検出と非循環グラフのクリーン報告を検証（63 → 65）
+
 ## [0.5.23] - 2026-07-10
 
 CodeGraph に**グラフ出力 `cg export`** を追加。依存グラフを外部ツールで可視化・解析できるようにした。
