@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.16] - 2026-07-09
+
+CodeGraph に推移的到達可能性分析 `cg impact` を追加（Moodle 分析の続き）。
+
+### Added
+
+- **`cg impact <path>` — 推移的な影響範囲分析** — 依存エッジを逆方向に辿り、「対象ファイルが変更/侵害された場合に（間接的に含め）影響を受けるファイル群」を BFS で列挙。import ターゲットは「定義シンボル名」または「パス系 import のファイル名」でインデックス済みファイルに解決（PHP の名前空間 `use` と TS/JS/Python の相対 import の両方に対応）。脆弱性の伝播・変更影響の把握に利用可能
+
+### Notes
+
+- 解決は正規表現パーサーが捕捉する短いシンボル名に基づくヒューリスティックで、`provider` のような共通クラス名が並行ディレクトリに複数存在する場合は影響範囲を保守的に過剰近似することがある（安全側）
+
+### Tests
+
+- `cg impact` の推移的到達（base→mid→top）・引数必須の検証テストを追加。全ワークスペース 1703 テスト green
+
 ## [0.5.15] - 2026-07-09
 
 CodeGraph に依存関係エッジと `cg deps` を追加（Moodle 分析の続き）。

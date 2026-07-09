@@ -153,7 +153,7 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'オントロジー管理',
   },
   cg: {
-    usage: 'musubix cg <index|search|stats|deps|languages> [args]',
+    usage: 'musubix cg <index|search|stats|deps|impact|languages> [args]',
     description: 'コードグラフ分析',
   },
   security: {
@@ -897,19 +897,69 @@ function saveCodeGraph(
   writeFileSync(CODEGRAPH_STATE_FILE, JSON.stringify({ nodes, edges }, null, 2), 'utf-8');
 }
 
-/** Read persisted dependency edges directly (from/to/kind) for `cg deps`. */
-function loadCodeGraphEdges(): Array<{ from: string; to: string; kind: string }> {
+interface StoredGraphNode {
+  id: string;
+  name: string;
+  kind: string;
+  filePath: string;
+}
+interface StoredGraphEdge {
+  from: string;
+  to: string;
+  kind: string;
+}
+
+/** Read the persisted graph ({nodes, edges}) for `cg deps` / `cg impact`. */
+function loadCodeGraphData(): { nodes: StoredGraphNode[]; edges: StoredGraphEdge[] } {
   try {
     if (existsSync(CODEGRAPH_STATE_FILE)) {
       const data = JSON.parse(readFileSync(CODEGRAPH_STATE_FILE, 'utf-8')) as {
-        edges?: Array<{ from: string; to: string; kind: string }>;
+        nodes?: StoredGraphNode[];
+        edges?: StoredGraphEdge[];
       };
-      return data.edges ?? [];
+      return { nodes: data.nodes ?? [], edges: data.edges ?? [] };
     }
   } catch {
-    // Corrupt/unreadable — no edges.
+    // Corrupt/unreadable — empty graph.
   }
-  return [];
+  return { nodes: [], edges: [] };
+}
+
+function loadCodeGraphEdges(): StoredGraphEdge[] {
+  return loadCodeGraphData().edges;
+}
+
+/**
+ * Resolve an import target (e.g. `auth_db\privacy\provider`) to the indexed
+ * file(s) that define it. Matches by the final name segment (the parser only
+ * captures short class names), then — when several files define that name —
+ * prefers candidates whose path contains the import's namespace segments, so
+ * common class names like `provider` are disambiguated where possible.
+ * This is a heuristic: for colliding short names it may still over-match.
+ */
+function resolveImportToFiles(
+  moduleName: string,
+  defFilesByName: Map<string, Set<string>>,
+  filesByBasename?: Map<string, Set<string>>,
+): string[] {
+  const segs = moduleName.split(/[\\/]/).filter(Boolean);
+  const last = segs[segs.length - 1] ?? moduleName;
+  const candidates = [...(defFilesByName.get(last) ?? defFilesByName.get(moduleName) ?? [])];
+  if (candidates.length === 0 && filesByBasename) {
+    // Fall back to path-style imports (e.g. `./mid`, `../auth`) whose last
+    // segment names a file rather than a defined symbol.
+    return [...(filesByBasename.get(last.replace(/\.[a-z]+$/i, '')) ?? [])];
+  }
+  if (candidates.length <= 1) return candidates;
+  const middle = segs.slice(0, -1).map((s) => s.toLowerCase());
+  if (middle.length === 0) return candidates;
+  const scored = candidates.map((f) => {
+    const parts = f.toLowerCase().split(/[\\/]/);
+    const score = middle.filter((m) => parts.some((p) => p === m || p.includes(m) || m.includes(p))).length;
+    return { f, score };
+  });
+  const max = Math.max(...scored.map((s) => s.score));
+  return max > 0 ? scored.filter((s) => s.score === max).map((s) => s.f) : candidates;
 }
 
 export async function handleCodegraph(
@@ -1027,6 +1077,73 @@ export async function handleCodegraph(
       for (const [file, targets] of byFile) {
         console.log(`  ${file}`);
         for (const t of [...new Set(targets)].sort()) console.log(`    → ${t}`);
+      }
+      return ExitCode.SUCCESS;
+    }
+    case 'impact': {
+      // Transitive reverse reachability: which files are (in)directly affected
+      // if the target file changes / is compromised.
+      const filter = args[0];
+      if (!filter) {
+        console.error('❌ Usage: musubix cg impact <path-fragment>');
+        return ExitCode.VALIDATION_ERROR;
+      }
+      const { nodes, edges } = loadCodeGraphData();
+      if (nodes.length === 0) {
+        console.log('No indexed graph. Run `musubix cg index <path>` first.');
+        return ExitCode.SUCCESS;
+      }
+      // Map a defined symbol name → the file(s) that define it, and each file's
+      // basename → its path (for path-style imports like `./mid`).
+      const defFiles = new Map<string, Set<string>>();
+      const filesByBasename = new Map<string, Set<string>>();
+      for (const n of nodes) {
+        if (n.kind === 'class' || n.kind === 'interface' || n.kind === 'function') {
+          const set = defFiles.get(n.name) ?? new Set<string>();
+          set.add(n.filePath);
+          defFiles.set(n.name, set);
+        }
+        const base = (n.filePath.split(/[\\/]/).pop() ?? '').replace(/\.[a-z]+$/i, '');
+        if (base) {
+          const set = filesByBasename.get(base) ?? new Set<string>();
+          set.add(n.filePath);
+          filesByBasename.set(base, set);
+        }
+      }
+      // Reverse adjacency: definingFile → files that import it (its dependents).
+      const dependents = new Map<string, Set<string>>();
+      for (const e of edges) {
+        for (const defFile of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
+          if (defFile === e.from) continue;
+          const set = dependents.get(defFile) ?? new Set<string>();
+          set.add(e.from);
+          dependents.set(defFile, set);
+        }
+      }
+      const seeds = [...new Set(nodes.map((n) => n.filePath))].filter((f) => f.includes(filter));
+      if (seeds.length === 0) {
+        console.log(`No indexed file matches '${filter}'.`);
+        return ExitCode.SUCCESS;
+      }
+      // BFS over reverse edges to find all transitively-affected files.
+      const affected = new Set<string>();
+      const queue = [...seeds];
+      while (queue.length > 0) {
+        const f = queue.shift()!;
+        for (const dep of dependents.get(f) ?? []) {
+          if (!affected.has(dep)) {
+            affected.add(dep);
+            queue.push(dep);
+          }
+        }
+      }
+      console.log(`Impact of ${seeds.length} file(s) matching '${filter}':`);
+      for (const s of seeds) console.log(`  ⦿ ${s}`);
+      if (affected.size === 0) {
+        console.log('  No other indexed files depend on these (no transitive impact found).');
+      } else {
+        console.log(`\n  ${affected.size} file(s) transitively affected:`);
+        for (const a of [...affected].sort()) console.log(`    ← ${a}`);
       }
       return ExitCode.SUCCESS;
     }

@@ -282,6 +282,33 @@ describe('CLI Commands B — Codegraph', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // v0.5.16: cg impact = reverse transitive reachability over import edges.
+  it('cg impact finds files that transitively depend on a target', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_impact');
+    mkdirSync(dir, { recursive: true });
+    // base defines UniqueWidget; mid imports it; top imports mid.
+    writeFileSync(join(dir, 'base.ts'), 'export class UniqueWidgetXyz {}\n');
+    writeFileSync(join(dir, 'mid.ts'), "import { UniqueWidgetXyz } from './base';\nexport class MidThing {}\n");
+    writeFileSync(join(dir, 'top.ts'), "import { MidThing } from './mid';\nexport class TopThing {}\n");
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['base.ts'])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('mid.ts'); // directly depends on base
+      expect(out).toContain('top.ts'); // transitively depends via mid
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('cg impact requires a target argument', async () => {
+    expect(await handleCodegraph('impact', [])).toBe(ExitCode.VALIDATION_ERROR);
+  });
 });
 
 // ── Security ───────────────────────────────────────────────────────────────
