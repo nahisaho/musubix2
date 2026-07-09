@@ -180,7 +180,11 @@ npx musubix workflow            # ワークフロー管理（status|approve|tran
 npx musubix status              # ステータス表示
 
 # 分析・検証
-npx musubix cg index <file|dir> # コードグラフ解析（index|search|stats|deps|impact|languages）
+npx musubix cg index <file|dir> # コードグラフ解析 — docs/codegraph.md 参照
+                                #   サブコマンド: index|search|stats|deps|impact|candidates|
+                                #   cycles|gate|export|diff|languages
+npx musubix cg impact <frag>    # 逆依存の影響分析（--direct, --depth N, --json）
+npx musubix cg gate --max-cycles 0 --forbid "ui/:db/"   # CI アーキテクチャゲート（非ゼロ終了）
 npx musubix security <file|dir> # セキュリティスキャン（--fail-on <sev>, --exclude-tests）
 npx musubix policy              # ポリシー検証
 npx musubix ontology add <s> <p> <o>      # オントロジー管理（add|list|validate|stats、永続化）
@@ -241,6 +245,7 @@ npx prettier --write "packages/*/src/**/*.ts" # フォーマット
 
 ## ドキュメント
 
+- [CodeGraph (`cg`) リファレンス](docs/codegraph.md) — 依存分析・影響範囲・循環・CI ゲート
 - [English README](README.md)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)

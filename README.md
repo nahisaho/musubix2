@@ -182,7 +182,11 @@ npx musubix workflow            # Workflow management (status|approve|transition
 npx musubix status              # Status display
 
 # Analysis & Verification
-npx musubix cg index <file|dir> # Code graph analysis (index|search|stats|deps|impact|languages)
+npx musubix cg index <file|dir> # Code graph analysis — see docs/codegraph.md
+                                #   subcommands: index|search|stats|deps|impact|candidates|
+                                #   cycles|gate|export|diff|languages
+npx musubix cg impact <frag>    # Reverse dependency impact (--direct, --depth N, --json)
+npx musubix cg gate --max-cycles 0 --forbid "ui/:db/"   # CI architecture gate (non-zero exit)
 npx musubix security <file|dir> # Security scanning (--fail-on <sev>, --exclude-tests)
 npx musubix policy              # Policy verification
 npx musubix ontology add <s> <p> <o>      # Ontology management (add|list|validate|stats, persisted)
@@ -244,6 +248,7 @@ npx prettier --write "packages/*/src/**/*.ts" # Format
 
 ## Documentation
 
+- [CodeGraph (`cg`) reference](docs/codegraph.md) — dependency analysis, impact, cycles, CI gate
 - [日本語 README](README-ja.md)
 - [Contributing Guide (日本語)](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
