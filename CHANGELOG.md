@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-07-09
+
+v0.5.1 の再ドッグフーディングで発見した、未検証だったコマンド群の課題を改修。
+
+### Fixed
+
+- **`cg index <dir>` がディレクトリでクラッシュする問題を修正** — `readFileSync` を対象パスへ直呼びしていたため、コードベース索引の主用途であるディレクトリ指定が `EISDIR` で失敗していた。再帰走査ヘルパー `collectFiles()` を追加し、ディレクトリ配下の対応拡張子ファイルを全て索引（`node_modules`/`.git`/`dist` 等は除外）
+- **`security <dir>` がディレクトリ非対応だった問題を修正** — 同じく `readFileSync` 直呼び。`collectFiles()` で再帰スキャンに対応し、各指摘に `file:line` を付与
+
+### Added
+
+- **`security --fail-on <critical|high|medium|low|info>`** — 指定重大度以上の指摘が存在する場合に非ゼロ終了する品質ゲート（オプトイン。既定は後方互換で exit 0）。CRITICAL 検出でも exit 0 だった問題に対応（Article IX 品質ゲート）
+
+### Changed
+
+- **`trace matrix` / `trace:verify` の0件データ時の表示を是正** — トレース系ハンドラは実データ未連携で常に空入力のため、`Completeness: 100%` / `Requirements: 0/0` / `No gaps found` と誤解を招いていた。データ0件時は「データ無し（N/A）」を明示（実データ連携は今後の課題として明記）
+
+### Tests
+
+- 上記のリグレッションテスト 6 件を追加。musubi パッケージ 233 テスト green
+
 ## [0.5.1] - 2026-07-09
 
 Webアプリ開発（TaskFlow）でのドッグフーディングにより発見した CLI パイプラインの課題を改修。

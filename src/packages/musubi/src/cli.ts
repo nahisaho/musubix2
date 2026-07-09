@@ -158,8 +158,8 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'コードグラフ分析',
   },
   security: {
-    usage: 'musubix security <path>',
-    description: 'セキュリティスキャン',
+    usage: 'musubix security <path> [--fail-on critical|high|medium|low|info]',
+    description: 'セキュリティスキャン（ファイル/ディレクトリ対応）',
   },
   skills: {
     usage: 'musubix skills <list|validate|create> [args]',
@@ -367,7 +367,8 @@ import {
   type WorkflowPhase,
   PHASE_ORDER,
 } from '@musubix2/workflow-engine';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
+import { join as joinPath } from 'node:path';
 
 /**
  * Parse a simple markdown task file into TaskInfo objects.
@@ -534,6 +535,9 @@ export async function handleTrace(
       const generator = createMatrixGenerator();
       const report = generator.generate([], [], []);
       console.log(generator.toMarkdown(report));
+      // The generator currently operates on empty inputs; be explicit rather
+      // than presenting an empty matrix as a complete one.
+      console.log('\nℹ No traceability data loaded — matrix is empty (completeness is N/A).');
       return ExitCode.SUCCESS;
     }
     case 'validate': {
@@ -568,6 +572,12 @@ export async function handleTrace(
 export async function handleTraceVerify(): Promise<ExitCodeValue> {
   const validator = createTraceabilityValidator();
   const report = validator.validateCoverage([], [], [], []);
+  if (report.totalRequirements === 0) {
+    // Avoid the misleading "100% / No gaps" on an empty dataset.
+    console.log('No traceability data loaded — nothing to verify.');
+    console.log('ℹ Coverage cannot be computed with 0 requirements (reported as N/A).');
+    return ExitCode.SUCCESS;
+  }
   console.log(`Coverage: ${report.coveragePercent}%`);
   console.log(`Requirements: ${report.coveredRequirements}/${report.totalRequirements}`);
   if (report.gaps.length > 0) {
@@ -669,6 +679,34 @@ const EXT_TO_LANG: Record<string, SupportedLanguage> = {
   kt: 'kotlin', scala: 'scala', hs: 'haskell', lua: 'lua',
 };
 
+const WALK_IGNORE = new Set(['node_modules', '.git', 'dist', 'coverage', '.next', 'build']);
+
+/**
+ * Collect files from a path. A file returns itself; a directory is walked
+ * recursively (skipping common vendor/build dirs). Optionally filter by
+ * extension. Used by `cg index` and `security` so a directory argument works.
+ */
+export function collectFiles(target: string, extFilter?: (ext: string) => boolean): string[] {
+  const stat = statSync(target);
+  if (stat.isFile()) return [target];
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('.') && entry.name !== '.') continue;
+      if (WALK_IGNORE.has(entry.name)) continue;
+      const full = joinPath(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile()) {
+        const ext = entry.name.split('.').pop() ?? '';
+        if (!extFilter || extFilter(ext)) out.push(full);
+      }
+    }
+  };
+  walk(target);
+  return out;
+}
+
 export async function handleCodegraph(
   sub: string | undefined,
   args: string[],
@@ -681,29 +719,42 @@ export async function handleCodegraph(
         return ExitCode.GENERAL_ERROR;
       }
       try {
-        const parser = createASTParser();
-        const content = readFileSync(targetPath, 'utf-8');
-        const ext = targetPath.split('.').pop() ?? '';
-        const lang = EXT_TO_LANG[ext];
-        if (!lang) {
-          console.error(`❌ Unsupported file extension: .${ext}`);
+        if (!existsSync(targetPath)) {
+          console.error(`❌ Path not found: ${targetPath}`);
           return ExitCode.GENERAL_ERROR;
         }
-        const nodes = parser.parse(content, lang);
+        const parser = createASTParser();
         const engine = createGraphEngine();
-        for (const node of nodes) {
-          engine.addNode({
-            id: `${targetPath}:${node.name}`,
-            name: node.name,
-            kind: node.kind,
-            filePath: targetPath,
-            language: lang,
-            startLine: 0,
-            endLine: 0,
-          });
+        // Accept a single file or a directory (recursively indexed).
+        const files = collectFiles(targetPath, (ext) => ext in EXT_TO_LANG);
+        if (files.length === 0) {
+          console.error(`❌ No indexable source files found under: ${targetPath}`);
+          return ExitCode.GENERAL_ERROR;
+        }
+        let indexedFiles = 0;
+        for (const file of files) {
+          const ext = file.split('.').pop() ?? '';
+          const lang = EXT_TO_LANG[ext];
+          if (!lang) continue;
+          const content = readFileSync(file, 'utf-8');
+          const nodes = parser.parse(content, lang);
+          for (const node of nodes) {
+            engine.addNode({
+              id: `${file}:${node.name}`,
+              name: node.name,
+              kind: node.kind,
+              filePath: file,
+              language: lang,
+              startLine: 0,
+              endLine: 0,
+            });
+          }
+          indexedFiles++;
         }
         const stats = engine.getStats();
-        console.log(`✅ Indexed ${targetPath}: ${stats.nodeCount} nodes, ${stats.edgeCount} edges`);
+        console.log(
+          `✅ Indexed ${targetPath}: ${indexedFiles} file(s), ${stats.nodeCount} nodes, ${stats.edgeCount} edges`,
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`❌ ${msg}`);
@@ -748,22 +799,32 @@ export async function handleCodegraph(
 
 // ── Security handler ───────────────────────────────────────────────────────
 
-export async function handleSecurity(filePath: string): Promise<ExitCodeValue> {
+const SEVERITY_ORDER: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
+
+export async function handleSecurity(
+  filePath: string,
+  failOn?: string,
+): Promise<ExitCodeValue> {
   try {
     if (!existsSync(filePath)) {
-      console.error(`❌ File not found: ${filePath}`);
+      console.error(`❌ Path not found: ${filePath}`);
       return ExitCode.GENERAL_ERROR;
     }
-    const code = readFileSync(filePath, 'utf-8');
     const secrets = createSecretDetector();
     const taint = new TaintAnalyzer();
     const deps = new DependencyScanner();
 
-    const findings: SecurityFinding[] = [
-      ...secrets.scan(code, filePath),
-      ...taint.analyze(code, filePath),
-      ...deps.scan(code, filePath),
-    ];
+    // Accept a single file or a directory (recursively scanned).
+    const files = collectFiles(filePath, (ext) => ext in EXT_TO_LANG);
+    const findings: SecurityFinding[] = [];
+    for (const file of files) {
+      const code = readFileSync(file, 'utf-8');
+      findings.push(
+        ...secrets.scan(code, file),
+        ...taint.analyze(code, file),
+        ...deps.scan(code, file),
+      );
+    }
 
     const bySeverity = new Map<Severity, SecurityFinding[]>();
     for (const f of findings) {
@@ -772,17 +833,31 @@ export async function handleSecurity(filePath: string): Promise<ExitCodeValue> {
       bySeverity.set(f.severity, list);
     }
 
-    console.log(`Security scan: ${filePath}`);
+    console.log(`Security scan: ${filePath} (${files.length} file(s))`);
     console.log(`Total findings: ${findings.length}`);
 
-    const severityOrder: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
-    for (const sev of severityOrder) {
+    for (const sev of SEVERITY_ORDER) {
       const items = bySeverity.get(sev);
       if (items && items.length > 0) {
         console.log(`\n  ${sev.toUpperCase()} (${items.length}):`);
         for (const f of items) {
-          console.log(`    - ${f.description}`);
+          console.log(`    - ${f.description} (${f.location.file}:${f.location.line})`);
         }
+      }
+    }
+
+    // Opt-in quality gate: fail when findings at/above the threshold exist.
+    if (failOn) {
+      const threshold = failOn.toLowerCase() as Severity;
+      if (!SEVERITY_ORDER.includes(threshold)) {
+        console.error(`❌ Invalid --fail-on severity: ${failOn} (use critical|high|medium|low|info)`);
+        return ExitCode.VALIDATION_ERROR;
+      }
+      const maxIdx = SEVERITY_ORDER.indexOf(threshold);
+      const gating = findings.filter((f) => SEVERITY_ORDER.indexOf(f.severity) <= maxIdx);
+      if (gating.length > 0) {
+        console.error(`\n❌ ${gating.length} finding(s) at or above "${threshold}" — failing.`);
+        return ExitCode.VALIDATION_ERROR;
       }
     }
 
@@ -2084,10 +2159,10 @@ export function getDefaultCommands(): CLICommand[] {
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
         const filePath = (args['subcommand'] as string) ?? positionalArgs[0];
         if (!filePath) {
-          console.error('❌ Usage: musubix security <path>');
+          console.error('❌ Usage: musubix security <path> [--fail-on critical|high|medium|low|info]');
           return ExitCode.VALIDATION_ERROR;
         }
-        return await handleSecurity(filePath);
+        return await handleSecurity(filePath, args['fail-on'] as string | undefined);
       },
     },
     {

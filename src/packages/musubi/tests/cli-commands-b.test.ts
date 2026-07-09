@@ -385,3 +385,69 @@ describe('CLI Commands B — Dispatch integration', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Project Status'));
   });
 });
+
+// ── v0.5.2 fixes: directory support, security gating, trace honesty ─────────
+
+describe('v0.5.2 CLI fixes', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_v052');
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mkdirSync(join(dir, 'nested'), { recursive: true });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    errSpy.mockRestore();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // ISSUE-6
+  it('cg index accepts a directory (recursively) instead of crashing', async () => {
+    writeFileSync(join(dir, 'a.ts'), 'export function a() { return 1; }\n');
+    writeFileSync(join(dir, 'nested', 'b.js'), 'export function b() { return 2; }\n');
+    const code = await handleCodegraph('index', [dir]);
+    expect(code).toBe(ExitCode.SUCCESS);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('file(s)'));
+  });
+
+  // ISSUE-7
+  it('security scans a directory', async () => {
+    writeFileSync(join(dir, 'ok.ts'), 'export const n = 1;\n');
+    const code = await handleSecurity(dir);
+    expect(code).toBe(ExitCode.SUCCESS);
+  });
+
+  // ISSUE-8
+  it('security --fail-on returns non-zero when a matching finding exists', async () => {
+    writeFileSync(join(dir, 'leak.js'), 'export const KEY = "AKIAIOSFODNN7EXAMPLE";\n');
+    const failed = await handleSecurity(dir, 'high');
+    expect(failed).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
+  it('security --fail-on passes when no finding meets the threshold', async () => {
+    writeFileSync(join(dir, 'clean.js'), 'export const n = 2;\n');
+    const ok = await handleSecurity(dir, 'critical');
+    expect(ok).toBe(ExitCode.SUCCESS);
+  });
+
+  it('security rejects an invalid --fail-on severity', async () => {
+    writeFileSync(join(dir, 'x.js'), 'export const n = 3;\n');
+    const code = await handleSecurity(dir, 'bogus');
+    expect(code).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
+  // ISSUE-9
+  it('trace:verify does not claim 100% on empty data', async () => {
+    const code = await handleTraceVerify();
+    expect(code).toBe(ExitCode.SUCCESS);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('No traceability data'));
+    const claimed100 = logSpy.mock.calls.some((c) =>
+      typeof c[0] === 'string' && c[0].includes('Coverage: 100%'),
+    );
+    expect(claimed100).toBe(false);
+  });
+});
