@@ -621,6 +621,49 @@ describe('CLI Commands B — Codegraph', () => {
     expect(await handleCodegraph('diff', ['/no/such/baseline.json'])).toBe(ExitCode.GENERAL_ERROR);
   });
 
+  // v0.5.27: --json machine-readable output for impact/cycles/candidates/diff.
+  it('cg supports --json output for automation', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_json');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'lib.c'), 'int helper_fn(int x)\n{\n\treturn x + 1;\n}\n');
+    writeFileSync(join(dir, 'app.c'), 'int run(void)\n{\n\treturn helper_fn(1);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    const parseLast = () => JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['lib.c', '--json'])).toBe(ExitCode.SUCCESS);
+      const impact = parseLast();
+      expect(impact.counts.direct).toBeGreaterThanOrEqual(1);
+      expect(impact.direct.some((f: string) => f.endsWith('app.c'))).toBe(true);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('candidates', ['--json'])).toBe(ExitCode.SUCCESS);
+      const cand = parseLast();
+      expect(Array.isArray(cand.candidates)).toBe(true);
+      expect(cand.candidates[0]).toHaveProperty('score');
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('cycles', ['--json'])).toBe(ExitCode.SUCCESS);
+      const cyc = parseLast();
+      expect(cyc.count).toBe(0); // no cycle in this fixture
+      expect(Array.isArray(cyc.cycles)).toBe(true);
+
+      // diff --json (self-diff → all zero).
+      const baseline = join(dir, 'baseline.json');
+      writeFileSync(baseline, readFileSync(join(dir, '.musubix', 'codegraph.json'), 'utf-8'));
+      logSpy.mockClear();
+      expect(await handleCodegraph('diff', [baseline, baseline, '--json'])).toBe(ExitCode.SUCCESS);
+      const diff = parseLast();
+      expect(diff.counts).toEqual({ filesAdded: 0, filesRemoved: 0, edgesAdded: 0, edgesRemoved: 0 });
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.20: enriched stats + candidates ranking for rewrite triage.
   it('cg stats reports kind breakdowns and top called functions', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_stats');

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.27] - 2026-07-10
+
+CodeGraph の分析コマンドに**機械可読な `--json` 出力**を追加。CI ゲートや自動化スクリプトへ結果を連携できる。
+
+### Added
+
+- **`--json` フラグ**（`cg impact` / `cg cycles` / `cg candidates` / `cg diff`）— 人間向けの整形出力に代えて構造化 JSON を出力
+  - `impact --json`: `{ filter, depth, seeds, direct[], indirect[], total, counts }`
+  - `cycles --json`: `{ count, cycles: [[files…]…] }`
+  - `candidates --json`: `{ total, candidates: [{file, functions, externalDeps, dependents, score}…] }`
+  - `diff --json`: `{ baseline, current, filesAdded[], filesRemoved[], edgesAdded[], edgesRemoved[], counts }`
+- 各サブコマンドの `--help` に `--json` を明記
+
+### Impact
+
+- Linux カーネルコアで `cg impact … --json` / `cg cycles --json` / `cg candidates --json` / `cg diff … --json` がいずれも妥当な JSON を出力（例: diff で `edgesAdded` 6,004 件を配列で取得）。`jq` 連携や CI での依存契約チェックが可能に
+
+### Tests
+
+- musubi: impact/candidates/cycles/diff の JSON 構造をパースして検証（69 → 70）
+
 ## [0.5.26] - 2026-07-10
 
 CodeGraph に**グラフ差分 `cg diff`** を追加。2 つのグラフスナップショット間で、ファイルと依存関係の増減を比較できる（変更影響レビュー・ブランチ間比較に有用）。

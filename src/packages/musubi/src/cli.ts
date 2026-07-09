@@ -1079,31 +1079,34 @@ const CG_SUBCOMMAND_HELP: Record<string, string> = {
     '  List outgoing dependencies (→ #include targets and function calls) per\n' +
     '  file. Call edges are annotated `name() [call]`.',
   impact:
-    'musubix cg impact <path-fragment> [--direct] [--depth N]\n' +
+    'musubix cg impact <path-fragment> [--direct] [--depth N] [--json]\n' +
     '  Reverse reachability: which files are affected if the target changes.\n' +
     '  Splits direct (depth-1) from indirect dependents.\n' +
     '    --direct     show only immediate (depth-1) dependents\n' +
-    '    --depth N    limit transitive expansion to N hops',
+    '    --depth N    limit transitive expansion to N hops\n' +
+    '    --json       machine-readable output (for CI/automation)',
   candidates:
-    'musubix cg candidates [N]\n' +
+    'musubix cg candidates [N] [--json]\n' +
     '  Rank files by suitability for an isolated rewrite (e.g. to Rust):\n' +
     '  score = (functions + dependents) / (1 + external deps). Test files are\n' +
-    '  excluded. N limits the number of rows (default 15).',
+    '  excluded. N limits the number of rows (default 15). --json for automation.',
   cycles:
-    'musubix cg cycles [path-fragment] [N]\n' +
+    'musubix cg cycles [path-fragment] [N] [--json]\n' +
     '  Detect circular file dependencies (strongly-connected components of the\n' +
     '  file-level graph with >1 member). N limits the number of cycles shown\n' +
-    '  (default 20); a path-fragment restricts to cycles touching those files.',
+    '  (default 20); a path-fragment restricts to cycles touching those files.\n' +
+    '  --json for machine-readable output.',
   export:
     'musubix cg export [path-fragment] [--format dot|json] [--out <file>]\n' +
     '  Export the file-level dependency graph (symbol edges resolved to\n' +
     '  file → file). Default format dot (Graphviz), or json. Writes to <file>\n' +
     '  with --out, else stdout. A path-fragment limits it to a subgraph.',
   diff:
-    'musubix cg diff <baseline.json> [current.json]\n' +
+    'musubix cg diff <baseline.json> [current.json] [--json]\n' +
     '  Compare two persisted graphs (.musubix/codegraph.json format) and report\n' +
     '  files and file-level dependency edges added/removed. current defaults to\n' +
-    '  the working graph .musubix/codegraph.json. Useful for change-impact review.',
+    '  the working graph .musubix/codegraph.json. Useful for change-impact review.\n' +
+    '  --json for machine-readable output.',
   languages:
     'musubix cg languages\n' +
     '  List the source languages the parser supports.',
@@ -1369,6 +1372,16 @@ export async function handleCodegraph(
         cands.push({ file, fns, deps, users, score });
       }
       cands.sort((a, b) => b.score - a.score);
+      if (args.includes('--json')) {
+        console.log(JSON.stringify({
+          total: cands.length,
+          candidates: cands.slice(0, limit).map((c) => ({
+            file: c.file, functions: c.fns, externalDeps: c.deps, dependents: c.users,
+            score: Number(c.score.toFixed(3)),
+          })),
+        }, null, 2));
+        return ExitCode.SUCCESS;
+      }
       console.log(`Rewrite candidates (top ${Math.min(limit, cands.length)} of ${cands.length}, by self-containment × usage):`);
       console.log(`  ${'score'.padStart(7)}  ${'fns'.padStart(4)}  ${'deps'.padStart(4)}  ${'users'.padStart(5)}  file`);
       for (const c of cands.slice(0, limit)) {
@@ -1479,6 +1492,19 @@ export async function handleCodegraph(
       // Indirect = transitively affected but not a direct dependent.
       const indirect = [...affected].filter((f) => !direct.has(f));
 
+      if (args.includes('--json')) {
+        console.log(JSON.stringify({
+          filter,
+          depth: Number.isFinite(maxDepth) ? maxDepth : null,
+          seeds,
+          direct: [...direct].sort(),
+          indirect: directOnly ? undefined : indirect.sort(),
+          total: affected.size,
+          counts: { direct: direct.size, indirect: indirect.length },
+        }, null, 2));
+        return ExitCode.SUCCESS;
+      }
+
       console.log(`Impact of ${seeds.length} file(s) matching '${filter}':`);
       for (const s of seeds) console.log(`  ⦿ ${s}`);
       if (affected.size === 0) {
@@ -1579,6 +1605,13 @@ export async function handleCodegraph(
       }
       let cycles = sccs.sort((a, b) => b.length - a.length);
       if (filter) cycles = cycles.filter((c) => c.some((f) => f.includes(filter!)));
+      if (args.includes('--json')) {
+        console.log(JSON.stringify({
+          count: cycles.length,
+          cycles: cycles.slice(0, limit).map((c) => [...c].sort()),
+        }, null, 2));
+        return ExitCode.SUCCESS;
+      }
       if (cycles.length === 0) {
         console.log(`No circular file dependencies found${filter ? ` matching '${filter}'` : ''}. ✅`);
         return ExitCode.SUCCESS;
@@ -1628,6 +1661,24 @@ export async function handleCodegraph(
         `${r.from} → ${r.to}${r.kind === 'calls' ? ' [call]' : ''}`;
       const edgesAdded = [...curEdges.entries()].filter(([k]) => !baseEdges.has(k)).map(([, v]) => v);
       const edgesRemoved = [...baseEdges.entries()].filter(([k]) => !curEdges.has(k)).map(([, v]) => v);
+
+      if (args.includes('--json')) {
+        console.log(JSON.stringify({
+          baseline: baselinePath,
+          current: currentPath ?? CODEGRAPH_STATE_FILE,
+          filesAdded,
+          filesRemoved,
+          edgesAdded,
+          edgesRemoved,
+          counts: {
+            filesAdded: filesAdded.length,
+            filesRemoved: filesRemoved.length,
+            edgesAdded: edgesAdded.length,
+            edgesRemoved: edgesRemoved.length,
+          },
+        }, null, 2));
+        return ExitCode.SUCCESS;
+      }
 
       const CAP = 25;
       const list = (label: string, items: string[]) => {
@@ -3221,6 +3272,7 @@ export function getDefaultCommands(): CLICommand[] {
         if (args['depth'] !== undefined) positionalArgs.push('--depth', String(args['depth']));
         if (args['format'] !== undefined) positionalArgs.push('--format', String(args['format']));
         if (args['out'] !== undefined) positionalArgs.push('--out', String(args['out']));
+        if (args['json'] === true) positionalArgs.push('--json');
         return await handleCodegraph(sub, positionalArgs);
       },
     },
