@@ -271,3 +271,58 @@ describe('v0.5.8 MCP tool wiring', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// v0.5.9 — code-analysis + ontology wired to real APIs
+// ---------------------------------------------------------------------------
+
+describe('v0.5.9 MCP tool wiring', () => {
+  it('code.parse returns real AST nodes', async () => {
+    const r = await findTool('code-analysis', 'code.parse').handler({
+      source: 'export function add(a,b){return a+b}\nexport class Calc{}', language: 'typescript',
+    });
+    expect(r.success).toBe(true);
+    const names = (r.data as { nodes: Array<{ name: string }> }).nodes.map((n) => n.name);
+    expect(names).toContain('add');
+    expect(names).toContain('Calc');
+  });
+
+  it('code.graph.search finds an indexed symbol', async () => {
+    const r = await findTool('code-analysis', 'code.graph.search').handler({
+      query: 'add',
+      sources: [{ code: 'export function add(){}', language: 'typescript', filePath: 'a.ts' }],
+    });
+    expect((r.data as { results: unknown[] }).results.length).toBeGreaterThan(0);
+  });
+
+  it('ontology triple add/query round-trips and rules infer transitively', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'mcp-ont-'));
+    try {
+      const add = (s: string, p: string, o: string) =>
+        findTool('ontology', 'ontology.triple.add').handler({ subject: s, predicate: p, object: o, basePath: base });
+      await add('Dog', 'rdfs:subClassOf', 'Animal');
+      const second = await add('Animal', 'rdfs:subClassOf', 'LivingThing');
+      expect((second.data as { total: number }).total).toBe(2);
+
+      const rules = await findTool('ontology', 'ontology.rules.apply').handler({ basePath: base });
+      const inferred = (rules.data as { inferred: Array<{ subject: string; object: string }> }).inferred;
+      expect(inferred.some((t) => t.subject === 'Dog' && t.object === 'LivingThing')).toBe(true);
+
+      const q = await findTool('ontology', 'ontology.triple.query').handler({ predicate: 'rdfs:subClassOf', basePath: base });
+      expect((q.data as { count: number }).count).toBeGreaterThanOrEqual(2);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('ontology.consistency.check runs against the store', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'mcp-ont2-'));
+    try {
+      const r = await findTool('ontology', 'ontology.consistency.check').handler({ basePath: base });
+      expect(r.success).toBe(true);
+      expect(typeof (r.data as { consistent: boolean }).consistent).toBe('boolean');
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});

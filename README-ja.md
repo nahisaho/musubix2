@@ -64,6 +64,8 @@ npx musubix2 mcp                     # stdio トランスポート（デフォ�
 npx musubix2 mcp --transport sse     # HTTP/SSE トランスポート
 ```
 
+stdio サーバーはクライアントセッション中は常駐し、13カテゴリ 61 ツールを公開します（`tools/list`）。`sdd-core`・`knowledge`・`security`・`code-analysis`・`ontology`・`synthesis`・`decisions` の各ツールは実パッケージ API で動作します（残りのカテゴリは順次配線中）。
+
 ### 開発（ソースから）
 
 ```bash

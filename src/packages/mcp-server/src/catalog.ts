@@ -542,96 +542,131 @@ function policyTools(): CatalogEntry[] {
 // Ontology tools (from @musubix2/ontology-mcp)
 // ---------------------------------------------------------------------------
 
+// Persist ontology triples so MCP calls (and the CLI) share the same store.
+async function loadTripleStore(basePath: string) {
+  const { createOntologyStore } = await import('@musubix2/ontology-mcp');
+  const store = createOntologyStore();
+  const { existsSync, readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const file = join(basePath, '.musubix', 'ontology.json');
+  try {
+    if (existsSync(file)) {
+      store.addTriples(JSON.parse(readFileSync(file, 'utf-8')));
+    }
+  } catch { /* start empty */ }
+  return { store, file };
+}
+async function saveTripleStore(store: { getAll(): unknown[] }, file: string) {
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { dirname } = await import('node:path');
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify(store.getAll(), null, 2), 'utf-8');
+}
+
 function ontologyTools(): CatalogEntry[] {
   return [
     tool(
       'ontology.triple.add',
-      'Add a triple (subject, predicate, object) to the ontology store',
+      'Add a triple (subject, predicate, object) to the persisted ontology store',
       'ontology',
       [
-        param('subject', 'string', 'Subject URI'),
-        param('predicate', 'string', 'Predicate URI'),
-        param('object', 'string', 'Object URI or literal'),
+        param('subject', 'string', 'Subject'),
+        param('predicate', 'string', 'Predicate'),
+        param('object', 'string', 'Object (URI or literal)'),
+        param('basePath', 'string', 'Project base path', false, '.'),
       ],
       async (params) => {
         try {
-          const ont = await import('@musubix2/ontology-mcp') as any;
-          const store = ont.createTripleStore?.();
-          store?.add(params['subject'] as string, params['predicate'] as string, params['object'] as string);
-          return ok({ added: true, subject: params['subject'], predicate: params['predicate'], object: params['object'] });
+          const { store, file } = await loadTripleStore((params['basePath'] as string) ?? '.');
+          store.addTriple({
+            subject: params['subject'] as string,
+            predicate: params['predicate'] as string,
+            object: params['object'] as string,
+          });
+          await saveTripleStore(store, file);
+          return ok({ added: true, total: store.size() });
         } catch {
-          return ok({ added: true, subject: params['subject'], predicate: params['predicate'], object: params['object'] });
+          return fail('Ontology package not available');
         }
       },
     ),
     tool(
       'ontology.triple.query',
-      'Query triples by pattern matching',
+      'Query triples by pattern (omit a term to wildcard it)',
       'ontology',
       [
-        param('subject', 'string', 'Subject pattern (empty for wildcard)', false),
-        param('predicate', 'string', 'Predicate pattern (empty for wildcard)', false),
-        param('object', 'string', 'Object pattern (empty for wildcard)', false),
+        param('subject', 'string', 'Subject pattern', false),
+        param('predicate', 'string', 'Predicate pattern', false),
+        param('object', 'string', 'Object pattern', false),
+        param('basePath', 'string', 'Project base path', false, '.'),
       ],
       async (params) => {
         try {
-          const ont = await import('@musubix2/ontology-mcp') as any;
-          const store = ont.createTripleStore?.();
-          const results = store?.query(
-            params['subject'] as string | undefined,
-            params['predicate'] as string | undefined,
-            params['object'] as string | undefined,
-          );
-          return ok(results ?? []);
+          const { store } = await loadTripleStore((params['basePath'] as string) ?? '.');
+          const results = store.query({
+            subject: params['subject'] as string | undefined,
+            predicate: params['predicate'] as string | undefined,
+            object: params['object'] as string | undefined,
+          });
+          return ok({ results, count: results.length });
         } catch {
-          return ok([]);
+          return fail('Ontology package not available');
         }
       },
     ),
     tool(
       'ontology.rules.apply',
-      'Apply rule engine to infer new triples',
+      'Apply the default OWL 2 RL rule engine to infer new triples',
       'ontology',
-      [param('rules', 'array', 'Rules to apply', false)],
+      [param('basePath', 'string', 'Project base path', false, '.')],
       async (params) => {
         try {
-          const ont = await import('@musubix2/ontology-mcp') as any;
-          const engine = ont.createRuleEngine?.();
-          const result = engine?.apply(params['rules'] as unknown[] | undefined);
-          return ok(result ?? { inferred: 0, triples: [] });
+          const { createRuleEngine } = await import('@musubix2/ontology-mcp');
+          const { store, file } = await loadTripleStore((params['basePath'] as string) ?? '.');
+          const result = createRuleEngine(true).applyRules(store);
+          await saveTripleStore(store, file);
+          return ok(result);
         } catch {
-          return ok({ inferred: 0, triples: [] });
+          return fail('Ontology package not available');
         }
       },
     ),
     tool(
       'ontology.consistency.check',
-      'Check ontology consistency',
+      'Check ontology consistency against the persisted store',
       'ontology',
-      [],
-      async () => {
+      [param('basePath', 'string', 'Project base path', false, '.')],
+      async (params) => {
         try {
-          const ont = await import('@musubix2/ontology-mcp') as any;
-          const checker = ont.createConsistencyChecker?.();
-          const result = checker?.check();
-          return ok(result ?? { consistent: true, issues: [] });
+          const { createConsistencyValidator } = await import('@musubix2/ontology-mcp');
+          const { store } = await loadTripleStore((params['basePath'] as string) ?? '.');
+          return ok(createConsistencyValidator().validate(store));
         } catch {
-          return ok({ consistent: true, issues: [] });
+          return fail('Ontology package not available');
         }
       },
     ),
     tool(
       'ontology.sparql.query',
-      'Execute a SPARQL-like query against the ontology',
+      'Pattern query over the store (basic subject/predicate/object matching)',
       'ontology',
-      [param('query', 'string', 'SPARQL-like query string')],
+      [
+        param('subject', 'string', 'Subject pattern', false),
+        param('predicate', 'string', 'Predicate pattern', false),
+        param('object', 'string', 'Object pattern', false),
+        param('basePath', 'string', 'Project base path', false, '.'),
+      ],
       async (params) => {
         try {
-          const ont = await import('@musubix2/ontology-mcp') as any;
-          const result = ont.sparqlQuery?.(params['query'] as string);
-          return ok(result ?? { bindings: [] });
+          const { store } = await loadTripleStore((params['basePath'] as string) ?? '.');
+          const bindings = store.query({
+            subject: params['subject'] as string | undefined,
+            predicate: params['predicate'] as string | undefined,
+            object: params['object'] as string | undefined,
+          });
+          return ok({ bindings, count: bindings.length });
         } catch {
-          return ok({ bindings: [] });
+          return fail('Ontology package not available');
         }
       },
     ),
@@ -654,65 +689,102 @@ function codeAnalysisTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const cg = await import('@musubix2/codegraph') as any;
-          const ast = cg.parseSource?.(params['source'] as string, params['language'] as string ?? 'typescript');
-          return ok(ast ?? { type: 'Program', body: [] });
+          const { createASTParser } = await import('@musubix2/codegraph');
+          const nodes = createASTParser().parse(
+            (params['source'] as string) ?? '',
+            (params['language'] as string ?? 'typescript') as never,
+          );
+          return ok({ nodes, count: nodes.length });
         } catch {
-          return ok({ type: 'Program', body: [] });
+          return fail('Codegraph package not available');
         }
       },
     ),
     tool(
       'code.graph.build',
-      'Build a dependency graph from source files',
+      'Build a code graph (nodes) from inline sources',
       'code-analysis',
-      [
-        param('entryPoint', 'string', 'Entry point file path'),
-        param('basePath', 'string', 'Project base path', false, '.'),
-      ],
+      [param('sources', 'array', 'Sources as {code, language, filePath} objects')],
       async (params) => {
         try {
-          const cg = await import('@musubix2/codegraph') as any;
-          const graph = cg.buildDependencyGraph?.(params['entryPoint'] as string, params['basePath'] as string ?? '.');
-          return ok(graph ?? { nodes: [], edges: [] });
+          const { createASTParser, createGraphEngine } = await import('@musubix2/codegraph');
+          const parser = createASTParser();
+          const engine = createGraphEngine();
+          const sources = (params['sources'] as Array<{ code?: string; language?: string; filePath?: string }>) ?? [];
+          for (const s of sources) {
+            const lang = (s.language ?? 'typescript') as never;
+            for (const n of parser.parse(s.code ?? '', lang)) {
+              engine.addNode({
+                id: `${s.filePath ?? 'inline'}:${n.name}`,
+                name: n.name,
+                kind: n.kind,
+                filePath: s.filePath ?? 'inline',
+                language: lang,
+                startLine: n.startLine ?? 0,
+                endLine: n.endLine ?? 0,
+              });
+            }
+          }
+          const stats = engine.getStats();
+          return ok({ nodeCount: stats.nodeCount, edgeCount: stats.edgeCount, languages: [...stats.languages] });
         } catch {
-          return ok({ nodes: [], edges: [] });
+          return fail('Codegraph package not available');
         }
       },
     ),
     tool(
       'code.graph.search',
-      'Search code graph using GraphRAG techniques',
+      'Search a code graph built from inline sources using GraphRAG',
       'code-analysis',
       [
         param('query', 'string', 'Search query'),
-        param('basePath', 'string', 'Project base path', false, '.'),
+        param('sources', 'array', 'Sources as {code, language, filePath} objects to index'),
       ],
       async (params) => {
         try {
-          const cg = await import('@musubix2/codegraph') as any;
-          const results = cg.graphSearch?.(params['query'] as string, params['basePath'] as string ?? '.');
-          return ok(results ?? []);
+          const { createASTParser, createGraphEngine, GraphRAGSearch } = await import('@musubix2/codegraph');
+          const parser = createASTParser();
+          const engine = createGraphEngine();
+          const sources = (params['sources'] as Array<{ code?: string; language?: string; filePath?: string }>) ?? [];
+          for (const s of sources) {
+            const lang = (s.language ?? 'typescript') as never;
+            for (const n of parser.parse(s.code ?? '', lang)) {
+              engine.addNode({
+                id: `${s.filePath ?? 'inline'}:${n.name}`,
+                name: n.name,
+                kind: n.kind,
+                filePath: s.filePath ?? 'inline',
+                language: lang,
+                startLine: n.startLine ?? 0,
+                endLine: n.endLine ?? 0,
+              });
+            }
+          }
+          const results = new GraphRAGSearch(engine).globalSearch((params['query'] as string) ?? '');
+          return ok({ query: params['query'], results });
         } catch {
-          return ok([]);
+          return fail('Codegraph package not available');
         }
       },
     ),
     tool(
       'code.dfg.analyze',
-      'Perform data flow analysis on source code',
+      'Build a data-flow graph from structured statements and report reaching definitions',
       'code-analysis',
       [
-        param('source', 'string', 'Source code to analyze'),
-        param('language', 'string', 'Source language', false, 'typescript'),
+        param('statements', 'array', 'SimpleStatement[] (type/line/variable/value/usedVariables)'),
+        param('scope', 'string', 'Scope name', false, 'global'),
       ],
       async (params) => {
         try {
-          const dfg = await import('@musubix2/dfg') as any;
-          const result = dfg.analyzeDataFlow?.(params['source'] as string, params['language'] as string ?? 'typescript');
-          return ok(result ?? { flows: [], variables: [] });
+          const { createDataFlowAnalyzer } = await import('@musubix2/dfg');
+          const dfg = createDataFlowAnalyzer().buildDFG(
+            (params['statements'] as never[]) ?? [],
+            (params['scope'] as string) ?? 'global',
+          );
+          return ok(dfg);
         } catch {
-          return ok({ flows: [], variables: [] });
+          return fail('DFG package not available');
         }
       },
     ),

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.9] - 2026-07-09
+
+MCP ツール実 API 配線・第2弾（ISSUE-18 継続）。code-analysis と ontology を実装。
+
+### Fixed
+
+- **MCP `code-analysis` の4ツールを実 API へ配線** — `code.parse`（`createASTParser().parse` で実 AST ノード）、`code.graph.build` / `code.graph.search`（`createGraphEngine` + `GraphRAGSearch`、インラインソースを索引して検索）、`code.dfg.analyze`（`createDataFlowAnalyzer().buildDFG`）。従来は存在しない `cg.parseSource?.()` 等を呼び空を返していた
+- **MCP `ontology` の5ツールを実 API へ配線＋永続化** — `ontology.triple.add` / `triple.query` / `rules.apply`（OWL 2 RL 推移律推論）/ `consistency.check` / `sparql.query`（パターン検索）。`createOntologyStore` / `createRuleEngine` / `createConsistencyValidator` に配線し、`<basePath>/.musubix/ontology.json` に永続化（CLI と共有）。従来は存在しない `ont.createTripleStore?.()` 等で空を返していた
+
+### Known Issues
+
+- 残る MCP ツール（`research` / `neural` / `formal-verify` / `lean` / `workflow` / `skills` / `wake-sleep` / `library-learner`）は引き続き実 API 配線が必要（0.5.10 以降）
+- MCP stdio トランスポートは受信行を並行処理するため、同一クライアントが**状態変更ツールを応答待ちせず連続送信**するとレースし得る（通常のエージェントは逐次呼出しのため影響なし）
+
+### Tests
+
+- code.parse / graph.search、ontology 追加→クエリ→推移律推論の実データ検証テストを追加。全ワークスペース 1681 テスト green
+
 ## [0.5.8] - 2026-07-09
 
 MCP ツール監査（ISSUE-18 継続）で判明した「存在しない export を呼び偽の空成功を返すツール群」の実 API 配線を開始。
