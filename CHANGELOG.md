@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.29] - 2026-07-10
+
+CodeGraph の `cg export` に**ディレクトリクラスタリング `--cluster`** を追加し、大規模グラフを Graphviz で見やすく出力できるようにした。
+
+### Added
+
+- **`cg export --cluster`**（DOT のみ）— ファイルノードをディレクトリ単位の `subgraph cluster_<dir>` にグループ化し、各クラスタにディレクトリ名ラベルを付与。カーネルコアのような大規模グラフの可読性が大幅に向上
+- ドキュメント `docs/codegraph.md` の export 節に `--cluster` を追記
+
+### Impact
+
+- Linux カーネルコアで `cg export cmdline.c --cluster` が `kernel`/`kernel/cgroup`/`kernel/dma`/`lib` など 9 個のディレクトリクラスタに整理された DOT を生成（`dot -Tsvg` でそのまま可視化可能）。非 `--cluster` 時は従来どおりフラット出力（後方互換）
+
+### Tests
+
+- musubi: `--cluster` の subgraph 生成・ラベル・波括弧バランス、非クラスタ時のフラット出力を検証
+
 ## [0.5.28] - 2026-07-10
 
 CodeGraph に**CI 品質ゲート `cg gate`** を追加。アーキテクチャルールを検証し、違反時に非ゼロ終了コードを返す。0.5.27 の分析基盤を CI 連携に発展。

@@ -1165,10 +1165,11 @@ const CG_SUBCOMMAND_HELP: Record<string, string> = {
     '  (default 20); a path-fragment restricts to cycles touching those files.\n' +
     '  --json for machine-readable output.',
   export:
-    'musubix cg export [path-fragment] [--format dot|json] [--out <file>]\n' +
+    'musubix cg export [path-fragment] [--format dot|json] [--out <file>] [--cluster]\n' +
     '  Export the file-level dependency graph (symbol edges resolved to\n' +
     '  file → file). Default format dot (Graphviz), or json. Writes to <file>\n' +
-    '  with --out, else stdout. A path-fragment limits it to a subgraph.',
+    '  with --out, else stdout. A path-fragment limits it to a subgraph.\n' +
+    '    --cluster    (dot only) group nodes into a subgraph per directory',
   gate:
     'musubix cg gate [--max-cycles N] [--forbid A:B[,C:D]] [--json]\n' +
     '  CI quality gate: check architectural rules against the current graph and\n' +
@@ -1793,6 +1794,7 @@ export async function handleCodegraph(
       let format = 'dot';
       let outPath: string | undefined;
       let filter: string | undefined;
+      const cluster = args.includes('--cluster');
       for (let i = 0; i < args.length; i++) {
         const a = args[i];
         if (a === '--format') { format = (args[++i] ?? 'dot').toLowerCase(); continue; }
@@ -1828,8 +1830,29 @@ export async function handleCodegraph(
         output = JSON.stringify({ files: [...fileSet].sort(), edges: rels }, null, 2);
       } else {
         const label = (f: string) => (f.split(/[\\/]/).pop() ?? f).replace(/"/g, '');
+        const dirOf = (f: string) => {
+          const i = f.replace(/\\/g, '/').lastIndexOf('/');
+          return i >= 0 ? f.replace(/\\/g, '/').slice(0, i) : '.';
+        };
         const lines = ['digraph codegraph {', '  rankdir=LR;', '  node [shape=box, fontsize=10];'];
-        for (const f of [...fileSet].sort()) lines.push(`  "${f}" [label="${label(f)}"];`);
+        if (cluster) {
+          // Group file nodes into a subgraph per directory for readability.
+          const byDir = new Map<string, string[]>();
+          for (const f of [...fileSet].sort()) {
+            const d = dirOf(f);
+            (byDir.get(d) ?? byDir.set(d, []).get(d)!).push(f);
+          }
+          let ci = 0;
+          for (const [dir, files] of [...byDir.entries()].sort()) {
+            lines.push(`  subgraph "cluster_${ci++}" {`);
+            lines.push(`    label="${dir.replace(/"/g, '')}";`);
+            lines.push('    style=rounded; color="#999999";');
+            for (const f of files) lines.push(`    "${f}" [label="${label(f)}"];`);
+            lines.push('  }');
+          }
+        } else {
+          for (const f of [...fileSet].sort()) lines.push(`  "${f}" [label="${label(f)}"];`);
+        }
         for (const r of rels) {
           const style = r.kind === 'imports' ? ' [style=dashed]' : '';
           lines.push(`  "${r.from}" -> "${r.to}"${style};`);
@@ -3357,6 +3380,7 @@ export function getDefaultCommands(): CLICommand[] {
         if (args['json'] === true) positionalArgs.push('--json');
         if (args['max-cycles'] !== undefined) positionalArgs.push('--max-cycles', String(args['max-cycles']));
         if (args['forbid'] !== undefined) positionalArgs.push('--forbid', String(args['forbid']));
+        if (args['cluster'] === true) positionalArgs.push('--cluster');
         return await handleCodegraph(sub, positionalArgs);
       },
     },

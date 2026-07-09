@@ -95,14 +95,17 @@ npx musubix cg gate --forbid "ui/:db/,api/:ui/"    # layering rules
 npx musubix cg gate --max-cycles 5 --json          # for scripting
 ```
 
-### `cg export [fragment] [--format dot|json] [--out <file>]`
+### `cg export [fragment] [--format dot|json] [--out <file>] [--cluster]`
 
 Emits the file-level dependency graph. DOT nodes are files (labelled by
-basename); `imports` are dashed, `calls` solid.
+basename); `imports` are dashed, `calls` solid. `--cluster` (DOT only) groups
+nodes into a `subgraph cluster_<dir>` per directory, which makes large graphs
+navigable in Graphviz.
 
 ```bash
 npx musubix cg export --out graph.dot && dot -Tsvg graph.dot -o graph.svg
-npx musubix cg export auth --format json      # subgraph as JSON
+npx musubix cg export --cluster --out graph.dot   # grouped by directory
+npx musubix cg export auth --format json          # subgraph as JSON
 ```
 
 ### `cg diff <baseline.json> [current.json] [--json]`

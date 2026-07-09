@@ -593,6 +593,16 @@ describe('CLI Commands B — Codegraph', () => {
       expect(dot).toContain('digraph codegraph {');
       expect(dot).toContain(' -> '); // at least one edge (app.c -> lib.c)
       expect(dot.trimEnd().endsWith('}')).toBe(true);
+      expect(dot).not.toContain('subgraph'); // flat by default
+
+      // v0.5.29: --cluster groups nodes into per-directory subgraphs.
+      logSpy.mockClear();
+      expect(await handleCodegraph('export', ['--format', 'dot', '--cluster'])).toBe(ExitCode.SUCCESS);
+      const clustered = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(clustered).toContain('subgraph "cluster_0"');
+      expect(clustered).toContain('label='); // directory label
+      // Balanced braces (well-formed DOT).
+      expect((clustered.match(/{/g) ?? []).length).toBe((clustered.match(/}/g) ?? []).length);
 
       logSpy.mockClear();
       expect(await handleCodegraph('export', ['--format', 'json'])).toBe(ExitCode.SUCCESS);
