@@ -539,6 +539,43 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.28: cg gate — CI quality gate with non-zero exit on violations.
+  it('cg gate enforces cycle and layering rules with exit codes', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_gate');
+    mkdirSync(dir, { recursive: true });
+    // ui.c → lib.c (layering edge); cyc_a.c ↔ cyc_b.c (a cycle).
+    writeFileSync(join(dir, 'lib.c'), 'int helper(int x)\n{\n\treturn x;\n}\n');
+    writeFileSync(join(dir, 'ui.c'), 'int helper(int);\nint show(void)\n{\n\treturn helper(1);\n}\n');
+    writeFileSync(join(dir, 'cyc_a.c'), 'int cyc_b_fn(int);\nint cyc_a_fn(int x)\n{\n\treturn cyc_b_fn(x);\n}\n');
+    writeFileSync(join(dir, 'cyc_b.c'), 'int cyc_a_fn(int);\nint cyc_b_fn(int x)\n{\n\treturn cyc_a_fn(x);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      // Cycle gate: 1 cycle present.
+      expect(await handleCodegraph('gate', ['--max-cycles', '0'])).toBe(ExitCode.GENERAL_ERROR);
+      expect(await handleCodegraph('gate', ['--max-cycles', '5'])).toBe(ExitCode.SUCCESS);
+
+      // Layering gate: ui.c → lib.c edge exists.
+      expect(await handleCodegraph('gate', ['--forbid', 'ui.c:lib.c'])).toBe(ExitCode.GENERAL_ERROR);
+      expect(await handleCodegraph('gate', ['--forbid', 'ui.c:nonexistent'])).toBe(ExitCode.SUCCESS);
+
+      // JSON output.
+      logSpy.mockClear();
+      expect(await handleCodegraph('gate', ['--forbid', 'ui.c:lib.c', '--json'])).toBe(ExitCode.GENERAL_ERROR);
+      const gate = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+      expect(gate.passed).toBe(false);
+      expect(gate.checks[0].pass).toBe(false);
+
+      // No rules → validation error.
+      expect(await handleCodegraph('gate', [])).toBe(ExitCode.VALIDATION_ERROR);
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.23: cg export — file-level dependency graph as DOT / JSON.
   it('cg export emits DOT and JSON file-level graphs', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_export');

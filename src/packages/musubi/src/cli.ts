@@ -153,8 +153,8 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'オントロジー管理',
   },
   cg: {
-    usage: 'musubix cg <index|search|stats|deps|impact|candidates|cycles|export|diff|languages> [args]',
-    description: 'コードグラフ分析 (impact --direct/--depth、candidates 書き換え候補、cycles 循環依存、export DOT/JSON、diff グラフ差分)',
+    usage: 'musubix cg <index|search|stats|deps|impact|candidates|cycles|gate|export|diff|languages> [args]',
+    description: 'コードグラフ分析 (impact 影響、candidates 候補、cycles 循環、gate CI品質ゲート、export、diff)',
   },
   security: {
     usage: 'musubix security <path> [--fail-on critical|high|medium|low|info] [--exclude-tests]',
@@ -1045,6 +1045,74 @@ function resolveFileEdges(
   return fileEdges;
 }
 
+/**
+ * Find circular file dependencies: strongly-connected components (size > 1) of
+ * the file-level dependency graph, via iterative Tarjan. Sorted largest-first.
+ */
+function findDependencyCycles(
+  nodes: StoredGraphNode[],
+  edges: StoredGraphEdge[],
+): string[][] {
+  const { defFiles, filesByBasename } = buildResolutionMaps(nodes);
+  const adj = new Map<string, Set<string>>();
+  for (const e of edges) {
+    for (const to of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
+      if (to === e.from) continue;
+      const set = adj.get(e.from) ?? new Set<string>();
+      set.add(to);
+      adj.set(e.from, set);
+    }
+  }
+  const index = new Map<string, number>();
+  const low = new Map<string, number>();
+  const onStack = new Set<string>();
+  const stack: string[] = [];
+  const sccs: string[][] = [];
+  let idx = 0;
+  const allNodes = new Set<string>([...adj.keys()]);
+  for (const set of adj.values()) for (const t of set) allNodes.add(t);
+  for (const start of allNodes) {
+    if (index.has(start)) continue;
+    const work: Array<{ v: string; it: Iterator<string> }> = [];
+    const pushNode = (v: string) => {
+      index.set(v, idx);
+      low.set(v, idx);
+      idx++;
+      stack.push(v);
+      onStack.add(v);
+      work.push({ v, it: (adj.get(v) ?? new Set<string>()).values() });
+    };
+    pushNode(start);
+    while (work.length > 0) {
+      const frame = work[work.length - 1];
+      const next = frame.it.next();
+      if (!next.done) {
+        const w = next.value;
+        if (!index.has(w)) {
+          pushNode(w);
+        } else if (onStack.has(w)) {
+          low.set(frame.v, Math.min(low.get(frame.v)!, index.get(w)!));
+        }
+      } else {
+        if (low.get(frame.v) === index.get(frame.v)) {
+          const comp: string[] = [];
+          let w: string;
+          do {
+            w = stack.pop()!;
+            onStack.delete(w);
+            comp.push(w);
+          } while (w !== frame.v);
+          if (comp.length > 1) sccs.push(comp);
+        }
+        work.pop();
+        const parent = work[work.length - 1];
+        if (parent) low.set(parent.v, Math.min(low.get(parent.v)!, low.get(frame.v)!));
+      }
+    }
+  }
+  return sccs.sort((a, b) => b.length - a.length);
+}
+
 /** Load a persisted code graph from an arbitrary path (for cg diff). */
 function loadGraphFromPath(
   path: string,
@@ -1101,6 +1169,13 @@ const CG_SUBCOMMAND_HELP: Record<string, string> = {
     '  Export the file-level dependency graph (symbol edges resolved to\n' +
     '  file → file). Default format dot (Graphviz), or json. Writes to <file>\n' +
     '  with --out, else stdout. A path-fragment limits it to a subgraph.',
+  gate:
+    'musubix cg gate [--max-cycles N] [--forbid A:B[,C:D]] [--json]\n' +
+    '  CI quality gate: check architectural rules against the current graph and\n' +
+    '  exit non-zero on any violation.\n' +
+    '    --max-cycles N   fail if dependency cycles exceed N\n' +
+    "    --forbid A:B     fail if any file matching 'A' depends on one matching 'B'\n" +
+    '                     (comma-separate multiple rules); --json for automation',
   diff:
     'musubix cg diff <baseline.json> [current.json] [--json]\n' +
     '  Compare two persisted graphs (.musubix/codegraph.json format) and report\n' +
@@ -1542,68 +1617,7 @@ export async function handleCodegraph(
         console.log('No indexed graph. Run `musubix cg index <path>` first.');
         return ExitCode.SUCCESS;
       }
-      const { defFiles, filesByBasename } = buildResolutionMaps(nodes);
-      // File-level adjacency (deduped).
-      const adj = new Map<string, Set<string>>();
-      for (const e of edges) {
-        for (const to of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
-          if (to === e.from) continue;
-          const set = adj.get(e.from) ?? new Set<string>();
-          set.add(to);
-          adj.set(e.from, set);
-        }
-      }
-      // Tarjan's strongly-connected components (iterative).
-      const index = new Map<string, number>();
-      const low = new Map<string, number>();
-      const onStack = new Set<string>();
-      const stack: string[] = [];
-      const sccs: string[][] = [];
-      let idx = 0;
-      const allNodes = new Set<string>([...adj.keys()]);
-      for (const set of adj.values()) for (const t of set) allNodes.add(t);
-      for (const start of allNodes) {
-        if (index.has(start)) continue;
-        // Explicit DFS stack of frames: [node, neighbour-iterator position].
-        const work: Array<{ v: string; it: Iterator<string>; }> = [];
-        const pushNode = (v: string) => {
-          index.set(v, idx);
-          low.set(v, idx);
-          idx++;
-          stack.push(v);
-          onStack.add(v);
-          work.push({ v, it: (adj.get(v) ?? new Set<string>()).values() });
-        };
-        pushNode(start);
-        while (work.length > 0) {
-          const frame = work[work.length - 1];
-          const next = frame.it.next();
-          if (!next.done) {
-            const w = next.value;
-            if (!index.has(w)) {
-              pushNode(w);
-            } else if (onStack.has(w)) {
-              low.set(frame.v, Math.min(low.get(frame.v)!, index.get(w)!));
-            }
-          } else {
-            // Done with frame.v — settle low-link into parent, close SCC if root.
-            if (low.get(frame.v) === index.get(frame.v)) {
-              const comp: string[] = [];
-              let w: string;
-              do {
-                w = stack.pop()!;
-                onStack.delete(w);
-                comp.push(w);
-              } while (w !== frame.v);
-              if (comp.length > 1) sccs.push(comp);
-            }
-            work.pop();
-            const parent = work[work.length - 1];
-            if (parent) low.set(parent.v, Math.min(low.get(parent.v)!, low.get(frame.v)!));
-          }
-        }
-      }
-      let cycles = sccs.sort((a, b) => b.length - a.length);
+      let cycles = findDependencyCycles(nodes, edges);
       if (filter) cycles = cycles.filter((c) => c.some((f) => f.includes(filter!)));
       if (args.includes('--json')) {
         console.log(JSON.stringify({
@@ -1626,6 +1640,74 @@ export async function handleCodegraph(
         if (sorted.length > PER_CYCLE) console.log(`    … and ${sorted.length - PER_CYCLE} more`);
       });
       return ExitCode.SUCCESS;
+    }
+    case 'gate': {
+      // CI quality gate: evaluate architectural rules against the current graph
+      // and exit non-zero on any violation.
+      const asJson = args.includes('--json');
+      let maxCycles: number | null = null;
+      const forbidRules: Array<{ from: string; to: string }> = [];
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a === '--max-cycles') {
+          const v = Number(args[++i]);
+          if (Number.isFinite(v) && v >= 0) maxCycles = Math.floor(v);
+        } else if (a === '--forbid') {
+          for (const spec of (args[++i] ?? '').split(',')) {
+            const [from, to] = spec.split(':');
+            if (from && to) forbidRules.push({ from: from.trim(), to: to.trim() });
+          }
+        }
+      }
+      if (maxCycles === null && forbidRules.length === 0) {
+        console.error('❌ Usage: musubix cg gate [--max-cycles N] [--forbid A:B[,C:D]] [--json]');
+        return ExitCode.VALIDATION_ERROR;
+      }
+      const { nodes, edges } = loadCodeGraphData();
+      if (nodes.length === 0) {
+        console.log('No indexed graph. Run `musubix cg index <path>` first.');
+        return ExitCode.SUCCESS;
+      }
+      type Check = { rule: string; pass: boolean; detail: string; offenders?: string[] };
+      const checks: Check[] = [];
+
+      if (maxCycles !== null) {
+        const cycles = findDependencyCycles(nodes, edges);
+        checks.push({
+          rule: `cycles ≤ ${maxCycles}`,
+          pass: cycles.length <= maxCycles,
+          detail: `${cycles.length} dependency cycle(s)`,
+          offenders: cycles.slice(0, 5).map((c) => `[${c.length}] ${[...c].sort()[0]}, …`),
+        });
+      }
+      if (forbidRules.length > 0) {
+        const rels = [...resolveFileEdges(nodes, edges).values()];
+        for (const rule of forbidRules) {
+          const hits = rels.filter((e) => e.from.includes(rule.from) && e.to.includes(rule.to));
+          checks.push({
+            rule: `forbid ${rule.from} → ${rule.to}`,
+            pass: hits.length === 0,
+            detail: `${hits.length} forbidden edge(s)`,
+            offenders: hits.slice(0, 10).map((e) => `${e.from} → ${e.to}`),
+          });
+        }
+      }
+
+      const failed = checks.filter((c) => !c.pass);
+      if (asJson) {
+        console.log(JSON.stringify({ passed: failed.length === 0, checks }, null, 2));
+      } else {
+        for (const c of checks) {
+          console.log(`  ${c.pass ? '✅' : '❌'} ${c.rule} — ${c.detail}`);
+          if (!c.pass) for (const o of c.offenders ?? []) console.log(`       ${o}`);
+        }
+        console.log(
+          failed.length === 0
+            ? `\n✅ Gate passed (${checks.length} check(s)).`
+            : `\n❌ Gate failed: ${failed.length}/${checks.length} check(s) violated.`,
+        );
+      }
+      return failed.length === 0 ? ExitCode.SUCCESS : ExitCode.GENERAL_ERROR;
     }
     case 'diff': {
       // Compare two persisted graphs and report file/dependency changes.
@@ -3273,6 +3355,8 @@ export function getDefaultCommands(): CLICommand[] {
         if (args['format'] !== undefined) positionalArgs.push('--format', String(args['format']));
         if (args['out'] !== undefined) positionalArgs.push('--out', String(args['out']));
         if (args['json'] === true) positionalArgs.push('--json');
+        if (args['max-cycles'] !== undefined) positionalArgs.push('--max-cycles', String(args['max-cycles']));
+        if (args['forbid'] !== undefined) positionalArgs.push('--forbid', String(args['forbid']));
         return await handleCodegraph(sub, positionalArgs);
       },
     },

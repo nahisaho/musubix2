@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.28] - 2026-07-10
+
+CodeGraph に**CI 品質ゲート `cg gate`** を追加。アーキテクチャルールを検証し、違反時に非ゼロ終了コードを返す。0.5.27 の分析基盤を CI 連携に発展。
+
+### Added
+
+- **`cg gate [--max-cycles N] [--forbid A:B[,C:D]] [--json]`** — 現在のグラフに対してルールを評価し、違反があれば exit code 1（成功は 0、ルール未指定は 2）
+  - `--max-cycles N`: 依存循環が N を超えたら失敗
+  - `--forbid A:B`: 「A にマッチするファイルが B にマッチするファイルへ依存」を禁止（カンマ区切りで複数ルール）。レイヤリング違反の検出に有用
+  - `--json`: `{ passed, checks: [{rule, pass, detail, offenders}] }` を出力
+- 内部リファクタ: Tarjan の循環検出を `findDependencyCycles()` に抽出し `cycles`/`gate` で共用
+
+### Impact
+
+- Linux カーネルコアで `cg gate --max-cycles 0` は 5 循環を検出して失敗（exit 1）、`--max-cycles 10` は成功。`cg gate --forbid lib/:kernel/` は `lib/` → `kernel/` の依存 431 件を検出（レイヤリング観察）。CI で「新規循環禁止」「レイヤ違反禁止」を自動判定可能に
+
+### Tests
+
+- musubi: 循環・レイヤリングルールの合否と終了コード、JSON 出力、ルール未指定エラーを検証（70 → 71）
+
 ## [0.5.27] - 2026-07-10
 
 CodeGraph の分析コマンドに**機械可読な `--json` 出力**を追加。CI ゲートや自動化スクリプトへ結果を連携できる。
