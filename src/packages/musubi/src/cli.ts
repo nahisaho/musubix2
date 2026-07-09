@@ -153,8 +153,8 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'オントロジー管理',
   },
   cg: {
-    usage: 'musubix cg <index|search|stats|deps|impact|languages> [args]',
-    description: 'コードグラフ分析',
+    usage: 'musubix cg <index|search|stats|deps|impact|candidates|languages> [args]',
+    description: 'コードグラフ分析 (impact に --direct、candidates は書き換え候補ランキング)',
   },
   security: {
     usage: 'musubix security <path> [--fail-on critical|high|medium|low|info] [--exclude-tests]',
@@ -1082,9 +1082,105 @@ export async function handleCodegraph(
     case 'stats': {
       const engine = loadCodeGraph();
       const stats = engine.getStats();
+      const { nodes, edges } = loadCodeGraphData();
       console.log(`Nodes: ${stats.nodeCount}`);
       console.log(`Edges: ${stats.edgeCount}`);
       console.log(`Languages: ${[...stats.languages].join(', ') || 'none'}`);
+
+      // Node-kind and edge-kind breakdowns.
+      const nodeKinds = new Map<string, number>();
+      const files = new Set<string>();
+      for (const n of nodes) {
+        nodeKinds.set(n.kind, (nodeKinds.get(n.kind) ?? 0) + 1);
+        files.add(n.filePath);
+      }
+      const edgeKinds = new Map<string, number>();
+      for (const e of edges) edgeKinds.set(e.kind, (edgeKinds.get(e.kind) ?? 0) + 1);
+      console.log(`Files: ${files.size}`);
+      if (nodeKinds.size > 0) {
+        const parts = [...nodeKinds.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`);
+        console.log(`Node kinds: ${parts.join(', ')}`);
+      }
+      if (edgeKinds.size > 0) {
+        const parts = [...edgeKinds.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`);
+        console.log(`Edge kinds: ${parts.join(', ')}`);
+      }
+
+      // Top-5 most-called functions (in-degree over `calls` edges).
+      const callInDegree = new Map<string, number>();
+      for (const e of edges) {
+        if (e.kind === 'calls') callInDegree.set(e.to, (callInDegree.get(e.to) ?? 0) + 1);
+      }
+      const top = [...callInDegree.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+      if (top.length > 0) {
+        console.log(`Top called functions:`);
+        for (const [name, deg] of top) console.log(`  ${name} — ${deg} caller(s)`);
+      }
+      return ExitCode.SUCCESS;
+    }
+    case 'candidates': {
+      // Rank files by suitability for an isolated rewrite (e.g. to Rust):
+      // substantive logic (functions) with few *external* dependencies to port.
+      const limit = Number(args.find((a) => /^\d+$/.test(a))) || 15;
+      const { nodes, edges } = loadCodeGraphData();
+      if (nodes.length === 0) {
+        console.log('No indexed graph. Run `musubix cg index <path>` first.');
+        return ExitCode.SUCCESS;
+      }
+      // Per-file metrics.
+      const fnCount = new Map<string, number>();
+      for (const n of nodes) {
+        if (n.kind === 'function') fnCount.set(n.filePath, (fnCount.get(n.filePath) ?? 0) + 1);
+      }
+      // External dependencies = distinct call/import edges leaving the file.
+      const extDeps = new Map<string, Set<string>>();
+      for (const e of edges) {
+        if (e.kind === 'calls' || e.kind === 'imports') {
+          const set = extDeps.get(e.from) ?? new Set<string>();
+          set.add(`${e.kind}:${e.to}`);
+          extDeps.set(e.from, set);
+        }
+      }
+      // Dependents = files that call functions defined in this file.
+      const defFiles = new Map<string, Set<string>>();
+      for (const n of nodes) {
+        if (n.kind === 'function') {
+          const set = defFiles.get(n.name) ?? new Set<string>();
+          set.add(n.filePath);
+          defFiles.set(n.name, set);
+        }
+      }
+      const dependents = new Map<string, Set<string>>();
+      for (const e of edges) {
+        if (e.kind !== 'calls') continue;
+        const defs = defFiles.get(e.to);
+        if (!defs || defs.size !== 1) continue;
+        const target = [...defs][0];
+        if (target === e.from) continue;
+        const set = dependents.get(target) ?? new Set<string>();
+        set.add(e.from);
+        dependents.set(target, set);
+      }
+      // Score: reward logic (functions) and being depended-upon; penalise the
+      // external deps you would also have to port. Only files with functions.
+      type Cand = { file: string; fns: number; deps: number; users: number; score: number };
+      const cands: Cand[] = [];
+      for (const [file, fns] of fnCount) {
+        if (fns < 1 || isTestFile(file)) continue; // skip test/fixture files
+        const deps = extDeps.get(file)?.size ?? 0;
+        const users = dependents.get(file)?.size ?? 0;
+        // Self-contained + substantive + used ⇒ higher score.
+        const score = (fns + users) / (1 + deps);
+        cands.push({ file, fns, deps, users, score });
+      }
+      cands.sort((a, b) => b.score - a.score);
+      console.log(`Rewrite candidates (top ${Math.min(limit, cands.length)} of ${cands.length}, by self-containment × usage):`);
+      console.log(`  ${'score'.padStart(7)}  ${'fns'.padStart(4)}  ${'deps'.padStart(4)}  ${'users'.padStart(5)}  file`);
+      for (const c of cands.slice(0, limit)) {
+        console.log(
+          `  ${c.score.toFixed(1).padStart(7)}  ${String(c.fns).padStart(4)}  ${String(c.deps).padStart(4)}  ${String(c.users).padStart(5)}  ${c.file}`,
+        );
+      }
       return ExitCode.SUCCESS;
     }
     case 'deps': {

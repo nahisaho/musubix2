@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.20] - 2026-07-09
+
+CodeGraph に**書き換え候補ランキング `cg candidates`** を追加し、`cg stats` を充実化。当初の「Rust で置き換えられる部分を調査」というタスクを、手動探索ではなくコマンド一発で支援できるようにした。
+
+### Added
+
+- **`cg candidates [N]`** — 各ファイルを「隔離した書き換え（例: Rust 化）への適性」でランキング。スコア = （関数数 + 依存元数）/（1 + 外部依存数）で、実装量があり（関数）・よく使われ（依存元）・移植すべき外部依存が少ない（self-contained）ファイルを上位に。テスト/フィクスチャファイルは除外。`N` で表示件数指定（既定15）
+- **`cg stats` の内訳表示** — ファイル数、ノード種別内訳（function/import/variable/class）、エッジ種別内訳（calls/imports）、最も呼ばれている関数 Top5（call in-degree）を追加
+
+### Changed
+
+- `cg` の usage に `candidates` を追記、`impact` の `--direct` を明記
+
+### Impact
+
+- Linux カーネルコアで `cg candidates` が `lib/string.c` / `lib/maple_tree.c` / `lib/xarray.c` / `lib/kstrtox.c` / `lib/rbtree.c` など、実際に Rust-for-Linux で議論される純粋データ構造・ユーティリティを上位提示。`cg stats` は最多呼び出し関数（memset 214, memcpy 180, strcmp 114 …）を可視化
+
+### Tests
+
+- musubi: `cg stats` の内訳/Top 関数表示、`cg candidates` の順位付けとテストファイル除外を検証（56 → 58）
+
 ## [0.5.19] - 2026-07-09
 
 `cg impact` に**直接／推移（indirect）依存の区別**と `--direct` フラグを追加。0.5.18 でコアユーティリティ（`lib/cmdline.c`）の影響範囲が 836 ファイルと出て「広すぎて actionable でない」問題に対応。

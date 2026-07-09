@@ -349,6 +349,55 @@ describe('CLI Commands B — Codegraph', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // v0.5.20: enriched stats + candidates ranking for rewrite triage.
+  it('cg stats reports kind breakdowns and top called functions', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_stats');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'lib.c'), 'int helper_fn(int x)\n{\n\treturn x + 1;\n}\n');
+    writeFileSync(join(dir, 'app.c'), 'int run(void)\n{\n\treturn helper_fn(41);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('stats', [])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('Node kinds:');
+      expect(out).toContain('function=');
+      expect(out).toContain('Top called functions:');
+      expect(out).toContain('helper_fn');
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('cg candidates ranks self-contained files and excludes test files', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_cand');
+    mkdirSync(dir, { recursive: true });
+    // core.c: substantive, no external deps, used by others → strong candidate.
+    writeFileSync(
+      join(dir, 'core.c'),
+      'int a(int x)\n{\n\treturn x;\n}\nint b(int x)\n{\n\treturn x;\n}\n',
+    );
+    writeFileSync(join(dir, 'user.c'), 'int u(void)\n{\n\treturn a(1) + b(2);\n}\n');
+    writeFileSync(join(dir, 'core_test.c'), 'int t(void)\n{\n\treturn a(0);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('candidates', [])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('Rewrite candidates');
+      expect(out).toContain('core.c');
+      expect(out).not.toContain('core_test.c'); // test file excluded
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── Security ───────────────────────────────────────────────────────────────
