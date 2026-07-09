@@ -1332,6 +1332,8 @@ export async function handleKnowledge(
   const { createKnowledgeStore } = await import('@musubix2/knowledge');
   const basePath = (flags['path'] as string | undefined) ?? '.knowledge';
   const store = createKnowledgeStore(basePath);
+  // Load persisted graph so state survives across separate CLI invocations.
+  await store.load();
 
   switch (sub) {
     case 'get': {
@@ -1340,7 +1342,7 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge get <id>');
         return ExitCode.GENERAL_ERROR;
       }
-      const entity = store.getEntity(id);
+      const entity = await store.getEntity(id);
       if (!entity) {
         console.error(`❌ Entity not found: ${id}`);
         return ExitCode.GENERAL_ERROR;
@@ -1355,7 +1357,8 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge put <id> <type>');
         return ExitCode.GENERAL_ERROR;
       }
-      store.putEntity({ id, type: type as EntityType, properties: {} } as any);
+      await store.putEntity({ id, type: type as EntityType, properties: {} } as any);
+      await store.save();
       console.log(`✅ Stored entity: ${id} (${type})`);
       return ExitCode.SUCCESS;
     }
@@ -1365,7 +1368,8 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge delete <id>');
         return ExitCode.GENERAL_ERROR;
       }
-      store.deleteEntity(id);
+      await store.deleteEntity(id);
+      await store.save();
       console.log(`✅ Deleted entity: ${id}`);
       return ExitCode.SUCCESS;
     }
@@ -1377,7 +1381,8 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge link <from> <rel> <to>');
         return ExitCode.GENERAL_ERROR;
       }
-      store.addRelation({ from, to, type: rel as RelationType } as any);
+      await store.addRelation({ from, to, type: rel as RelationType } as any);
+      await store.save();
       console.log(`✅ Linked: ${from} —[${rel}]→ ${to}`);
       return ExitCode.SUCCESS;
     }
@@ -1443,6 +1448,8 @@ export async function handleDecision(
   const { createDecisionManager } = await import('@musubix2/decisions');
   const basePath = (flags['path'] as string | undefined) ?? '.decisions';
   const manager = createDecisionManager(basePath);
+  // Load persisted ADRs so state survives across separate CLI invocations.
+  await manager.load();
 
   switch (sub) {
     case 'create': {

@@ -14,6 +14,9 @@ import {
   handleWatch,
 } from '../src/cli.js';
 import { ExitCode } from '@musubix2/core';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // ── Registration ───────────────────────────────────────────────────────────
 
@@ -456,5 +459,65 @@ describe('CLI Commands C — Dispatch integration', () => {
     const dispatcher = createCLIDispatcher();
     await dispatcher.dispatch('synthesis', { subcommand: 'version-space', args: [] });
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Version space'));
+  });
+});
+
+// ── v0.5.3: knowledge / decision persistence across invocations ─────────────
+
+describe('v0.5.3 CLI persistence', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  let dir: string;
+
+  beforeEach(async () => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    dir = await mkdtemp(join(tmpdir(), 'musubix2-persist-'));
+  });
+
+  afterEach(async () => {
+    logSpy.mockRestore();
+    errSpy.mockRestore();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  // ISSUE-10
+  it('knowledge put then get (separate handler calls) round-trips via disk', async () => {
+    const kdir = join(dir, 'kg');
+    const put = await handleKnowledge('put', ['E1', 'concept'], { path: kdir });
+    expect(put).toBe(ExitCode.SUCCESS);
+
+    logSpy.mockClear();
+    const get = await handleKnowledge('get', ['E1'], { path: kdir });
+    expect(get).toBe(ExitCode.SUCCESS);
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('"id": "E1"');
+    expect(printed).not.toBe('{}');
+  });
+
+  it('knowledge get for a missing id returns an error', async () => {
+    const code = await handleKnowledge('get', ['NOPE'], { path: join(dir, 'kg') });
+    expect(code).toBe(ExitCode.GENERAL_ERROR);
+  });
+
+  // ISSUE-11
+  it('decision create then list (separate handler calls) persists', async () => {
+    const created = await handleDecision('create', ['Use PostgreSQL'], { path: dir });
+    expect(created).toBe(ExitCode.SUCCESS);
+
+    logSpy.mockClear();
+    const listed = await handleDecision('list', [], { path: dir });
+    expect(listed).toBe(ExitCode.SUCCESS);
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('Use PostgreSQL');
+    expect(printed).not.toContain('No ADRs found');
+  });
+
+  it('decision ids increment across separate invocations', async () => {
+    await handleDecision('create', ['First'], { path: dir });
+    logSpy.mockClear();
+    await handleDecision('create', ['Second'], { path: dir });
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('ADR-002');
   });
 });

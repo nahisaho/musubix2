@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-07-09
+
+v0.5.2 の再ドッグフーディングで、CLI 状態が呼び出し間で永続化されない課題を発見・改修。
+
+### Fixed
+
+- **`knowledge` コマンドが CLI 呼び出し間で永続化されない問題を修正** — `handleKnowledge` が `store.load()` / `store.save()` を呼ばず、async な `putEntity`/`getEntity` 等を await していなかった。このため `put` は「✅ Stored」と表示しても `get` は `{}`（未解決 Promise の stringify）、`stats` は常に 0 件だった。起動時に `load()`、更新後に `save()`、全 async 呼び出しを await するよう修正
+- **`decision` コマンドが CLI 呼び出し間で永続化されない問題を修正** — `DecisionManager` は ADR の `.md` を書き出すが `load()` が無く、`list`/`get`/`search` は in-memory Map のみ参照。さらに `counter` が毎回 0 リセットされ、常に `ADR-001` が生成・上書きされていた。`adrs.json` による永続化と `load()` を追加し、`counter` を既存最大 ID から再開。CLI ハンドラで `load()` を呼ぶよう修正
+
+### Tests
+
+- 永続化のリグレッションテスト 10 件を追加（knowledge round-trip、ADR 再読込・採番継続・空ディレクトリ）。musubi 240 + decisions 16 = 256 テスト green
+
 ## [0.5.2] - 2026-07-09
 
 v0.5.1 の再ドッグフーディングで発見した、未検証だったコマンド群の課題を改修。

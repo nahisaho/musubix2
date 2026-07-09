@@ -7,7 +7,7 @@
  * @see DES-DES-003 — ADR management
  */
 
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export type ADRStatus = 'proposed' | 'accepted' | 'deprecated' | 'superseded';
@@ -38,6 +38,7 @@ export interface ADRFilter {
 }
 
 export interface IDecisionManager {
+  load(): Promise<void>;
   create(draft: ADRDraft): Promise<ADR>;
   get(id: string): Promise<ADR | undefined>;
   list(filter?: ADRFilter): Promise<ADR[]>;
@@ -71,6 +72,35 @@ export class DecisionManager implements IDecisionManager {
 
   constructor(basePath: string) {
     this.basePath = join(basePath, 'decisions');
+  }
+
+  private get indexFile(): string {
+    return join(this.basePath, 'adrs.json');
+  }
+
+  /**
+   * Load previously-persisted ADRs from disk so that ADR state survives across
+   * separate CLI invocations. Missing/corrupt store is treated as empty.
+   */
+  async load(): Promise<void> {
+    try {
+      const raw = await readFile(this.indexFile, 'utf-8');
+      const adrs = JSON.parse(raw) as ADR[];
+      this.adrs = new Map(adrs.map((a) => [a.id, a]));
+      // Resume the id counter past the highest existing ADR number.
+      this.counter = adrs.reduce((max, a) => {
+        const n = Number.parseInt(a.id.replace(/\D/g, ''), 10);
+        return Number.isFinite(n) && n > max ? n : max;
+      }, 0);
+    } catch {
+      this.adrs = new Map();
+      this.counter = 0;
+    }
+  }
+
+  private async saveIndex(): Promise<void> {
+    await mkdir(this.basePath, { recursive: true });
+    await writeFile(this.indexFile, JSON.stringify([...this.adrs.values()], null, 2), 'utf-8');
   }
 
   async create(draft: ADRDraft): Promise<ADR> {
@@ -182,6 +212,8 @@ export class DecisionManager implements IDecisionManager {
       .replace('{decision}', adr.decision)
       .replace('{consequences}', adr.consequences);
     await writeFile(join(this.basePath, `${adr.id}.md`), content, 'utf-8');
+    // Persist the machine-readable index so the state can be reloaded later.
+    await this.saveIndex();
   }
 }
 

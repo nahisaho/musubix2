@@ -131,4 +131,31 @@ describe('REQ-DES-003: DecisionManager', () => {
     const m = createDecisionManager(tmpDir);
     expect(m).toBeDefined();
   });
+
+  // v0.5.3: state must survive across separate manager instances (CLI runs).
+  it('persists ADRs and reloads them in a fresh manager', async () => {
+    await manager.create({ title: 'Use PostgreSQL', context: '', decision: '', consequences: '' });
+    await manager.create({ title: 'Use Redis', context: '', decision: '', consequences: '' });
+
+    const reloaded = new DecisionManager(tmpDir);
+    await reloaded.load();
+    const adrs = await reloaded.list();
+    expect(adrs.map((a) => a.id)).toEqual(['ADR-001', 'ADR-002']);
+    expect(adrs.map((a) => a.title)).toContain('Use Redis');
+  });
+
+  it('resumes the id counter after load (no ADR-001 collision)', async () => {
+    await manager.create({ title: 'First', context: '', decision: '', consequences: '' });
+
+    const reloaded = new DecisionManager(tmpDir);
+    await reloaded.load();
+    const next = await reloaded.create({ title: 'Second', context: '', decision: '', consequences: '' });
+    expect(next.id).toBe('ADR-002');
+  });
+
+  it('load() on an empty directory yields no ADRs', async () => {
+    const fresh = new DecisionManager(tmpDir);
+    await fresh.load();
+    expect(await fresh.list()).toHaveLength(0);
+  });
 });
