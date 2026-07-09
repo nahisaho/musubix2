@@ -199,7 +199,9 @@ const LANGUAGE_PATTERNS: Record<string, LanguagePatterns> = {
     { kind: 'class', regex: /(?:abstract\s+)?class\s+(\w+)/ },
     { kind: 'interface', regex: /interface\s+(\w+)/ },
     { kind: 'function', regex: /(?:public|private|protected)?\s*(?:static\s+)?function\s+(\w+)/ },
-    { kind: 'import', regex: /(?:use|require|include)\s+([\w\\]+)/ },
+    // Anchor to statement start so the words "use"/"include" in prose/comments
+    // are not mistaken for imports; capture the namespaced module name.
+    { kind: 'import', regex: /^\s*(?:use|require_once|require|include_once|include)\s+([A-Za-z_\\][\w\\]*)/ },
     { kind: 'variable', regex: /(?:public|private|protected)\s+(?:static\s+)?\$(\w+)/ },
   ],
   swift: [

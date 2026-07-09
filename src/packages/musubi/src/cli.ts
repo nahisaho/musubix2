@@ -153,7 +153,7 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'オントロジー管理',
   },
   cg: {
-    usage: 'musubix cg <index|search|stats|languages> [args]',
+    usage: 'musubix cg <index|search|stats|deps|languages> [args]',
     description: 'コードグラフ分析',
   },
   security: {
@@ -897,6 +897,21 @@ function saveCodeGraph(
   writeFileSync(CODEGRAPH_STATE_FILE, JSON.stringify({ nodes, edges }, null, 2), 'utf-8');
 }
 
+/** Read persisted dependency edges directly (from/to/kind) for `cg deps`. */
+function loadCodeGraphEdges(): Array<{ from: string; to: string; kind: string }> {
+  try {
+    if (existsSync(CODEGRAPH_STATE_FILE)) {
+      const data = JSON.parse(readFileSync(CODEGRAPH_STATE_FILE, 'utf-8')) as {
+        edges?: Array<{ from: string; to: string; kind: string }>;
+      };
+      return data.edges ?? [];
+    }
+  } catch {
+    // Corrupt/unreadable — no edges.
+  }
+  return [];
+}
+
 export async function handleCodegraph(
   sub: string | undefined,
   args: string[],
@@ -922,6 +937,7 @@ export async function handleCodegraph(
           return ExitCode.GENERAL_ERROR;
         }
         const savedNodes: Array<Parameters<typeof engine.addNode>[0]> = [];
+        const savedEdges: Array<Parameters<typeof engine.addEdge>[0]> = [];
         let indexedFiles = 0;
         for (const file of files) {
           const ext = file.split('.').pop() ?? '';
@@ -941,11 +957,17 @@ export async function handleCodegraph(
             };
             engine.addNode(entry);
             savedNodes.push(entry);
+            // Dependency edge: this file imports/uses the named module.
+            if (node.kind === 'import' && node.name) {
+              const edge = { from: file, to: node.name, kind: 'imports' as const };
+              engine.addEdge(edge);
+              savedEdges.push(edge);
+            }
           }
           indexedFiles++;
         }
-        // Persist so `cg search` / `cg stats` can operate on the indexed graph.
-        saveCodeGraph(savedNodes);
+        // Persist so `cg search` / `cg stats` / `cg deps` operate on the graph.
+        saveCodeGraph(savedNodes, savedEdges);
         const stats = engine.getStats();
         console.log(
           `✅ Indexed ${targetPath}: ${indexedFiles} file(s), ${stats.nodeCount} nodes, ${stats.edgeCount} edges`,
@@ -980,6 +1002,32 @@ export async function handleCodegraph(
       console.log(`Nodes: ${stats.nodeCount}`);
       console.log(`Edges: ${stats.edgeCount}`);
       console.log(`Languages: ${[...stats.languages].join(', ') || 'none'}`);
+      return ExitCode.SUCCESS;
+    }
+    case 'deps': {
+      // Show file → imported-module dependency edges from the persisted graph.
+      const filter = args[0];
+      const edges = loadCodeGraphEdges();
+      if (edges.length === 0) {
+        console.log('No dependency edges. Run `musubix cg index <path>` first.');
+        return ExitCode.SUCCESS;
+      }
+      const matched = filter ? edges.filter((e) => e.from.includes(filter)) : edges;
+      if (matched.length === 0) {
+        console.log(`No dependencies found${filter ? ` for '${filter}'` : ''}.`);
+        return ExitCode.SUCCESS;
+      }
+      const byFile = new Map<string, string[]>();
+      for (const e of matched) {
+        const arr = byFile.get(e.from) ?? [];
+        arr.push(e.to);
+        byFile.set(e.from, arr);
+      }
+      console.log(`Dependencies (${matched.length} edges across ${byFile.size} file(s)):`);
+      for (const [file, targets] of byFile) {
+        console.log(`  ${file}`);
+        for (const t of [...new Set(targets)].sort()) console.log(`    → ${t}`);
+      }
       return ExitCode.SUCCESS;
     }
     case 'languages': {

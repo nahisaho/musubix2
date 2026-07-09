@@ -338,6 +338,25 @@ describe('REQ-CG-001: PHP parser (regex)', () => {
     const fns = nodes.filter((n) => n.kind === 'function');
     expect(fns.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('captures a real `use` statement as an import', () => {
+    const parser = createASTParser();
+    const imports = parser.parse(PHP_SOURCE, 'php').filter((n) => n.kind === 'import');
+    expect(imports.some((n) => n.name === 'App\\Models\\User')).toBe(true);
+  });
+
+  // v0.5.15: the words "use"/"include" in prose/comments must not be imports.
+  it('does not treat the word "use" in comments/prose as an import', () => {
+    const parser = createASTParser();
+    const src = [
+      '<?php',
+      '// You can use the helper to include extra data',
+      '/* please use App properly and include tests */',
+      '$x = 1; // we use it here',
+    ].join('\n');
+    const imports = parser.parse(src, 'php').filter((n) => n.kind === 'import');
+    expect(imports).toHaveLength(0);
+  });
 });
 
 describe('REQ-CG-001: All 16 languages have patterns', () => {

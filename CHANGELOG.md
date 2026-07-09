@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.15] - 2026-07-09
+
+CodeGraph に依存関係エッジと `cg deps` を追加（Moodle 分析の続き）。
+
+### Added
+
+- **CodeGraph の依存エッジ生成 + `cg deps` コマンド** — `cg index` が import/use ノードから「ファイル → 依存モジュール」の `imports` エッジを生成し永続化。`cg deps [パスの一部]` でファイルごとの依存モジュールを一覧表示。従来 `edges` は常に 0 だったが、実依存グラフを構築できるようになった（影響範囲分析の基盤）
+
+### Fixed
+
+- **PHP の import 抽出が文章中の "use"/"include" を誤検知する問題を修正** — 正規表現 `/(?:use|require|include)\s+([\w\\]+)/` がコメントや説明文中の英単語 "use"/"include" も import として拾い、`cg deps` に `the`/`a`/`it` 等の偽依存が混入していた。行頭アンカー（`^\s*`）と名前形状の制約を追加し、実際の `use Foo\Bar;` / `require_once ...` 文のみを抽出。Moodle 認証系のエッジは 202（ノイズ込み）→ 120（実 `use` 文のみ）に是正され、`oauth2` クラスは `core\di` / `core\oauth2\client` / `moodle_url` 等の実名前空間依存を正確に表示
+
+### Tests
+
+- PHP import 精度（プロース中の "use" を非検知・実 `use` 文を検知）、`cg deps` の依存エッジ表示のテストを追加。全ワークスペース 1701 テスト green
+
 ## [0.5.14] - 2026-07-09
 
 Moodle 分析で判明した「テストファイルの指摘がノイズになる」問題に対応。

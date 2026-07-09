@@ -263,6 +263,25 @@ describe('CLI Commands B — Codegraph', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // v0.5.15: cg index records import edges; cg deps lists file → module deps.
+  it('cg deps lists dependency edges from imports', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_deps');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'svc.ts'), "import { Token } from './auth';\nexport class Svc {}\n");
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['svc.ts'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('deps', [])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('./auth'); // the imported module
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── Security ───────────────────────────────────────────────────────────────
