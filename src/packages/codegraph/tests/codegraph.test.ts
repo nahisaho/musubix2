@@ -179,6 +179,25 @@ describe('DES-CG-001: ASTParser', () => {
     expect(classes).toEqual(['real_def']);
   });
 
+  it('should mark C function linkage (static) in metadata', () => {
+    const parser = createASTParser();
+    const src = [
+      'static int internal_helper(int x)',
+      '{',
+      '\treturn x;',
+      '}',
+      'int public_api(int x)',
+      '{',
+      '\treturn x;',
+      '}',
+    ].join('\n');
+    const fns = parser.parse(src, 'c').filter((n) => n.kind === 'function');
+    const helper = fns.find((n) => n.name === 'internal_helper');
+    const api = fns.find((n) => n.name === 'public_api');
+    expect(helper?.metadata?.static).toBe(true);
+    expect(api?.metadata?.static).toBe(false);
+  });
+
   it('should extract C call sites, excluding keywords/comments/strings', () => {
     const parser = createASTParser();
     const src = [

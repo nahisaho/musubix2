@@ -902,6 +902,8 @@ interface StoredGraphNode {
   name: string;
   kind: string;
   filePath: string;
+  /** For functions: true if defined with internal linkage (`static`). */
+  isStatic?: boolean;
 }
 interface StoredGraphEdge {
   from: string;
@@ -991,7 +993,11 @@ export async function handleCodegraph(
         // For building the cross-file call graph in a second phase, once every
         // function definition across the corpus is known.
         const fileCalls: Array<{ file: string; calls: string[] }> = [];
-        const fnToFiles = new Map<string, Set<string>>();
+        // Global (external-linkage) function name → defining files.
+        const globalFnToFiles = new Map<string, Set<string>>();
+        // Every function name a file defines (static or global) — a call to such
+        // a name binds locally in C and must not create a cross-file edge.
+        const fileDefines = new Map<string, Set<string>>();
         let indexedFiles = 0;
         for (const file of files) {
           const ext = file.split('.').pop() ?? '';
@@ -1000,6 +1006,7 @@ export async function handleCodegraph(
           const content = readFileSync(file, 'utf-8');
           const nodes = parser.parse(content, lang);
           for (const node of nodes) {
+            const isStatic = node.metadata?.static === true;
             const entry = {
               id: `${file}:${node.name}`,
               name: node.name,
@@ -1008,13 +1015,19 @@ export async function handleCodegraph(
               language: lang,
               startLine: node.startLine ?? 0,
               endLine: node.endLine ?? 0,
+              ...(node.kind === 'function' ? { isStatic } : {}),
             };
             engine.addNode(entry);
             savedNodes.push(entry);
             if (node.kind === 'function' && node.name) {
-              const set = fnToFiles.get(node.name) ?? new Set<string>();
-              set.add(file);
-              fnToFiles.set(node.name, set);
+              const defined = fileDefines.get(file) ?? new Set<string>();
+              defined.add(node.name);
+              fileDefines.set(file, defined);
+              if (!isStatic) {
+                const set = globalFnToFiles.get(node.name) ?? new Set<string>();
+                set.add(file);
+                globalFnToFiles.set(node.name, set);
+              }
             }
             // Dependency edge: this file imports/uses the named module.
             if (node.kind === 'import' && node.name) {
@@ -1026,17 +1039,20 @@ export async function handleCodegraph(
           fileCalls.push({ file, calls: parser.extractCalls(content, lang) });
           indexedFiles++;
         }
-        // Phase 2 — call-graph edges. Emit a `calls` edge only when the callee
-        // name resolves to exactly ONE defining file (unambiguous) and it is a
-        // different file (cross-file). This keeps precision high on codebases
-        // full of same-named `static` helpers (e.g. the kernel) while capturing
-        // the real dependencies that `#include` edges cannot see.
+        // Phase 2 — call-graph edges, resolved with C linkage rules:
+        //  • a call to a name the caller itself defines binds locally (skip);
+        //  • otherwise it must reach a function with external linkage — emit an
+        //    edge only when exactly ONE *global* (non-static) definition exists.
+        // This binds file-local `static` homonyms correctly AND still captures
+        // calls to unique globals that a static homonym elsewhere used to hide.
         for (const { file, calls } of fileCalls) {
+          const localDefs = fileDefines.get(file);
           for (const name of calls) {
-            const defs = fnToFiles.get(name);
-            if (!defs || defs.size !== 1) continue; // undefined or ambiguous
+            if (localDefs?.has(name)) continue; // local binding (static/own def)
+            const defs = globalFnToFiles.get(name);
+            if (!defs || defs.size !== 1) continue; // undefined or ambiguous global
             const target = [...defs][0];
-            if (target === file) continue; // intra-file call
+            if (target === file) continue;
             const edge = { from: file, to: name, kind: 'calls' as const };
             engine.addEdge(edge);
             savedEdges.push(edge);
@@ -1144,7 +1160,7 @@ export async function handleCodegraph(
       // Dependents = files that call functions defined in this file.
       const defFiles = new Map<string, Set<string>>();
       for (const n of nodes) {
-        if (n.kind === 'function') {
+        if (n.kind === 'function' && !n.isStatic) {
           const set = defFiles.get(n.name) ?? new Set<string>();
           set.add(n.filePath);
           defFiles.set(n.name, set);
@@ -1231,7 +1247,10 @@ export async function handleCodegraph(
       const defFiles = new Map<string, Set<string>>();
       const filesByBasename = new Map<string, Set<string>>();
       for (const n of nodes) {
-        if (n.kind === 'class' || n.kind === 'interface' || n.kind === 'function') {
+        // Static functions have internal linkage — never a cross-file target.
+        const isResolvable =
+          n.kind === 'class' || n.kind === 'interface' || (n.kind === 'function' && !n.isStatic);
+        if (isResolvable) {
           const set = defFiles.get(n.name) ?? new Set<string>();
           set.add(n.filePath);
           defFiles.set(n.name, set);

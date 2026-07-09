@@ -402,7 +402,17 @@ export class ASTParser {
           !end.endsWith(';') && // not a prototype/declaration
           (end.endsWith('{') || end.endsWith(')') || end.endsWith(',') || nextNonEmptyIsBrace(i + 1));
         if (isDefinition && !CONTROL.has(firstTok) && !CONTROL.has(name)) {
-          nodes.push({ kind: 'function', name, startLine: i + 1, endLine: i + 1, children: [] });
+          // Record internal linkage (`static`) so cross-file call resolution can
+          // bind file-local homonyms correctly.
+          const isStatic = /\bstatic\b/.test(retType);
+          nodes.push({
+            kind: 'function',
+            name,
+            startLine: i + 1,
+            endLine: i + 1,
+            children: [],
+            metadata: { static: isStatic },
+          });
           continue;
         }
       }

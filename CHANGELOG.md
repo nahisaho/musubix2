@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.21] - 2026-07-09
+
+CodeGraph のコールグラフ解決を **C の `static`（内部リンケージ）認識**に対応。0.5.18 は「コーパス全体で一意な名前」のみをエッジ化していたため、カーネルに多い同名 `static` ヘルパー（`show`/`open`/`probe` 等）は一切エッジ化されず、また同名 `static` を持つ一意グローバル関数も誤って除外されていた。
+
+### Fixed
+
+- **`static` 同名関数の解決** — C パーサーが関数定義の `static` 修飾を `metadata.static` として記録。インデックス時のコールグラフ解決を C のスコープ規則に従わせた:
+  - 呼び出し元が同名を定義していれば**ファイル内でローカル束縛**（`static` は同一ファイルの定義に解決）→ 横断エッジを張らない
+  - それ以外は外部リンケージ関数へ解決 — **グローバル（非 static）定義が一意なときのみ**エッジ化
+- これにより、①ファイルローカル `static` への誤った横断エッジを除去（別ファイルから `static` は呼べない）、②同名 `static` に隠れていた一意グローバルへの呼び出しを回収。`cg impact` の `defFiles` 解決も非 static 定義のみを対象に
+
+### Impact
+
+- Linux カーネルコアで `calls` エッジが 8,671 → 8,474 に純化（誤エッジ除去が回収を上回る、いずれも精度向上）。同名 `static` を10個持つ一意グローバルが正しく10エッジで解決され、`static` のみの名前は0エッジに。`cg impact lib/cmdline.c` は 21 direct を維持
+
+### Tests
+
+- codegraph: `static`/グローバルのリンケージ記録を検証
+- musubi: `static` 同名はローカル束縛・グローバル呼び出しは横断解決されることを検証（58 → 59）
+
 ## [0.5.20] - 2026-07-09
 
 CodeGraph に**書き換え候補ランキング `cg candidates`** を追加し、`cg stats` を充実化。当初の「Rust で置き換えられる部分を調査」というタスクを、手動探索ではなくコマンド一発で支援できるようにした。

@@ -350,6 +350,34 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.21: static-aware call resolution — local `static` binds in-file.
+  it('cg impact binds static homonyms locally and globals cross-file', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_static');
+    mkdirSync(dir, { recursive: true });
+    // global.c defines the global shared_api.
+    writeFileSync(join(dir, 'global.c'), 'int shared_api(int x)\n{\n\treturn x;\n}\n');
+    // other.c defines its OWN static shared_api and calls it — local binding.
+    writeFileSync(
+      join(dir, 'other.c'),
+      'static int shared_api(int x)\n{\n\treturn x * 2;\n}\nint wrap(void)\n{\n\treturn shared_api(3);\n}\n',
+    );
+    // caller.c has no local def — its call binds to the global.
+    writeFileSync(join(dir, 'caller.c'), 'int c(void)\n{\n\treturn shared_api(9);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['global.c'])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('caller.c'); // global call resolves to global.c
+      expect(out).not.toContain('other.c'); // static homonym binds locally, not to global.c
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.20: enriched stats + candidates ranking for rewrite triage.
   it('cg stats reports kind breakdowns and top called functions', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_stats');
