@@ -203,3 +203,71 @@ describe('v0.5.7 MCP tool fixes', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// v0.5.8 — sdd-core / synthesis / decisions wired to real APIs
+// ---------------------------------------------------------------------------
+
+describe('v0.5.8 MCP tool wiring', () => {
+  it('sdd.requirements.create classifies EARS pattern', async () => {
+    const r = await findTool('sdd-core', 'sdd.requirements.create').handler({
+      text: 'WHEN a user logs in, THE system SHALL issue a token.', id: 'REQ-AUT-001',
+    });
+    expect(r.success).toBe(true);
+    expect((r.data as { pattern: string }).pattern).toBe('event-driven');
+  });
+
+  it('sdd.requirements.list parses a Markdown document', async () => {
+    const r = await findTool('sdd-core', 'sdd.requirements.list').handler({
+      markdown: '## REQ-AUT-001: Login\n**要件**:\nTHE system SHALL work.\n',
+    });
+    expect((r.data as unknown[]).length).toBe(1);
+    expect((r.data as Array<{ id: string }>)[0].id).toBe('REQ-AUT-001');
+  });
+
+  it('sdd.codegen.generate produces real code (not an empty stub)', async () => {
+    const r = await findTool('sdd-core', 'sdd.codegen.generate').handler({ name: 'TaskService', templateType: 'class' });
+    expect((r.data as { code: string }).code).toContain('class TaskService');
+  });
+
+  it('sdd.test.generate produces a test suite', async () => {
+    const r = await findTool('sdd-core', 'sdd.test.generate').handler({ code: 'export function add(a,b){return a+b}' });
+    expect((r.data as { code: string }).code).toContain('describe');
+  });
+
+  it('sdd.trace.verify computes coverage and gaps from references', async () => {
+    const r = await findTool('sdd-core', 'sdd.trace.verify').handler({
+      requirementIds: ['REQ-AUT-001', 'REQ-TSK-001'],
+      sources: [{ file: 'a.ts', code: '// @see REQ-AUT-001' }],
+    });
+    const d = r.data as { coverage: number; gaps: string[] };
+    expect(d.coverage).toBe(50);
+    expect(d.gaps).toEqual(['REQ-TSK-001']);
+  });
+
+  it('synthesis.dsl.build applies the ops pipeline', async () => {
+    const r = await findTool('synthesis', 'synthesis.dsl.build').handler({ input: '  hello world ', ops: ['trim', 'camelCase'] });
+    expect((r.data as { result: string }).result).toBe('helloWorld');
+  });
+
+  it('synthesis.synthesize derives a rule from examples', async () => {
+    const r = await findTool('synthesis', 'synthesis.synthesize').handler({
+      examples: [{ input: 'a', output: 'aa' }, { input: 'b', output: 'bb' }],
+    });
+    expect((r.data as { synthesized: boolean }).synthesized).toBe(true);
+  });
+
+  it('decisions.create then list round-trips via disk', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'mcp-adr-'));
+    try {
+      const created = await findTool('decisions', 'decisions.create').handler({
+        title: 'Use Postgres', context: 'scale', decision: 'pg', basePath: base,
+      });
+      expect((created.data as { id: string }).id).toBe('ADR-001');
+      const listed = await findTool('decisions', 'decisions.list').handler({ basePath: base });
+      expect((listed.data as unknown[]).length).toBe(1);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});

@@ -48,153 +48,186 @@ function sddCoreTools(): CatalogEntry[] {
   return [
     tool(
       'sdd.requirements.create',
-      'Create an EARS requirement (Easy Approach to Requirements Syntax)',
+      'Create and classify an EARS requirement (Easy Approach to Requirements Syntax)',
       'sdd-core',
       [
-        param('pattern', 'string', 'EARS pattern: ubiquitous | event-driven | unwanted | state-driven | optional'),
-        param('text', 'string', 'Requirement text'),
+        param('text', 'string', 'Requirement text (EARS sentence)'),
         param('id', 'string', 'Requirement ID', false),
       ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core') as any;
-          const req = core.createRequirement?.({
-            pattern: params['pattern'] as string,
-            text: params['text'] as string,
-            id: params['id'] as string | undefined,
+          const { createEARSValidator } = await import('@musubix2/core');
+          const v = createEARSValidator();
+          const text = params['text'] as string;
+          const analysis = v.analyze(text);
+          const validation = v.validate(text);
+          return ok({
+            id: (params['id'] as string) ?? 'REQ-XXX-001',
+            text,
+            pattern: analysis.pattern,
+            confidence: analysis.confidence,
+            valid: validation.valid,
+            issues: validation.issues,
           });
-          return ok(req ?? { pattern: params['pattern'], text: params['text'], id: params['id'] ?? 'REQ-001' });
         } catch {
-          return ok({ pattern: params['pattern'], text: params['text'], id: params['id'] ?? 'REQ-001' });
+          return fail('Core package not available');
         }
       },
     ),
     tool(
       'sdd.requirements.validate',
-      'Validate requirements for completeness and consistency',
+      'Validate requirements (EARS pattern + issues) for a list of requirement texts',
       'sdd-core',
-      [param('requirements', 'array', 'Array of requirement objects to validate')],
+      [param('requirements', 'array', 'Array of requirement texts or {text} objects')],
       async (params) => {
         try {
-          const core = await import('@musubix2/core') as any;
-          const result = core.validateRequirements?.(params['requirements'] as unknown[]);
-          return ok(result ?? { valid: true, issues: [] });
+          const { createEARSValidator } = await import('@musubix2/core');
+          const v = createEARSValidator();
+          const items = (params['requirements'] as Array<string | { text?: string }>) ?? [];
+          const results = items.map((it) => {
+            const text = typeof it === 'string' ? it : (it.text ?? '');
+            const analysis = v.analyze(text);
+            const validation = v.validate(text);
+            return { text, pattern: analysis.pattern, valid: validation.valid, issues: validation.issues };
+          });
+          return ok({ results, allValid: results.every((r) => r.valid) });
         } catch {
-          return ok({ valid: true, issues: [] });
+          return fail('Core package not available');
         }
       },
     ),
     tool(
       'sdd.requirements.list',
-      'List all requirements in the current project',
+      'Parse and list requirements from a Markdown requirements document',
       'sdd-core',
-      [param('basePath', 'string', 'Project base path', false, '.')],
+      [param('markdown', 'string', 'Requirements document contents (Markdown)')],
       async (params) => {
         try {
-          const core = await import('@musubix2/core') as any;
-          const list = core.listRequirements?.(params['basePath'] as string ?? '.');
-          return ok(list ?? []);
+          const { MarkdownEARSParser } = await import('@musubix2/core');
+          const parsed = new MarkdownEARSParser().parse((params['markdown'] as string) ?? '');
+          return ok(parsed.map((r) => ({ id: r.id, title: r.title, pattern: r.pattern, text: r.text })));
         } catch {
-          return ok([]);
+          return fail('Core package not available');
         }
       },
     ),
     tool(
       'sdd.design.generate',
-      'Generate a design document from requirements',
+      'Generate a design document from parsed requirements',
       'sdd-core',
-      [
-        param('requirements', 'array', 'Requirements to generate design from'),
-        param('format', 'string', 'Output format: markdown | json', false, 'markdown'),
-      ],
+      [param('requirements', 'array', 'Requirements as {id,title,text,pattern} objects')],
       async (params) => {
         try {
-          const core = await import('@musubix2/core') as any;
-          const design = core.generateDesign?.({
-            requirements: params['requirements'] as unknown[],
-            format: params['format'] as string ?? 'markdown',
-          });
-          return ok(design ?? { sections: [], format: params['format'] ?? 'markdown' });
+          const { createDesignGenerator } = await import('@musubix2/core');
+          const reqs = (params['requirements'] as Array<Record<string, unknown>>) ?? [];
+          const mapped = reqs.map((r) => ({
+            id: String(r['id'] ?? 'REQ-XXX-001'),
+            title: String(r['title'] ?? ''),
+            text: String(r['text'] ?? ''),
+            pattern: String(r['pattern'] ?? 'ubiquitous'),
+          }));
+          return ok(createDesignGenerator().generate(mapped));
         } catch {
-          return ok({ sections: [], format: params['format'] ?? 'markdown' });
+          return fail('Core package not available');
         }
       },
     ),
     tool(
       'sdd.design.verify',
-      'Verify design traceability back to requirements',
+      'Verify a design against SOLID principles',
       'sdd-core',
-      [
-        param('design', 'object', 'Design document to verify'),
-        param('requirements', 'array', 'Requirements to trace against'),
-      ],
+      [param('requirements', 'array', 'Requirements the design is generated from')],
       async (params) => {
         try {
-          const core = await import('@musubix2/core') as any;
-          const result = core.verifyTraceability?.({
-            design: params['design'],
-            requirements: params['requirements'] as unknown[],
-          });
-          return ok(result ?? { complete: true, gaps: [] });
+          const { createDesignGenerator, createSOLIDValidator } = await import('@musubix2/core');
+          const reqs = (params['requirements'] as Array<Record<string, unknown>>) ?? [];
+          const mapped = reqs.map((r) => ({
+            id: String(r['id'] ?? 'REQ-XXX-001'),
+            title: String(r['title'] ?? ''),
+            text: String(r['text'] ?? ''),
+            pattern: String(r['pattern'] ?? 'ubiquitous'),
+          }));
+          const design = createDesignGenerator().generate(mapped);
+          return ok(createSOLIDValidator().validate(design));
         } catch {
-          return ok({ complete: true, gaps: [] });
+          return fail('Core package not available');
         }
       },
     ),
     tool(
       'sdd.codegen.generate',
-      'Generate code from a design document',
+      'Generate a code skeleton (class/interface/function) from a name',
       'sdd-core',
       [
-        param('design', 'object', 'Design document'),
-        param('language', 'string', 'Target language: typescript | python', false, 'typescript'),
+        param('name', 'string', 'Symbol name to generate'),
+        param('templateType', 'string', 'class | interface | function | enum | type', false, 'class'),
+        param('description', 'string', 'Doc description', false),
       ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core') as any;
-          const code = core.generateCode?.({
-            design: params['design'],
-            language: params['language'] as string ?? 'typescript',
+          const { createCodeGenerator } = await import('@musubix2/core');
+          const code = createCodeGenerator().generate({
+            templateType: (params['templateType'] as string ?? 'class') as never,
+            name: (params['name'] as string) ?? 'Generated',
+            description: params['description'] as string | undefined,
           });
-          return ok(code ?? { files: [], language: params['language'] ?? 'typescript' });
+          return ok(code);
         } catch {
-          return ok({ files: [], language: params['language'] ?? 'typescript' });
+          return fail('Core package not available');
         }
       },
     ),
     tool(
       'sdd.test.generate',
-      'Generate tests from a design document',
+      'Generate a unit-test skeleton from source code',
       'sdd-core',
       [
-        param('design', 'object', 'Design document'),
-        param('framework', 'string', 'Test framework: vitest | jest | pytest', false, 'vitest'),
+        param('code', 'string', 'Source code to generate tests for'),
+        param('style', 'string', 'Test style: unit | integration', false, 'unit'),
       ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core') as any;
-          const tests = core.generateTests?.({
-            design: params['design'],
-            framework: params['framework'] as string ?? 'vitest',
-          });
-          return ok(tests ?? { files: [], framework: params['framework'] ?? 'vitest' });
+          const { createUnitTestGenerator } = await import('@musubix2/core');
+          const suite = createUnitTestGenerator().generate(
+            (params['code'] as string) ?? '',
+            (params['style'] as string ?? 'unit') as never,
+          );
+          return ok(suite);
         } catch {
-          return ok({ files: [], framework: params['framework'] ?? 'vitest' });
+          return fail('Core package not available');
         }
       },
     ),
     tool(
       'sdd.trace.verify',
-      'Verify full traceability matrix (requirements → design → code → tests)',
+      'Verify requirement → code coverage by scanning source references (REQ-XXX-NNN)',
       'sdd-core',
-      [param('basePath', 'string', 'Project base path', false, '.')],
+      [
+        param('requirementIds', 'array', 'Requirement IDs to check (e.g. ["REQ-AUT-001"])'),
+        param('sources', 'array', 'Sources as {file, code} objects to scan for references'),
+      ],
       async (params) => {
         try {
-          const core = await import('@musubix2/core') as any;
-          const result = core.verifyTraceabilityMatrix?.(params['basePath'] as string ?? '.');
-          return ok(result ?? { complete: true, matrix: [], gaps: [] });
+          const reqIds = [...new Set((params['requirementIds'] as string[]) ?? [])];
+          const sources = (params['sources'] as Array<{ file?: string; code?: string }>) ?? [];
+          const refRe = /REQ-[A-Z]{3}-\d{3}/g;
+          const covered = new Set<string>();
+          for (const s of sources) {
+            for (const m of (s.code ?? '').matchAll(refRe)) {
+              if (reqIds.includes(m[0])) covered.add(m[0]);
+            }
+          }
+          const gaps = reqIds.filter((r) => !covered.has(r));
+          const coverage = reqIds.length === 0 ? 0 : Math.round((covered.size / reqIds.length) * 100);
+          return ok({
+            total: reqIds.length,
+            covered: covered.size,
+            coverage,
+            gaps,
+            complete: gaps.length === 0 && reqIds.length > 0,
+          });
         } catch {
-          return ok({ complete: true, matrix: [], gaps: [] });
+          return fail('Trace verification failed');
         }
       },
     ),
@@ -941,55 +974,79 @@ function synthesisTools(): CatalogEntry[] {
   return [
     tool(
       'synthesis.dsl.build',
-      'Build a DSL transformation from specification',
+      'Apply a DSL transform pipeline to an input string',
       'synthesis',
       [
-        param('spec', 'object', 'DSL specification'),
-        param('examples', 'array', 'Input/output examples', false),
+        param('input', 'string', 'Input string to transform'),
+        param('ops', 'array', 'Ops: trim | upper | lower | reverse | capitalize | camelCase | snakeCase | replace:from:to'),
       ],
       async (params) => {
         try {
-          const syn = await import('@musubix2/synthesis') as any;
-          const result = syn.buildDSL?.(params['spec'], params['examples'] as unknown[] | undefined);
-          return ok(result ?? { dsl: null, spec: params['spec'] });
+          const { createDSLBuilder } = await import('@musubix2/synthesis');
+          const builder = createDSLBuilder();
+          const ops = (params['ops'] as string[]) ?? [];
+          for (const op of ops) {
+            const [name, ...a] = String(op).split(':');
+            switch (name) {
+              case 'trim': builder.trim(); break;
+              case 'upper': case 'toUpperCase': builder.toUpperCase(); break;
+              case 'lower': case 'toLowerCase': builder.toLowerCase(); break;
+              case 'reverse': builder.reverse(); break;
+              case 'capitalize': builder.capitalize(); break;
+              case 'camelCase': case 'camel': builder.camelCase(); break;
+              case 'snakeCase': case 'snake': builder.snakeCase(); break;
+              case 'replace': builder.replace(a[0] ?? '', a[1] ?? ''); break;
+              case 'prefixRemove': builder.prefixRemove(a[0] ?? ''); break;
+              case 'suffixAppend': builder.suffixAppend(a[0] ?? ''); break;
+              default: return fail(`Unknown DSL op: ${name}`);
+            }
+          }
+          const result = builder.execute((params['input'] as string) ?? '');
+          return ok({ input: params['input'], ops, result });
         } catch {
-          return ok({ dsl: null, spec: params['spec'] });
+          return fail('Synthesis package not available');
         }
       },
     ),
     tool(
       'synthesis.synthesize',
-      'Synthesize a program from input/output examples',
+      'Synthesize a transformation rule from input/output examples',
       'synthesis',
-      [
-        param('examples', 'array', 'Input/output example pairs'),
-        param('constraints', 'object', 'Synthesis constraints', false),
-      ],
+      [param('examples', 'array', 'Array of {input, output} example pairs')],
       async (params) => {
         try {
-          const syn = await import('@musubix2/synthesis') as any;
-          const result = syn.synthesize?.(params['examples'] as unknown[], params['constraints']);
-          return ok(result ?? { program: null, confidence: 0 });
+          const { createSynthesisEngine } = await import('@musubix2/synthesis');
+          const examples = ((params['examples'] as Array<{ input?: string; output?: string }>) ?? []).map((e) => ({
+            input: e.input ?? '',
+            output: e.output ?? '',
+          }));
+          const rule = createSynthesisEngine().synthesize(examples);
+          return ok({ rule, synthesized: rule !== null });
         } catch {
-          return ok({ program: null, confidence: 0 });
+          return fail('Synthesis package not available');
         }
       },
     ),
     tool(
       'synthesis.version-space',
-      'Manage version spaces for program synthesis',
+      'Build a version space from positive/negative examples and get consistent hypotheses',
       'synthesis',
       [
-        param('action', 'string', 'Action: create | update | query'),
-        param('examples', 'array', 'Examples for version space', false),
+        param('name', 'string', 'Version space name', false, 'default'),
+        param('positive', 'array', 'Positive examples', false),
+        param('negative', 'array', 'Negative examples', false),
       ],
       async (params) => {
         try {
-          const syn = await import('@musubix2/synthesis') as any;
-          const result = syn.versionSpace?.(params['action'] as string, params['examples'] as unknown[] | undefined);
-          return ok(result ?? { action: params['action'], spaces: [] });
+          const { createVersionSpaceManager } = await import('@musubix2/synthesis');
+          const mgr = createVersionSpaceManager();
+          const name = (params['name'] as string) ?? 'default';
+          mgr.create(name);
+          for (const p of (params['positive'] as string[]) ?? []) mgr.addPositive(name, p);
+          for (const n of (params['negative'] as string[]) ?? []) mgr.addNegative(name, n);
+          return ok({ name, hypotheses: mgr.getConsistentHypotheses(name), spaces: mgr.getSpaces().size });
         } catch {
-          return ok({ action: params['action'], spaces: [] });
+          return fail('Synthesis package not available');
         }
       },
     ),
@@ -1186,16 +1243,18 @@ function decisionsTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const dec = await import('@musubix2/decisions') as any;
-          const adr = dec.createADR?.({
+          const { createDecisionManager } = await import('@musubix2/decisions');
+          const mgr = createDecisionManager((params['basePath'] as string) ?? '.decisions');
+          await mgr.load();
+          const adr = await mgr.create({
             title: params['title'] as string,
-            context: params['context'] as string,
-            decision: params['decision'] as string,
-            consequences: params['consequences'] as string | undefined,
+            context: (params['context'] as string) ?? '',
+            decision: (params['decision'] as string) ?? '',
+            consequences: (params['consequences'] as string) ?? '',
           });
-          return ok(adr ?? { title: params['title'], status: 'proposed' });
+          return ok(adr);
         } catch {
-          return ok({ title: params['title'], status: 'proposed' });
+          return fail('Decisions package not available');
         }
       },
     ),
@@ -1203,14 +1262,15 @@ function decisionsTools(): CatalogEntry[] {
       'decisions.list',
       'List all Architecture Decision Records',
       'decisions',
-      [param('basePath', 'string', 'ADR directory path', false, '.')],
+      [param('basePath', 'string', 'ADR base path', false, '.decisions')],
       async (params) => {
         try {
-          const dec = await import('@musubix2/decisions') as any;
-          const adrs = dec.listADRs?.(params['basePath'] as string ?? '.');
-          return ok(adrs ?? []);
+          const { createDecisionManager } = await import('@musubix2/decisions');
+          const mgr = createDecisionManager((params['basePath'] as string) ?? '.decisions');
+          await mgr.load();
+          return ok(await mgr.list());
         } catch {
-          return ok([]);
+          return fail('Decisions package not available');
         }
       },
     ),
@@ -1220,15 +1280,16 @@ function decisionsTools(): CatalogEntry[] {
       'decisions',
       [
         param('query', 'string', 'Search query'),
-        param('basePath', 'string', 'ADR directory path', false, '.'),
+        param('basePath', 'string', 'ADR base path', false, '.decisions'),
       ],
       async (params) => {
         try {
-          const dec = await import('@musubix2/decisions') as any;
-          const results = dec.searchADRs?.(params['query'] as string, params['basePath'] as string ?? '.');
-          return ok(results ?? []);
+          const { createDecisionManager } = await import('@musubix2/decisions');
+          const mgr = createDecisionManager((params['basePath'] as string) ?? '.decisions');
+          await mgr.load();
+          return ok(await mgr.search(params['query'] as string));
         } catch {
-          return ok([]);
+          return fail('Decisions package not available');
         }
       },
     ),

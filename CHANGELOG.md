@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] - 2026-07-09
+
+MCP ツール監査（ISSUE-18 継続）で判明した「存在しない export を呼び偽の空成功を返すツール群」の実 API 配線を開始。
+
+### Fixed
+
+- **MCP `sdd-core` の8ツールが偽の空/成功を返す問題を修正** — `sdd.requirements.create/validate/list`、`sdd.design.generate/verify`、`sdd.codegen.generate`、`sdd.test.generate`、`sdd.trace.verify` が `core.createRequirement?.()` 等の存在しない関数を呼び、フォールバックの空データを返していた。実 API（`createEARSValidator` / `MarkdownEARSParser` / `createDesignGenerator` / `createSOLIDValidator` / `createCodeGenerator` / `createUnitTestGenerator`）へ配線。`sdd.trace.verify` は渡された要件 ID とソースの `REQ-XXX-NNN` 参照から実カバレッジを算出
+- **MCP `decisions.create/list/search` を修正** — 存在しない `dec.createADR?.()` 等を呼んでいたのを `createDecisionManager()` の `load()`＋`create/list/search` に配線（永続化対応）
+- **MCP `synthesis.dsl.build/synthesize/version-space` を修正** — 存在しない `syn.buildDSL?.()` 等を、`createDSLBuilder`（ops パイプライン実行）/ `createSynthesisEngine`（例からルール合成）/ `createVersionSpaceManager`（正例・負例から仮説導出）へ配線
+
+### Known Issues
+
+- 残る MCP ツール（`code-analysis` / `ontology` の一部 / `research` / `neural` / `formal-verify` / `lean` / `workflow` / `skills` / `wake-sleep` / `dfg` / `library-learner`）も同様に存在しない export を呼んでおり、順次実 API へ配線予定（0.5.9 以降）
+
+### Tests
+
+- 上記 sdd-core / synthesis / decisions ツールの実データ検証テストを追加。全ワークスペース 1677 テスト green
+
 ## [0.5.7] - 2026-07-09
 
 MCP サーバー（Claude Code / GitHub Copilot 統合の主要経路）のドッグフーディングで発見した致命的バグを改修。
