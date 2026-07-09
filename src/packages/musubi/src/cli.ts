@@ -1116,10 +1116,13 @@ export async function handleCodegraph(
     }
     case 'impact': {
       // Transitive reverse reachability: which files are (in)directly affected
-      // if the target file changes / is compromised.
-      const filter = args[0];
+      // if the target file changes / is compromised. `--direct` limits output to
+      // depth-1 (immediate) dependents, which is the actionable set for core
+      // utilities whose transitive closure spans most of the codebase.
+      const directOnly = args.includes('--direct');
+      const filter = args.find((a) => !a.startsWith('--'));
       if (!filter) {
-        console.error('❌ Usage: musubix cg impact <path-fragment>');
+        console.error('❌ Usage: musubix cg impact <path-fragment> [--direct]');
         return ExitCode.VALIDATION_ERROR;
       }
       const { nodes, edges } = loadCodeGraphData();
@@ -1159,26 +1162,48 @@ export async function handleCodegraph(
         console.log(`No indexed file matches '${filter}'.`);
         return ExitCode.SUCCESS;
       }
+      const seedSet = new Set(seeds);
+      // Depth-1 dependents (immediate callers/importers of the seed files).
+      const direct = new Set<string>();
+      for (const s of seeds) {
+        for (const dep of dependents.get(s) ?? []) {
+          if (!seedSet.has(dep)) direct.add(dep);
+        }
+      }
       // BFS over reverse edges to find all transitively-affected files.
       const affected = new Set<string>();
       const queue = [...seeds];
       while (queue.length > 0) {
         const f = queue.shift()!;
         for (const dep of dependents.get(f) ?? []) {
-          if (!affected.has(dep)) {
+          if (!affected.has(dep) && !seedSet.has(dep)) {
             affected.add(dep);
             queue.push(dep);
           }
         }
       }
+      // Indirect = transitively affected but not a direct dependent.
+      const indirect = [...affected].filter((f) => !direct.has(f));
+
       console.log(`Impact of ${seeds.length} file(s) matching '${filter}':`);
       for (const s of seeds) console.log(`  ⦿ ${s}`);
       if (affected.size === 0) {
         console.log('  No other indexed files depend on these (no transitive impact found).');
-      } else {
-        console.log(`\n  ${affected.size} file(s) transitively affected:`);
-        for (const a of [...affected].sort()) console.log(`    ← ${a}`);
+        return ExitCode.SUCCESS;
       }
+      console.log(`\n  ${direct.size} direct dependent(s):`);
+      for (const a of [...direct].sort()) console.log(`    ← ${a}`);
+      if (directOnly) {
+        if (indirect.length > 0) {
+          console.log(`\n  (+${indirect.length} indirect; omitted — run without --direct to list)`);
+        }
+      } else if (indirect.length > 0) {
+        console.log(`\n  ${indirect.length} indirect (transitive) dependent(s):`);
+        for (const a of indirect.sort()) console.log(`    ← ${a}`);
+      }
+      console.log(
+        `\n  Total: ${affected.size} file(s) affected (${direct.size} direct, ${indirect.length} indirect).`,
+      );
       return ExitCode.SUCCESS;
     }
     case 'languages': {
@@ -2681,7 +2706,9 @@ export function getDefaultCommands(): CLICommand[] {
           return;
         }
         const sub = args['subcommand'] as string | undefined;
-        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        const positionalArgs = [...((args['args'] as string[] | undefined) ?? [])];
+        // Forward recognised flags so handleCodegraph can parse them uniformly.
+        if (args['direct'] === true) positionalArgs.push('--direct');
         return await handleCodegraph(sub, positionalArgs);
       },
     },

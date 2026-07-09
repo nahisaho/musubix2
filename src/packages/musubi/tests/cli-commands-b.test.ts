@@ -300,6 +300,16 @@ describe('CLI Commands B — Codegraph', () => {
       const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
       expect(out).toContain('mid.ts'); // directly depends on base
       expect(out).toContain('top.ts'); // transitively depends via mid
+      expect(out).toContain('direct dependent'); // v0.5.19: direct/indirect split
+      expect(out).toContain('indirect (transitive)');
+
+      // v0.5.19: --direct limits output to depth-1 dependents.
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['base.ts', '--direct'])).toBe(ExitCode.SUCCESS);
+      const dOut = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(dOut).toContain('mid.ts'); // direct dependent shown
+      expect(dOut).toContain('omitted'); // indirect suppressed with a note
+      expect(dOut).not.toContain('← ' + join(dir, 'top.ts')); // top (indirect) not listed
     } finally {
       process.chdir(prevCwd);
       rmSync(dir, { recursive: true, force: true });

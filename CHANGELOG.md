@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.19] - 2026-07-09
+
+`cg impact` に**直接／推移（indirect）依存の区別**と `--direct` フラグを追加。0.5.18 でコアユーティリティ（`lib/cmdline.c`）の影響範囲が 836 ファイルと出て「広すぎて actionable でない」問題に対応。
+
+### Added
+
+- **`cg impact <path> --direct`** — 深さ1（直接呼び出し／直接 import）の依存のみを表示。推移閉包が巨大になるコアユーティリティで、実際に手を入れるべき直接の呼び出し元を即座に把握できる
+- **直接／推移の内訳表示** — 通常の `cg impact` も「N direct / M indirect (transitive)」に分けて列挙し、末尾に `Total: X 件 (N direct, M indirect)` を表示
+
+### Fixed
+
+- グローバル引数パーサーが `--` フラグを吸収し、サブコマンドハンドラーに渡していなかった問題を修正（`cg` アクションで `--direct` をハンドラーへ転送）
+
+### Impact
+
+- `cg impact lib/cmdline.c` の出力が「835 件が推移的に影響」から「**21 direct / 814 indirect**」に分離。`--direct` で 21 件の実際の呼び出し元（`printk.c`/`profile.c`/`signal.c` は `get_option`、`crash_reserve.c`/`dma/*` は `memparse` など）だけを提示
+
+### Tests
+
+- musubi: 直接／推移の分離表示と `--direct` による推移依存の抑制を検証
+
 ## [0.5.18] - 2026-07-09
 
 CodeGraph にシンボルレベルの**コールグラフ（`calls`）エッジ抽出**を追加。0.5.17 で判明した「`cg impact`/`cg deps` が `#include` エッジしか辿らず、ヘッダー経由で多用途に呼ばれるモジュールを『孤立リーフ』と誤報告する」偽陰性を解消。
