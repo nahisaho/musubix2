@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.17] - 2026-07-09
+
+CodeGraph の C パーサーを全面修正（Linux カーネルコア dogfooding より）。実カーネルコード（`kernel/` + `lib/`、1018 ファイル）に対する検証で、関数定義がほぼ検出されず（1018 ファイルで 244 関数のみ）、`struct` の *使用箇所* を大量に誤ってノード化（44,786 個の偽 `class` ノード）していた問題を発見・修正。
+
+### Fixed
+
+- **C 関数定義の検出** — カーネル/K&R スタイルで `{` が次行にある場合や、引数リストが複数行にまたがる場合に関数定義を検出できなかった問題を修正。定義認識型の専用パーサー（`parseCLike`）を追加し、列 0 のシグネチャ・複数行引数・次行の `{` を正しく扱う。マクロ呼び出し（`EXPORT_SYMBOL(x)`）・プロトタイプ宣言・制御文（`if`/`for`/`return` 等）は関数として誤検出しない
+- **`struct`/`union`/`enum` の過剰ノード化** — フィールド・引数・ローカル変数中の型 *使用* をすべて `class` ノード化していたのを、*定義*（`tag {`）のみに限定。カーネルコアで偽ノードが 44,786 → 934 に減少
+- **ノード数の不整合** — `cg index` が報告するノード数（エンジンの重複排除後）と `.musubix/codegraph.json` に永続化される配列（重複あり）が食い違っていた問題を修正。ノード id / エッジ三つ組で重複排除してから永続化し、報告値＝永続化値に統一
+
+### Impact
+
+- Linux カーネルコアの再インデックスで検出関数が 244 → 22,027、偽 `class` ノードが 44,786 → 934、報告/永続化ノード数が一致（34,052）、`lib/cmdline.c` の全 5 関数を正しく検出（従来は 0 件）
+- `cg search` / `cg stats` が関数シンボルを実際に返せるようになった
+
+### Known limitation (次バージョン候補)
+
+- `cg deps` / `cg impact` は依然 `#include` エッジのみを辿るため、関数呼び出し（コールグラフ）の横断依存は追跡されない。ヘッダー経由で参照される多用途モジュールが「孤立リーフ」に見える偽陰性が残る。シンボルレベルの `calls` エッジ抽出が次の改善対象
+
+### Tests
+
+- codegraph: C 定義検出・マクロ/プロトタイプ除外・struct 定義限定の 3 ケースを追加（122 → 125）
+
 ## [0.5.16] - 2026-07-09
 
 CodeGraph に推移的到達可能性分析 `cg impact` を追加（Moodle 分析の続き）。

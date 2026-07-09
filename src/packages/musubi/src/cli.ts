@@ -1017,10 +1017,17 @@ export async function handleCodegraph(
           indexedFiles++;
         }
         // Persist so `cg search` / `cg stats` / `cg deps` operate on the graph.
-        saveCodeGraph(savedNodes, savedEdges);
-        const stats = engine.getStats();
+        // Dedupe by node id / edge triple so the reported counts match exactly
+        // what is persisted (the engine dedupes by id, savedNodes did not).
+        const uniqueNodes = Array.from(
+          new Map(savedNodes.map((n) => [n.id, n])).values(),
+        );
+        const uniqueEdges = Array.from(
+          new Map(savedEdges.map((e) => [`${e.from} ${e.to} ${e.kind}`, e])).values(),
+        );
+        saveCodeGraph(uniqueNodes, uniqueEdges);
         console.log(
-          `✅ Indexed ${targetPath}: ${indexedFiles} file(s), ${stats.nodeCount} nodes, ${stats.edgeCount} edges`,
+          `✅ Indexed ${targetPath}: ${indexedFiles} file(s), ${uniqueNodes.length} nodes, ${uniqueEdges.length} edges`,
         );
         console.log(`   Saved to ${CODEGRAPH_STATE_FILE}`);
       } catch (err) {

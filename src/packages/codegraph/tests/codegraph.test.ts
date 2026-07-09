@@ -113,6 +113,71 @@ describe('DES-CG-001: ASTParser', () => {
     expect(cls).toBeDefined();
     expect(cls!.startLine).toBeGreaterThan(0);
   });
+
+  // Kernel/C style: `{` on the next line, multi-line params, macro invocations.
+  const C_SOURCE = [
+    '#include <linux/string.h>',
+    '',
+    'struct point {',
+    '\tint x;',
+    '};',
+    '',
+    'static int counter = 0;',
+    '',
+    'int get_option(char **str, int *pint)',
+    '{',
+    '\treturn 1;',
+    '}',
+    'EXPORT_SYMBOL(get_option);',
+    '',
+    'unsigned long long memparse(const char *ptr,',
+    '\t\t\t    char **retptr)',
+    '{',
+    '\treturn 0;',
+    '}',
+    '',
+    'int prototype_only(int a);',
+    '',
+    'void caller(void)',
+    '{',
+    '\tif (counter)',
+    '\t\tget_option(0, 0);',
+    '}',
+  ].join('\n');
+
+  it('should detect C function definitions with brace on the next line', () => {
+    const parser = createASTParser();
+    const nodes = parser.parse(C_SOURCE, 'c');
+    const fns = nodes.filter((n) => n.kind === 'function').map((n) => n.name);
+    expect(fns).toContain('get_option');
+    expect(fns).toContain('memparse'); // multi-line params
+    expect(fns).toContain('caller');
+  });
+
+  it('should not treat C macro calls, prototypes or control statements as functions', () => {
+    const parser = createASTParser();
+    const nodes = parser.parse(C_SOURCE, 'c');
+    const fns = nodes.filter((n) => n.kind === 'function').map((n) => n.name);
+    expect(fns).not.toContain('EXPORT_SYMBOL'); // macro invocation
+    expect(fns).not.toContain('prototype_only'); // declaration, ends with ';'
+    expect(fns).not.toContain('if'); // control statement
+  });
+
+  it('should emit struct nodes only for definitions, not usages', () => {
+    const parser = createASTParser();
+    const usageHeavy = [
+      'struct mutex lock;', // usage (field/var) — must NOT be a node
+      'void f(struct file *filp)', // usage in a param
+      '{',
+      '}',
+      'struct real_def {', // definition — must be a node
+      '\tint v;',
+      '};',
+    ].join('\n');
+    const nodes = parser.parse(usageHeavy, 'c');
+    const classes = nodes.filter((n) => n.kind === 'class').map((n) => n.name);
+    expect(classes).toEqual(['real_def']);
+  });
 });
 
 // ---------------------------------------------------------------------------

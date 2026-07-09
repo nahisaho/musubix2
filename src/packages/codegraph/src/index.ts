@@ -268,7 +268,96 @@ export class ASTParser {
     if (this.enhancedParsing && this.multiLangParser) {
       return this.parseWithMultiLang(source, language);
     }
+    // C needs definition-aware, multi-line-signature handling that the generic
+    // line-by-line regex fallback cannot provide (kernel style puts `{` on the
+    // next line, and `struct X` appears far more often as a *usage* than a def).
+    if (language === 'c') {
+      return this.parseCLike(source);
+    }
     return this.parseWithRegex(source, language);
+  }
+
+  /**
+   * Definition-aware parser for C.
+   *
+   * Fixes three failures of the generic regex fallback on real C code:
+   *  1. Function definitions are detected even when `(` params span multiple
+   *     lines or the opening `{` sits on the next line (K&R kernel style).
+   *  2. `struct`/`union`/`enum` nodes are emitted only for *definitions*
+   *     (`tag {`), not for the vastly more common type *usages* in fields,
+   *     parameters and locals — which otherwise flood the graph with noise.
+   *  3. Macro invocations (`EXPORT_SYMBOL(x)`) and control statements are not
+   *     mistaken for function definitions.
+   */
+  private parseCLike(source: string): ASTNode[] {
+    const lines = source.split('\n');
+    const nodes: ASTNode[] = [];
+    const CONTROL = new Set([
+      'if', 'for', 'while', 'switch', 'return', 'sizeof', 'else', 'do',
+      'case', 'goto', 'typedef', 'else if',
+    ]);
+    const includeRe = /#include\s+[<"]([^>"]+)[>"]/;
+    const tagRe = /^(?:typedef\s+)?(?:struct|union|enum)\s+(\w+)\s*(\{|$)/;
+    const funcRe = /^([A-Za-z_][\w\s*]*?\s+\*?)([A-Za-z_]\w*)\s*\(/;
+    const varRe = /^(?:static\s+|const\s+|volatile\s+|extern\s+)*[A-Za-z_]\w*[\w\s*]*?\s+\*?([A-Za-z_]\w*)\s*[=;]/;
+
+    const nextNonEmptyIsBrace = (from: number): boolean => {
+      for (let j = from; j < lines.length && j < from + 3; j++) {
+        const t = lines[j].trim();
+        if (t === '') continue;
+        return t.startsWith('{');
+      }
+      return false;
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // #include — the only cross-file edge source we currently track.
+      const inc = includeRe.exec(line);
+      if (inc) {
+        nodes.push({ kind: 'import', name: inc[1], startLine: i + 1, endLine: i + 1, children: [] });
+        continue;
+      }
+
+      // struct/union/enum DEFINITION (brace here or on the next non-empty line).
+      const tag = tagRe.exec(line);
+      if (tag && (line.includes('{') || nextNonEmptyIsBrace(i + 1))) {
+        nodes.push({ kind: 'class', name: tag[1], startLine: i + 1, endLine: i + 1, children: [] });
+        continue;
+      }
+
+      // Only top-level (column 0) declarations can be definitions.
+      if (line.length === 0 || /^\s/.test(line) || /^[#*/]/.test(line)) {
+        continue;
+      }
+
+      // Function definition.
+      const fm = funcRe.exec(line);
+      if (fm) {
+        const retType = fm[1].trim();
+        const firstTok = retType.split(/\s+/)[0];
+        const name = fm[2];
+        const end = line.trimEnd();
+        const isDefinition =
+          !end.endsWith(';') && // not a prototype/declaration
+          (end.endsWith('{') || end.endsWith(')') || end.endsWith(',') || nextNonEmptyIsBrace(i + 1));
+        if (isDefinition && !CONTROL.has(firstTok) && !CONTROL.has(name)) {
+          nodes.push({ kind: 'function', name, startLine: i + 1, endLine: i + 1, children: [] });
+          continue;
+        }
+      }
+
+      // File-scope variable (global) — ends with `=` or `;`, no call parens.
+      if (!line.includes('(')) {
+        const vm = varRe.exec(line);
+        if (vm && !CONTROL.has(vm[1])) {
+          nodes.push({ kind: 'variable', name: vm[1], startLine: i + 1, endLine: i + 1, children: [] });
+        }
+      }
+    }
+
+    return nodes;
   }
 
   getSupportedLanguages(): SupportedLanguage[] {
