@@ -898,51 +898,82 @@ function researchTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const research = await import('@musubix2/deep-research') as any;
-          const result = research.query?.(params['topic'] as string, params['depth'] as string ?? 'medium');
-          return ok(result ?? { findings: [], topic: params['topic'] });
+          const { createResearchEngine } = await import('@musubix2/deep-research');
+          const sources = normalizeSources(params['sources']);
+          const result = createResearchEngine().research(
+            { topic: (params['topic'] as string) ?? '', depth: (params['depth'] as string ?? 'medium') as never },
+            sources,
+          );
+          return ok(result);
         } catch {
-          return ok({ findings: [], topic: params['topic'] });
+          return fail('Deep-research package not available');
         }
       },
     ),
     tool(
       'research.iterative',
-      'Perform iterative deep research with progressive refinement',
+      'Perform iterative research with progressive refinement over provided sources',
       'research',
       [
         param('topic', 'string', 'Research topic'),
-        param('iterations', 'number', 'Number of refinement iterations', false, 3),
+        param('depth', 'string', 'Depth: shallow | medium | deep', false, 'medium'),
+        param('sources', 'array', 'Sources as {title,type,relevance,content} objects'),
       ],
       async (params) => {
         try {
-          const research = await import('@musubix2/deep-research') as any;
-          const result = research.iterativeResearch?.(params['topic'] as string, params['iterations'] as number ?? 3);
-          return ok(result ?? { findings: [], iterations: 0, topic: params['topic'] });
+          const { createResearchEngine } = await import('@musubix2/deep-research');
+          const sources = normalizeSources(params['sources']);
+          const result = createResearchEngine().researchIterative(
+            { topic: (params['topic'] as string) ?? '', depth: (params['depth'] as string ?? 'medium') as never },
+            () => sources,
+          );
+          return ok(result);
         } catch {
-          return ok({ findings: [], iterations: 0, topic: params['topic'] });
+          return fail('Deep-research package not available');
         }
       },
     ),
     tool(
       'research.evidence',
-      'Generate evidence chain for a claim or hypothesis',
+      'Accumulate research results and retrieve evidence for a topic',
       'research',
       [
-        param('claim', 'string', 'Claim or hypothesis to evaluate'),
-        param('sources', 'array', 'Evidence sources to consider', false),
+        param('topic', 'string', 'Topic to gather evidence for'),
+        param('sources', 'array', 'Sources as {title,type,relevance,content} objects'),
       ],
       async (params) => {
         try {
-          const research = await import('@musubix2/deep-research') as any;
-          const result = research.generateEvidence?.(params['claim'] as string, params['sources'] as string[] | undefined);
-          return ok(result ?? { evidence: [], confidence: 0 });
+          const { createResearchEngine, createKnowledgeAccumulator } = await import('@musubix2/deep-research');
+          const sources = normalizeSources(params['sources']);
+          const topic = (params['topic'] as string) ?? '';
+          const result = createResearchEngine().research({ topic, depth: 'medium' }, sources);
+          const acc = createKnowledgeAccumulator();
+          acc.accumulate(result);
+          return ok({ evidence: acc.query(topic), summary: result.summary, confidence: result.confidence });
         } catch {
-          return ok({ evidence: [], confidence: 0 });
+          return fail('Deep-research package not available');
         }
       },
     ),
   ];
+}
+
+type NormalizedSource = { title: string; type: 'code' | 'documentation' | 'article' | 'api-reference'; relevance: number; content: string };
+
+// Coerce loosely-typed source input into ResearchSource objects.
+function normalizeSources(raw: unknown): NormalizedSource[] {
+  const valid = new Set(['code', 'documentation', 'article', 'api-reference']);
+  const arr = Array.isArray(raw) ? raw : [];
+  return arr.map((s, i) => {
+    const o = (s ?? {}) as Record<string, unknown>;
+    const t = String(o['type'] ?? 'documentation');
+    return {
+      title: String(o['title'] ?? `source-${i + 1}`),
+      type: (valid.has(t) ? t : 'documentation') as NormalizedSource['type'],
+      relevance: typeof o['relevance'] === 'number' ? (o['relevance'] as number) : 0.5,
+      content: String(o['content'] ?? (typeof s === 'string' ? s : '')),
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -953,52 +984,70 @@ function neuralTools(): CatalogEntry[] {
   return [
     tool(
       'neural.search',
-      'Neural similarity search across embeddings',
+      'Neural (TF-IDF) similarity search over provided documents',
       'neural',
       [
         param('query', 'string', 'Search query'),
+        param('documents', 'array', 'Documents to index: strings or {id,text} objects'),
         param('topK', 'number', 'Number of results', false, 10),
       ],
       async (params) => {
         try {
-          const ns = await import('@musubix2/neural-search') as any;
-          const results = ns.search?.(params['query'] as string, params['topK'] as number ?? 10);
-          return ok(results ?? []);
+          const { createNeuralSearchEngine, createTfIdfEmbeddingModel } = await import('@musubix2/neural-search');
+          const model = createTfIdfEmbeddingModel();
+          const engine = createNeuralSearchEngine();
+          const docs = (params['documents'] as Array<string | { id?: string; text?: string }>) ?? [];
+          const texts = docs.map((d) => (typeof d === 'string' ? d : d.text ?? ''));
+          // TF-IDF requires the corpus to be fitted before embedding.
+          const model2 = createTfIdfEmbeddingModel();
+          if (typeof (model2 as { fit?: (t: string[]) => void }).fit === 'function') {
+            (model2 as { fit: (t: string[]) => void }).fit(texts);
+          }
+          const embedder = (typeof (model2 as { fit?: unknown }).fit === 'function') ? model2 : model;
+          for (let i = 0; i < docs.length; i++) {
+            const d = docs[i];
+            const id = typeof d === 'string' ? `doc-${i}` : (d.id ?? `doc-${i}`);
+            engine.addDocument(id, await embedder.embed(texts[i]), { text: texts[i] });
+          }
+          const hits = engine.search(await embedder.embed((params['query'] as string) ?? ''), (params['topK'] as number) ?? 10);
+          return ok({ query: params['query'], hits });
         } catch {
-          return ok([]);
+          return fail('Neural-search package not available');
         }
       },
     ),
     tool(
       'neural.embed',
-      'Generate embeddings for text',
+      'Generate a TF-IDF embedding vector for text',
       'neural',
       [param('text', 'string', 'Text to embed')],
       async (params) => {
         try {
-          const ns = await import('@musubix2/neural-search') as any;
-          const embedding = ns.embed?.(params['text'] as string);
-          return ok(embedding ?? { vector: [], dimensions: 0 });
+          const { createTfIdfEmbeddingModel } = await import('@musubix2/neural-search');
+          const model = createTfIdfEmbeddingModel();
+          const text = (params['text'] as string) ?? '';
+          if (typeof (model as { fit?: (t: string[]) => void }).fit === 'function') {
+            (model as { fit: (t: string[]) => void }).fit([text]);
+          }
+          const vector = await model.embed(text);
+          return ok({ vector, dimensions: Array.isArray(vector) ? vector.length : (vector as { values?: number[] }).values?.length ?? 0 });
         } catch {
-          return ok({ vector: [], dimensions: 0 });
+          return fail('Neural-search package not available');
         }
       },
     ),
     tool(
       'neural.patterns.extract',
-      'Wake phase: extract patterns from code or data',
+      'Wake phase: extract patterns from a list of items',
       'neural',
-      [
-        param('source', 'string', 'Source code or data to extract patterns from'),
-        param('type', 'string', 'Pattern type: structural | behavioral | api', false, 'structural'),
-      ],
+      [param('items', 'array', 'Items (strings) to process for pattern extraction')],
       async (params) => {
         try {
-          const ws = await import('@musubix2/wake-sleep') as any;
-          const patterns = ws.extractPatterns?.(params['source'] as string, params['type'] as string ?? 'structural');
-          return ok(patterns ?? { patterns: [], type: params['type'] ?? 'structural' });
+          const { createWakePhase } = await import('@musubix2/wake-sleep');
+          const items = ((params['items'] as unknown[]) ?? []).map(String);
+          return ok(createWakePhase().process(items));
         } catch {
-          return ok({ patterns: [], type: params['type'] ?? 'structural' });
+          return fail('Wake-sleep package not available');
         }
       },
     ),
@@ -1006,32 +1055,30 @@ function neuralTools(): CatalogEntry[] {
       'neural.patterns.consolidate',
       'Sleep phase: consolidate and compress learned patterns',
       'neural',
-      [param('patterns', 'array', 'Patterns to consolidate', false)],
+      [param('patterns', 'array', 'Pattern strings to consolidate')],
       async (params) => {
         try {
-          const ws = await import('@musubix2/wake-sleep') as any;
-          const result = ws.consolidatePatterns?.(params['patterns'] as unknown[] | undefined);
-          return ok(result ?? { consolidated: [], count: 0 });
+          const { createSleepPhase } = await import('@musubix2/wake-sleep');
+          const patterns = ((params['patterns'] as unknown[]) ?? []).map(String);
+          return ok(createSleepPhase().consolidate(patterns));
         } catch {
-          return ok({ consolidated: [], count: 0 });
+          return fail('Wake-sleep package not available');
         }
       },
     ),
     tool(
       'neural.library.learn',
-      'Learn patterns from a library or framework',
+      'Learn reusable patterns from code snippets (E-graph library learning)',
       'neural',
-      [
-        param('library', 'string', 'Library name or path'),
-        param('depth', 'string', 'Analysis depth: api | usage | deep', false, 'api'),
-      ],
+      [param('snippets', 'array', 'Array of code snippet strings to learn from')],
       async (params) => {
         try {
-          const ll = await import('@musubix2/library-learner') as any;
-          const result = ll.learnLibrary?.(params['library'] as string, params['depth'] as string ?? 'api');
-          return ok(result ?? { patterns: [], library: params['library'] });
+          const { createLibraryLearner } = await import('@musubix2/library-learner');
+          const snippets = ((params['snippets'] as unknown[]) ?? []).map(String);
+          const patterns = createLibraryLearner().learn(snippets);
+          return ok({ patterns, count: patterns.length });
         } catch {
-          return ok({ patterns: [], library: params['library'] });
+          return fail('Library-learner package not available');
         }
       },
     ),
@@ -1222,27 +1269,49 @@ function formalVerifyTools(): CatalogEntry[] {
 // Workflow tools (from @musubix2/workflow-engine)
 // ---------------------------------------------------------------------------
 
+// Load/save the shared workflow state (matches the CLI's .musubix/workflow-state.json).
+async function loadTracker(basePath: string) {
+  const { createStateTracker } = await import('@musubix2/workflow-engine');
+  const { existsSync, readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const tracker = createStateTracker();
+  const file = join(basePath, '.musubix', 'workflow-state.json');
+  try {
+    if (existsSync(file)) tracker.restore(JSON.parse(readFileSync(file, 'utf-8')));
+  } catch { /* start fresh */ }
+  return { tracker, file };
+}
+async function saveTracker(tracker: { toJSON(): unknown }, file: string) {
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { dirname } = await import('node:path');
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify(tracker.toJSON(), null, 2), 'utf-8');
+}
+
 function workflowTools(): CatalogEntry[] {
   return [
     tool(
       'workflow.phase.current',
-      'Get the current SDD workflow phase',
+      'Get the current SDD workflow phase and approvals',
       'workflow',
       [param('basePath', 'string', 'Project base path', false, '.')],
       async (params) => {
         try {
-          const wf = await import('@musubix2/workflow-engine') as any;
-          const engine = wf.createWorkflowEngine?.(params['basePath'] as string ?? '.');
-          const phase = engine?.getCurrentPhase();
-          return ok(phase ?? { phase: 'requirements', index: 0 });
+          const { PHASE_ORDER } = await import('@musubix2/workflow-engine');
+          const { tracker } = await loadTracker((params['basePath'] as string) ?? '.');
+          const state = tracker.getState();
+          return ok({
+            currentPhase: state.currentPhase,
+            approvals: PHASE_ORDER.map((p) => ({ phase: p, approved: tracker.isApproved(p) })),
+          });
         } catch {
-          return ok({ phase: 'requirements', index: 0 });
+          return fail('Workflow-engine package not available');
         }
       },
     ),
     tool(
       'workflow.phase.transition',
-      'Transition to the next SDD workflow phase',
+      'Transition to a target SDD workflow phase (persisted)',
       'workflow',
       [
         param('targetPhase', 'string', 'Target phase to transition to'),
@@ -1250,47 +1319,53 @@ function workflowTools(): CatalogEntry[] {
       ],
       async (params) => {
         try {
-          const wf = await import('@musubix2/workflow-engine') as any;
-          const engine = wf.createWorkflowEngine?.(params['basePath'] as string ?? '.');
-          const result = engine?.transition(params['targetPhase'] as string);
-          return ok(result ?? { success: false, phase: params['targetPhase'] });
+          const { createPhaseController } = await import('@musubix2/workflow-engine');
+          const { tracker, file } = await loadTracker((params['basePath'] as string) ?? '.');
+          const result = await createPhaseController(tracker).transitionTo(params['targetPhase'] as never);
+          if (result.success) await saveTracker(tracker, file);
+          return ok(result);
         } catch {
-          return ok({ success: false, phase: params['targetPhase'] });
+          return fail('Workflow-engine package not available');
         }
       },
     ),
     tool(
       'workflow.gate.check',
-      'Check if a quality gate can be passed',
+      'Check whether the workflow can transition to a target phase (quality gates)',
       'workflow',
       [
-        param('gate', 'string', 'Gate name'),
+        param('targetPhase', 'string', 'Target phase to check'),
         param('basePath', 'string', 'Project base path', false, '.'),
       ],
       async (params) => {
         try {
-          const wf = await import('@musubix2/workflow-engine') as any;
-          const engine = wf.createWorkflowEngine?.(params['basePath'] as string ?? '.');
-          const result = engine?.checkGate(params['gate'] as string);
-          return ok(result ?? { passed: false, gate: params['gate'] });
+          const { createPhaseController } = await import('@musubix2/workflow-engine');
+          const { tracker } = await loadTracker((params['basePath'] as string) ?? '.');
+          const target = (params['targetPhase'] ?? params['gate']) as never;
+          const canTransition = await createPhaseController(tracker).canTransition(target);
+          return ok({ targetPhase: target, canTransition });
         } catch {
-          return ok({ passed: false, gate: params['gate'] });
+          return fail('Workflow-engine package not available');
         }
       },
     ),
     tool(
-      'workflow.tasks.list',
-      'List tasks for the current workflow phase',
+      'workflow.approve',
+      'Approve the current (or a named) SDD phase (persisted)',
       'workflow',
-      [param('basePath', 'string', 'Project base path', false, '.')],
+      [
+        param('phase', 'string', 'Phase to approve'),
+        param('basePath', 'string', 'Project base path', false, '.'),
+      ],
       async (params) => {
         try {
-          const wf = await import('@musubix2/workflow-engine') as any;
-          const engine = wf.createWorkflowEngine?.(params['basePath'] as string ?? '.');
-          const tasks = engine?.listTasks();
-          return ok(tasks ?? []);
+          const { tracker, file } = await loadTracker((params['basePath'] as string) ?? '.');
+          const phase = (params['phase'] as string) ?? tracker.getState().currentPhase;
+          tracker.approve(phase as never);
+          await saveTracker(tracker, file);
+          return ok({ phase, approved: true });
         } catch {
-          return ok([]);
+          return fail('Workflow-engine package not available');
         }
       },
     ),

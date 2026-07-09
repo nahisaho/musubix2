@@ -326,3 +326,66 @@ describe('v0.5.9 MCP tool wiring', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// v0.5.10 — research + neural + workflow wired to real APIs
+// ---------------------------------------------------------------------------
+
+describe('v0.5.10 MCP tool wiring', () => {
+  it('research.query researches over provided sources', async () => {
+    const r = await findTool('research', 'research.query').handler({
+      topic: 'EARS',
+      sources: [{ title: 'S1', type: 'article', relevance: 0.9, content: 'EARS is a requirements syntax.' }],
+    });
+    expect(r.success).toBe(true);
+    expect((r.data as { sources: unknown[] }).sources.length).toBe(1);
+    expect(typeof (r.data as { summary: string }).summary).toBe('string');
+  });
+
+  it('neural.search ranks the most relevant document first', async () => {
+    const r = await findTool('neural', 'neural.search').handler({
+      query: 'login',
+      documents: ['payment processing', 'login session token', 'unrelated text'],
+    });
+    expect(r.success).toBe(true);
+    const hits = (r.data as { hits: Array<{ metadata: { text: string } }> }).hits;
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].metadata.text).toContain('login');
+  });
+
+  it('neural.library.learn extracts a repeated pattern', async () => {
+    const r = await findTool('neural', 'neural.library.learn').handler({
+      snippets: ['function add(a,b){return a+b}', 'function add(x,y){return x+y}'],
+    });
+    expect((r.data as { count: number }).count).toBeGreaterThan(0);
+  });
+
+  it('neural.patterns.extract processes items (wake phase)', async () => {
+    const r = await findTool('neural', 'neural.patterns.extract').handler({ items: ['const x=1', 'const y=2'] });
+    expect((r.data as { processedItems: number }).processedItems).toBe(2);
+  });
+
+  it('workflow approve persists and phase.current reflects it', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'mcp-wf-'));
+    try {
+      const appr = await findTool('workflow', 'workflow.approve').handler({ phase: 'requirements', basePath: base });
+      expect((appr.data as { approved: boolean }).approved).toBe(true);
+      const cur = await findTool('workflow', 'workflow.phase.current').handler({ basePath: base });
+      const approvals = (cur.data as { approvals: Array<{ phase: string; approved: boolean }> }).approvals;
+      expect(approvals.find((a) => a.phase === 'requirements')?.approved).toBe(true);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('workflow.gate.check reports whether a transition is allowed', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'mcp-wf2-'));
+    try {
+      const r = await findTool('workflow', 'workflow.gate.check').handler({ targetPhase: 'design', basePath: base });
+      expect(r.success).toBe(true);
+      expect(typeof (r.data as { canTransition: boolean }).canTransition).toBe('boolean');
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});

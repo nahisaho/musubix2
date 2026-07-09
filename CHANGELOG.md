@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.10] - 2026-07-09
+
+MCP ツール実 API 配線・第3弾（ISSUE-18 継続）。research / neural / workflow を実装。
+
+### Fixed
+
+- **MCP `research` の3ツールを実 API へ配線** — `research.query` / `research.iterative` / `research.evidence` を `createResearchEngine`（`research` / `researchIterative`）と `createKnowledgeAccumulator` に配線。提供されたソースに対して実際に調査・要約・確信度・エビデンスを返す
+- **MCP `neural` の5ツールを実 API へ配線** — `neural.embed`（TF-IDF）/ `neural.search`（提供ドキュメントを索引し類似検索）/ `neural.patterns.extract`（wake フェーズ）/ `neural.patterns.consolidate`（sleep フェーズ）/ `neural.library.learn`（E-graph ライブラリ学習）。`createNeuralSearchEngine` / `createTfIdfEmbeddingModel` / `createWakePhase` / `createSleepPhase` / `createLibraryLearner` に配線
+- **MCP `workflow` の4ツールを実 API へ配線＋永続化** — `workflow.phase.current` / `workflow.phase.transition`（品質ゲート判定付き）/ `workflow.gate.check` / `workflow.approve` を `createStateTracker` / `createPhaseController` に配線し、`<basePath>/.musubix/workflow-state.json` に永続化（CLI と共有）。従来は存在しない `wf.createWorkflowEngine?.()` で空を返していた
+
+### Known Issues
+
+- 残る MCP ツール（`skills` / `formal-verify` / `lean`）は構造化入力や実行モデルの都合で未配線。順次対応予定（0.5.11 以降）。`skills` は SkillManager がインメモリのため MCP 越しの register/execute に設計上の制約あり
+
+### Tests
+
+- research / neural（検索ランキング・ライブラリ学習）/ workflow（承認永続化・ゲート判定）の実データ検証テストを追加。全ワークスペース 1687 テスト green
+
 ## [0.5.9] - 2026-07-09
 
 MCP ツール実 API 配線・第2弾（ISSUE-18 継続）。code-analysis と ontology を実装。

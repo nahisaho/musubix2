@@ -64,9 +64,10 @@ npx musubix2 mcp --transport sse     # HTTP/SSE transport
 ```
 
 The stdio server stays alive for the client session and exposes 61 tools across
-13 categories (`tools/list`). The `sdd-core`, `knowledge`, `security`,
-`code-analysis`, `ontology`, `synthesis`, and `decisions` tools run against real
-package APIs; the remaining groups are being wired incrementally.
+13 categories (`tools/list`). Most tool groups — `sdd-core`, `knowledge`,
+`security`, `code-analysis`, `ontology`, `synthesis`, `decisions`, `research`,
+`neural`, and `workflow` — run against real package APIs; `skills`,
+`formal-verify`, and `lean` are being wired incrementally.
 
 ### Development (from source)
 
