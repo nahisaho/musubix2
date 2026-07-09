@@ -1093,13 +1093,14 @@ describe('ASTParser backward compatibility', () => {
       `class Foo:\n    def bar(self):\n        pass`,
       'python',
     );
-    // Regex mode: class is detected at top level, but indented def
-    // is NOT detected because Python regex patterns require ^ (start of line)
+    // Regex mode: class detected at top level; indented `def` (a method) is
+    // captured as a flat function node (v0.5.31 — Python method resolution).
     const cls = nodes.find((n) => n.kind === 'class');
     expect(cls).toBeDefined();
-    expect(cls!.children.length).toBe(0); // regex doesn't nest
-    // Indented def doesn't match /^(?:async\s+)?def\s+(\w+)/ in regex mode
-    expect(nodes.length).toBe(1);
+    expect(cls!.children.length).toBe(0); // regex mode does not nest children
+    const bar = nodes.find((n) => n.kind === 'function' && n.name === 'bar');
+    expect(bar).toBeDefined();
+    expect(nodes.length).toBe(2); // class Foo + method bar
   });
 
   it('should support useEnhancedParsing() toggle', () => {

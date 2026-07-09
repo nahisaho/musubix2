@@ -536,6 +536,76 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.31: Python class method call resolution.
+  it('cg impact resolves Python method calls across files', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_py');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'service.py'), 'class Service:\n    def do_unique_work(self):\n        return 42\n');
+    writeFileSync(
+      join(dir, 'consumer.py'),
+      'from service import Service\ndef run():\n    s = Service()\n    return s.do_unique_work()\n',
+    );
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['service.py'])).toBe(ExitCode.SUCCESS);
+      expect(logSpy.mock.calls.map((c) => String(c[0])).join('\n')).toContain('consumer.py');
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // v0.5.31: candidates cycle penalty + path --all.
+  it('cg candidates penalises files in a dependency cycle', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_cyc_pen');
+    mkdirSync(dir, { recursive: true });
+    // solo.c: self-contained (no cycle). a.c ↔ b.c: mutual cycle.
+    writeFileSync(join(dir, 'solo.c'), 'int s1(int x)\n{\n\treturn x;\n}\nint s2(int x)\n{\n\treturn x;\n}\n');
+    writeFileSync(join(dir, 'a.c'), 'int b_fn(int);\nint a_fn(int x)\n{\n\treturn b_fn(x);\n}\n');
+    writeFileSync(join(dir, 'b.c'), 'int a_fn(int);\nint b_fn(int x)\n{\n\treturn a_fn(x);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('candidates', ['--json'])).toBe(ExitCode.SUCCESS);
+      const j = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+      const byFile = Object.fromEntries(j.candidates.map((c: { file: string; cyclePenalty: number }) =>
+        [c.file.split(/[\\/]/).pop(), c.cyclePenalty]));
+      expect(byFile['solo.c']).toBe(0);
+      expect(byFile['a.c']).toBeGreaterThan(0); // in a cycle → penalised
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('cg path --all lists multiple shortest paths', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_pathall');
+    mkdirSync(dir, { recursive: true });
+    // src → m1 → dst and src → m2 → dst: two distinct 2-hop paths.
+    writeFileSync(join(dir, 'dst.c'), 'int dst_fn(int x)\n{\n\treturn x;\n}\n');
+    writeFileSync(join(dir, 'm1.c'), 'int dst_fn(int);\nint m1_fn(int x)\n{\n\treturn dst_fn(x);\n}\n');
+    writeFileSync(join(dir, 'm2.c'), 'int dst_fn(int);\nint m2_fn(int x)\n{\n\treturn dst_fn(x);\n}\n');
+    writeFileSync(join(dir, 'src.c'), 'int m1_fn(int);\nint m2_fn(int);\nint src_fn(int x)\n{\n\treturn m1_fn(x) + m2_fn(x);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      expect(await handleCodegraph('path', ['src.c', 'dst.c', '--all', '--json'])).toBe(ExitCode.SUCCESS);
+      const j = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+      expect(j.hops).toBe(2);
+      expect(j.paths.length).toBe(2); // via m1 and via m2
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.24: cg cycles — detect circular file dependencies (SCCs).
   it('cg cycles detects mutual file dependencies', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_cycles');

@@ -1,0 +1,42 @@
+# Sample: enforce architecture rules with `musubix cg gate` in CI.
+#
+# This is a manually-triggered demonstration (workflow_dispatch) so it never
+# blocks normal CI. Copy it into your own repository, switch the trigger to
+# `pull_request`, and adjust the rules to fail the build on violations.
+name: Architecture Gate (sample)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Build the dependency graph for the source tree.
+      - name: Index code graph
+        run: npx --yes musubix2 cg index src/
+
+      # Fail the job (non-zero exit) on any new circular dependency or a
+      # forbidden layering edge. Tune the rules for your architecture.
+      - name: Enforce architecture rules
+        run: |
+          npx --yes musubix2 cg gate \
+            --max-cycles 0 \
+            --forbid "ui/:infra/,api/:ui/"
+
+      # Optional: attach a machine-readable report as a build artifact.
+      - name: Cycle report (JSON)
+        if: always()
+        run: npx --yes musubix2 cg cycles --json > cycles.json || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: architecture-report
+          path: cycles.json

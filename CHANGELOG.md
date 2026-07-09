@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.31] - 2026-07-10
+
+残バックログ 4 件をまとめて対応。
+
+### Added
+
+- **`cg path --all`** — 最短依存経路を 1 本ではなく全て（上位 20 本まで）列挙。BFS で全最短前任を記録し、複数ルートを表示（`--json` は `paths[]`）
+- **`.github/workflows/architecture-gate.yml`** — `cg gate` を CI で使う実サンプルワークフロー（`workflow_dispatch` 手動トリガーで通常 CI を妨げない）。index → gate → JSON レポート成果物の流れを提示
+
+### Changed
+
+- **`cg candidates` に循環ペナルティ** — スコアを `(functions + dependents) / (1 + external deps + cycle entanglement)` に変更。依存循環に絡むファイル（SCC サイズ−1）を減点し、`cyc` 列を追加。「実際に切り出せる」自己完結ファイルが上位に来る（カーネルコアでは巨大 SCC に属する `lib/string.c` が降格し `lib/rbtree.c` 等が上位化）
+
+### Fixed
+
+- **Python メソッド解決** — インデント付き `def`（クラスメソッド・ネスト関数）が正規表現 `^def` にマッチせず未検出だった問題を修正（`^\s*def` に変更）。Python のクラスメソッド呼び出し `obj.method()` が横断解決されるように
+- **組み込み名 denylist の非 C 言語対応** — `map`/`set`/`get`/`append`/`items` 等がユーザー定義に誤解決されるのを防ぐ denylist を、メソッドだけでなく**非 C ファイルで定義された関数**にも適用（Python/TS を保護）。C の同名関数エッジには引き続き無影響（カーネルコア calls 8,474 で不変）。Python コンテナ系メソッド名も denylist に追加
+
+### Validated
+
+- Java のメソッドは従来どおり検出・解決されることを確認（アクセス修飾子付きシグネチャ）
+
+### Docs
+
+- `docs/codegraph.md` に「言語サポート状況」節、`path --all`、candidates 循環ペナルティ、CI サンプルへのリンクを追記
+
+### Tests
+
+- codegraph: Python インデント `def` 検出の期待値を修正
+- musubi: Python メソッド解決、candidates 循環ペナルティ、`path --all` の複数経路を検証（72 → 75）
+
 ## [0.5.30] - 2026-07-10
 
 CodeGraph に**依存経路探索 `cg path`** を追加。2 ファイル間の最短依存チェーンを表示し、「なぜ A が B に依存するのか」を可視化する。

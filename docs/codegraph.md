@@ -72,13 +72,16 @@ npx musubix cg path src/api.ts src/db.ts
 #   ◉ src/api.ts
 #   → src/service.ts
 #   → src/db.ts
+npx musubix cg path src/api.ts src/db.ts --all   # every shortest path (up to 20)
 ```
 
 ### `cg candidates [N] [--json]`
 
 Ranks files for an isolated rewrite (e.g. to Rust): `score = (functions +
-dependents) / (1 + external deps)` — substantive, well-used, self-contained
-files first. Test/fixture files are excluded.
+dependents) / (1 + external deps + cycle entanglement)` — substantive,
+well-used, self-contained files first. Files tangled in a dependency cycle are
+penalised (the `cyc` column) because they cannot be extracted without also
+untangling the cycle. Test/fixture files are excluded.
 
 ```
   score   fns  deps  users  file
@@ -154,4 +157,17 @@ npx musubix cg cycles --json | jq '.count'
 ```
 
 The `gate` step fails the job (non-zero exit) when a new circular dependency or
-a forbidden layering edge is introduced.
+a forbidden layering edge is introduced. A ready-to-copy workflow lives at
+[`.github/workflows/architecture-gate.yml`](../.github/workflows/architecture-gate.yml).
+
+## Language support notes
+
+- **C** — full: functions (multi-line/K&R signatures), `static` linkage,
+  struct/union/enum definitions.
+- **TypeScript / JavaScript** — full: functions and class methods
+  (`obj.method()` resolves; standard-library names are never mistaken for user
+  methods).
+- **Python** — functions and class/nested `def` methods (indented) are captured
+  and resolved.
+- **Java, Go, Rust, and others** — function/method definitions via the
+  language parser; call-edge resolution uses the same unique-name heuristic.

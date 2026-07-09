@@ -143,8 +143,9 @@ const LANGUAGE_PATTERNS: Record<string, LanguagePatterns> = {
     { kind: 'variable', regex: /(?:export\s+)?(?:const|let|var)\s+(\w+)/ },
   ],
   python: [
-    { kind: 'class', regex: /^class\s+(\w+)/ },
-    { kind: 'function', regex: /^(?:async\s+)?def\s+(\w+)/ },
+    { kind: 'class', regex: /^\s*class\s+(\w+)/ },
+    // Allow leading indentation so class methods and nested defs are captured.
+    { kind: 'function', regex: /^\s*(?:async\s+)?def\s+(\w+)/ },
     { kind: 'import', regex: /^(?:from\s+(\S+)\s+import|import\s+(\S+))/ },
     { kind: 'variable', regex: /^(\w+)\s*(?::\s*\w+)?\s*=/ },
   ],

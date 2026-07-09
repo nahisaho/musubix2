@@ -967,6 +967,9 @@ const BUILTIN_CALL_NAMES = new Set<string>([
   'keys', 'values', 'entries', 'stringify', 'parse', 'now', 'test', 'exec',
   // console / logging
   'log', 'error', 'warn', 'info', 'debug', 'trace', 'assert',
+  // Python container / string built-in methods
+  'append', 'extend', 'insert', 'remove', 'count', 'update', 'items',
+  'setdefault', 'strip', 'lstrip', 'rstrip', 'format', 'encode', 'decode',
 ]);
 
 /**
@@ -1159,10 +1162,11 @@ const CG_SUBCOMMAND_HELP: Record<string, string> = {
     '  score = (functions + dependents) / (1 + external deps). Test files are\n' +
     '  excluded. N limits the number of rows (default 15). --json for automation.',
   path:
-    'musubix cg path <from-fragment> <to-fragment> [--json]\n' +
+    'musubix cg path <from-fragment> <to-fragment> [--all] [--json]\n' +
     '  Show the shortest dependency chain from a file matching <from> to one\n' +
     '  matching <to> (over depends-on edges). Answers "why does A need B?".\n' +
-    '  --json for machine-readable output.',
+    '    --all    list all shortest paths (up to 20), not just one\n' +
+    '    --json   machine-readable output',
   cycles:
     'musubix cg cycles [path-fragment] [N] [--json]\n' +
     '  Detect circular file dependencies (strongly-connected components of the\n' +
@@ -1238,9 +1242,11 @@ export async function handleCodegraph(
         // Every function name a file defines (static or global) — a call to such
         // a name binds locally in C and must not create a cross-file edge.
         const fileDefines = new Map<string, Set<string>>();
-        // Names defined as class methods (used to scope the built-in denylist so
-        // it never affects C function edges).
-        const methodDefNames = new Set<string>();
+        // Names defined by a NON-C file (methods, or functions in TS/JS/Python/…).
+        // Used to scope the built-in denylist: a built-in-collision like a user
+        // `get()`/`map()` is dropped for these, while genuine C functions named
+        // `get`/`sort`/… keep their call edges.
+        const nonCDefNames = new Set<string>();
         let indexedFiles = 0;
         for (const file of files) {
           const ext = file.split('.').pop() ?? '';
@@ -1266,6 +1272,7 @@ export async function handleCodegraph(
               const defined = fileDefines.get(file) ?? new Set<string>();
               defined.add(node.name);
               fileDefines.set(file, defined);
+              if (lang !== 'c') nonCDefNames.add(node.name);
               if (!isStatic) {
                 const set = globalFnToFiles.get(node.name) ?? new Set<string>();
                 set.add(file);
@@ -1296,7 +1303,7 @@ export async function handleCodegraph(
               const defined = fileDefines.get(file) ?? new Set<string>();
               defined.add(child.name);
               fileDefines.set(file, defined);
-              methodDefNames.add(child.name);
+              nonCDefNames.add(child.name);
               const set = globalFnToFiles.get(child.name) ?? new Set<string>();
               set.add(file);
               globalFnToFiles.set(child.name, set);
@@ -1317,7 +1324,7 @@ export async function handleCodegraph(
             // Built-in method/global names (Array/Map/Set/Promise/console, …)
             // collide with user *method* names and would produce spurious edges.
             // Scoped to method-defined names so C function edges are unaffected.
-            if (methodDefNames.has(name) && BUILTIN_CALL_NAMES.has(name)) continue;
+            if (nonCDefNames.has(name) && BUILTIN_CALL_NAMES.has(name)) continue;
             if (localDefs?.has(name)) continue; // local binding (static/own def)
             const defs = globalFnToFiles.get(name);
             if (!defs || defs.size !== 1) continue; // undefined or ambiguous global
@@ -1440,17 +1447,24 @@ export async function handleCodegraph(
         set.add(e.from);
         dependents.set(target, set);
       }
+      // A file tangled in a dependency cycle is harder to extract in isolation.
+      // Map each cyclic file → (its SCC size − 1) as an extraction penalty.
+      const cyclePenalty = new Map<string, number>();
+      for (const scc of findDependencyCycles(nodes, edges)) {
+        for (const f of scc) cyclePenalty.set(f, scc.length - 1);
+      }
       // Score: reward logic (functions) and being depended-upon; penalise the
-      // external deps you would also have to port. Only files with functions.
-      type Cand = { file: string; fns: number; deps: number; users: number; score: number };
+      // external deps you would also have to port and any cycle entanglement.
+      type Cand = { file: string; fns: number; deps: number; users: number; cycle: number; score: number };
       const cands: Cand[] = [];
       for (const [file, fns] of fnCount) {
         if (fns < 1 || isTestFile(file)) continue; // skip test/fixture files
         const deps = extDeps.get(file)?.size ?? 0;
         const users = dependents.get(file)?.size ?? 0;
-        // Self-contained + substantive + used ⇒ higher score.
-        const score = (fns + users) / (1 + deps);
-        cands.push({ file, fns, deps, users, score });
+        const cycle = cyclePenalty.get(file) ?? 0;
+        // Self-contained + substantive + used ⇒ higher; cycle entanglement lowers.
+        const score = (fns + users) / (1 + deps + cycle);
+        cands.push({ file, fns, deps, users, cycle, score });
       }
       cands.sort((a, b) => b.score - a.score);
       if (args.includes('--json')) {
@@ -1458,16 +1472,16 @@ export async function handleCodegraph(
           total: cands.length,
           candidates: cands.slice(0, limit).map((c) => ({
             file: c.file, functions: c.fns, externalDeps: c.deps, dependents: c.users,
-            score: Number(c.score.toFixed(3)),
+            cyclePenalty: c.cycle, score: Number(c.score.toFixed(3)),
           })),
         }, null, 2));
         return ExitCode.SUCCESS;
       }
-      console.log(`Rewrite candidates (top ${Math.min(limit, cands.length)} of ${cands.length}, by self-containment × usage):`);
-      console.log(`  ${'score'.padStart(7)}  ${'fns'.padStart(4)}  ${'deps'.padStart(4)}  ${'users'.padStart(5)}  file`);
+      console.log(`Rewrite candidates (top ${Math.min(limit, cands.length)} of ${cands.length}, by self-containment × usage, minus cycle entanglement):`);
+      console.log(`  ${'score'.padStart(7)}  ${'fns'.padStart(4)}  ${'deps'.padStart(4)}  ${'users'.padStart(5)}  ${'cyc'.padStart(4)}  file`);
       for (const c of cands.slice(0, limit)) {
         console.log(
-          `  ${c.score.toFixed(1).padStart(7)}  ${String(c.fns).padStart(4)}  ${String(c.deps).padStart(4)}  ${String(c.users).padStart(5)}  ${c.file}`,
+          `  ${c.score.toFixed(1).padStart(7)}  ${String(c.fns).padStart(4)}  ${String(c.deps).padStart(4)}  ${String(c.users).padStart(5)}  ${String(c.cycle).padStart(4)}  ${c.file}`,
         );
       }
       return ExitCode.SUCCESS;
@@ -1613,11 +1627,12 @@ export async function handleCodegraph(
       // Shortest dependency chain from a file matching <from> to one matching
       // <to>, over forward (depends-on) file edges. Answers "why does A need B?"
       const asJson = args.includes('--json');
+      const showAll = args.includes('--all');
       const positional = args.filter((a) => !a.startsWith('--'));
       const fromFrag = positional[0];
       const toFrag = positional[1];
       if (!fromFrag || !toFrag) {
-        console.error('❌ Usage: musubix cg path <from-fragment> <to-fragment> [--json]');
+        console.error('❌ Usage: musubix cg path <from-fragment> <to-fragment> [--all] [--json]');
         return ExitCode.VALIDATION_ERROR;
       }
       const { nodes, edges } = loadCodeGraphData();
@@ -1639,34 +1654,65 @@ export async function handleCodegraph(
         console.log(`No indexed file matches '${fromFrag}'.`);
         return ExitCode.SUCCESS;
       }
-      // Multi-source BFS to the nearest target file.
-      const prev = new Map<string, string | null>();
+      // Multi-source BFS recording distance and ALL shortest predecessors.
+      const dist = new Map<string, number>();
+      const preds = new Map<string, string[]>();
       const queue: string[] = [];
-      for (const f of froms) { prev.set(f, null); queue.push(f); }
-      let found: string | undefined;
-      // A `from` file that is itself a target is a zero-hop path.
-      for (const f of froms) if (isTarget(f)) { found = f; break; }
-      while (!found && queue.length > 0) {
+      for (const f of froms) { dist.set(f, 0); preds.set(f, []); queue.push(f); }
+      while (queue.length > 0) {
         const f = queue.shift()!;
+        const d = dist.get(f)!;
         for (const dep of adj.get(f) ?? []) {
-          if (prev.has(dep)) continue;
-          prev.set(dep, f);
-          if (isTarget(dep)) { found = dep; break; }
-          queue.push(dep);
+          if (!dist.has(dep)) {
+            dist.set(dep, d + 1);
+            preds.set(dep, [f]);
+            queue.push(dep);
+          } else if (dist.get(dep) === d + 1) {
+            preds.get(dep)!.push(f); // another shortest path into dep
+          }
         }
       }
-      if (!found) {
-        if (asJson) console.log(JSON.stringify({ from: fromFrag, to: toFrag, path: null }, null, 2));
+      // Nearest target(s) at the minimum reachable distance.
+      const targets = allFiles.filter((f) => isTarget(f) && dist.has(f));
+      const minDist = targets.length ? Math.min(...targets.map((f) => dist.get(f)!)) : Infinity;
+      const nearest = targets.filter((f) => dist.get(f) === minDist);
+      if (nearest.length === 0) {
+        if (asJson) console.log(JSON.stringify({ from: fromFrag, to: toFrag, paths: [] }, null, 2));
         else console.log(`No dependency path from '${fromFrag}' to '${toFrag}'.`);
         return ExitCode.SUCCESS;
       }
-      const path: string[] = [];
-      for (let n: string | null | undefined = found; n != null; n = prev.get(n)) path.unshift(n);
+      // Reconstruct shortest paths (all if --all, else one), capped.
+      const CAP = showAll ? 20 : 1;
+      const paths: string[][] = [];
+      const build = (node: string, tail: string[]) => {
+        if (paths.length >= CAP) return;
+        const chain = [node, ...tail];
+        const ps = preds.get(node) ?? [];
+        if (ps.length === 0) { paths.push(chain); return; }
+        for (const p of ps) {
+          if (paths.length >= CAP) return;
+          build(p, chain);
+        }
+      };
+      for (const t of nearest) {
+        if (paths.length >= CAP) break;
+        build(t, []);
+      }
       if (asJson) {
-        console.log(JSON.stringify({ from: fromFrag, to: toFrag, hops: path.length - 1, path }, null, 2));
+        console.log(JSON.stringify({
+          from: fromFrag, to: toFrag, hops: minDist,
+          paths: showAll ? paths : undefined,
+          path: showAll ? undefined : paths[0],
+        }, null, 2));
+      } else if (showAll) {
+        console.log(`${paths.length} shortest dependency path(s) (${minDist} hop(s) each):`);
+        paths.forEach((p, i) => {
+          console.log(`\n  Path ${i + 1}:`);
+          p.forEach((f, j) => console.log(`    ${j === 0 ? '◉' : '→'} ${f}`));
+        });
       } else {
-        console.log(`Dependency path (${path.length - 1} hop(s)):`);
-        path.forEach((f, i) => console.log(`  ${i === 0 ? '◉' : '→'} ${f}`));
+        console.log(`Dependency path (${minDist} hop(s)):`);
+        paths[0].forEach((f, i) => console.log(`  ${i === 0 ? '◉' : '→'} ${f}`));
       }
       return ExitCode.SUCCESS;
     }
@@ -3447,6 +3493,7 @@ export function getDefaultCommands(): CLICommand[] {
         if (args['max-cycles'] !== undefined) positionalArgs.push('--max-cycles', String(args['max-cycles']));
         if (args['forbid'] !== undefined) positionalArgs.push('--forbid', String(args['forbid']));
         if (args['cluster'] === true) positionalArgs.push('--cluster');
+        if (args['all'] === true) positionalArgs.push('--all');
         return await handleCodegraph(sub, positionalArgs);
       },
     },
