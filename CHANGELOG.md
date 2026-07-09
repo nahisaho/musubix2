@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-07-09
+
+ドッグフーディングで残課題としていた3つの機能ギャップ（スタブ/データ未連携）を実装。
+
+### Added
+
+- **`trace matrix` / `trace:verify` の実データ連携** — 従来は常に空入力で「100%」を返していたが、要件定義書（`storage/specs/requirements.md`、`--specs` で変更可）から `REQ-XXX-NNN` を抽出し、ソース（`--src`、既定 `src`）内の `REQ-` 参照を走査して**要件→コードの実カバレッジ**を算出。未参照要件をギャップとして列挙。`trace:verify --strict` で未カバー時に非ゼロ終了（品質ゲート）
+- **`ontology add` / `ontology list` と永続化** — トリプルを追加する CLI が無く `stats` が常に0だった。`ontology add <s> <p> <o>` を追加し、`.musubix/ontology.json` に永続化。`list`/`stats`/`validate` は保存済みトリプルを読み込む（空時は「データ無し」を明示）
+- **`synthesis dsl --ops` による実変換** — 従来は入力をそのまま返すだけ（空パイプライン）だった。`--ops trim,camelCase,replace:from:to,...` で変換パイプラインを構築し実行。ops 未指定時は明示エラー（サイレントエコーを廃止）
+
+### Tests
+
+- trace 実カバレッジ・`--strict` ゲート、ontology 永続化、synthesis DSL パイプラインのテストを追加。全ワークスペース 1664 テスト green
+
 ## [0.5.5] - 2026-07-09
 
 v0.5.4 の再ドッグフーディングで、残っていたディレクトリ入力クラッシュを改修。

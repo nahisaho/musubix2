@@ -396,10 +396,22 @@ describe('CLI Commands C — Synthesis', () => {
     errSpy.mockRestore();
   });
 
-  it('synthesis dsl returns SUCCESS with input', async () => {
-    const code = await handleSynthesis('dsl', ['map x => x + 1']);
+  // v0.5.6: dsl applies a real transform pipeline given via --ops.
+  it('synthesis dsl applies the --ops pipeline', async () => {
+    const code = await handleSynthesis('dsl', ['  hello world  '], { ops: 'trim,camelCase' });
     expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('DSL output'));
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('helloWorld');
+  });
+
+  it('synthesis dsl without --ops returns a validation error (no more silent echo)', async () => {
+    const code = await handleSynthesis('dsl', ['hello'], {});
+    expect(code).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
+  it('synthesis dsl rejects an unknown op', async () => {
+    const code = await handleSynthesis('dsl', ['hello'], { ops: 'bogus' });
+    expect(code).toBe(ExitCode.VALIDATION_ERROR);
   });
 
   it('synthesis dsl returns GENERAL_ERROR without input', async () => {

@@ -72,9 +72,17 @@ describe('CLI Commands B — Trace:verify', () => {
   });
 
   it('trace:verify returns SUCCESS and prints coverage', async () => {
-    const code = await handleTraceVerify();
-    expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Coverage'));
+    const fx = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_tv');
+    mkdirSync(join(fx, 'src'), { recursive: true });
+    writeFileSync(join(fx, 'reqs.md'), '## REQ-AUT-001: Login\n');
+    writeFileSync(join(fx, 'src', 'a.ts'), '// @see REQ-AUT-001\nexport const a = 1;\n');
+    try {
+      const code = await handleTraceVerify({ specs: join(fx, 'reqs.md'), src: join(fx, 'src') });
+      expect(code).toBe(ExitCode.SUCCESS);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Coverage'));
+    } finally {
+      rmSync(fx, { recursive: true, force: true });
+    }
   });
 });
 
@@ -144,10 +152,12 @@ describe('CLI Commands B — Ontology', () => {
     logSpy.mockRestore();
   });
 
-  it('ontology validate returns SUCCESS', async () => {
+  it('ontology validate returns SUCCESS (empty store reports no data)', async () => {
     const code = await handleOntology('validate');
     expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Consistent'));
+    // With no persisted triples the command is honest instead of asserting
+    // consistency of nothing.
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('No triples stored'));
   });
 
   it('ontology stats returns SUCCESS', async () => {
@@ -459,14 +469,105 @@ describe('v0.5.2 CLI fixes', () => {
     expect(code).toBe(ExitCode.VALIDATION_ERROR);
   });
 
-  // ISSUE-9
+  // ISSUE-9 — point at a nonexistent specs file so the dataset is empty.
   it('trace:verify does not claim 100% on empty data', async () => {
-    const code = await handleTraceVerify();
+    const code = await handleTraceVerify({ specs: 'no/such/requirements.md', src: 'no/such/src' });
     expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('No traceability data'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('nothing to verify'));
     const claimed100 = logSpy.mock.calls.some((c) =>
       typeof c[0] === 'string' && c[0].includes('Coverage: 100%'),
     );
     expect(claimed100).toBe(false);
+  });
+});
+
+// ── v0.5.6: real-data trace + ontology persistence ─────────────────────────
+
+describe('v0.5.6 trace real data', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  const base = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_trace');
+  const specs = join(base, 'requirements.md');
+  const src = join(base, 'src');
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mkdirSync(src, { recursive: true });
+    writeFileSync(
+      specs,
+      ['## REQ-AUT-001: Login', '## REQ-TSK-001: Task', '## REQ-RLT-001: Realtime'].join('\n'),
+    );
+    writeFileSync(join(src, 'auth.ts'), '// @see REQ-AUT-001\nexport const a = 1;\n');
+    writeFileSync(join(src, 'task.ts'), '// REQ-TSK-001\nexport const t = 1;\n');
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    errSpy.mockRestore();
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  it('trace:verify computes real coverage and lists gaps', async () => {
+    const code = await handleTraceVerify({ specs, src });
+    expect(code).toBe(ExitCode.SUCCESS);
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('Coverage: 67%');
+    expect(printed).toContain('REQ-RLT-001'); // the uncovered one
+  });
+
+  it('trace:verify --strict fails when a requirement is uncovered', async () => {
+    const code = await handleTraceVerify({ specs, src, strict: true });
+    expect(code).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
+  it('trace matrix reports coverage from real references', async () => {
+    const code = await handleTrace('matrix', [], { specs, src });
+    expect(code).toBe(ExitCode.SUCCESS);
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('referenced in code: 2');
+  });
+});
+
+describe('v0.5.6 ontology persistence', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  let dir: string;
+  let prevCwd: string;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_onto');
+    mkdirSync(dir, { recursive: true });
+    prevCwd = process.cwd();
+    process.chdir(dir);
+  });
+
+  afterEach(() => {
+    process.chdir(prevCwd);
+    logSpy.mockRestore();
+    errSpy.mockRestore();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('add persists triples across separate handler calls', async () => {
+    expect(await handleOntology('add', ['Dog', 'rdfs:subClassOf', 'Animal'])).toBe(ExitCode.SUCCESS);
+    expect(await handleOntology('add', ['Cat', 'rdfs:subClassOf', 'Animal'])).toBe(ExitCode.SUCCESS);
+    logSpy.mockClear();
+    await handleOntology('stats', []);
+    expect(logSpy).toHaveBeenCalledWith('Triples: 2');
+  });
+
+  it('add rejects a missing operand', async () => {
+    expect(await handleOntology('add', ['Dog'])).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
+  it('list shows stored triples', async () => {
+    await handleOntology('add', ['A', 'rel', 'B']);
+    logSpy.mockClear();
+    await handleOntology('list', []);
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('A —[rel]→ B');
   });
 });

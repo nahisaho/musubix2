@@ -14,7 +14,6 @@ import {
   createTraceabilityManager,
   createMatrixGenerator,
   createImpactAnalyzer,
-  createTraceabilityValidator,
 } from '@musubix2/core';
 import {
   PolicyEngine,
@@ -130,12 +129,12 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'タスク管理',
   },
   trace: {
-    usage: 'musubix trace <matrix|validate|impact> [args]',
-    description: 'トレーサビリティ',
+    usage: 'musubix trace <matrix|validate|impact> [--specs <file>] [--src <dir>]',
+    description: 'トレーサビリティ（要件 → コードの REQ-ID 参照を解析）',
   },
   'trace:verify': {
-    usage: 'musubix trace:verify',
-    description: 'トレーサビリティ検証',
+    usage: 'musubix trace:verify [--specs <file>] [--src <dir>] [--strict]',
+    description: 'トレーサビリティ検証（未参照要件を検出）',
   },
   policy: {
     usage: 'musubix policy <validate|list|info> [args]',
@@ -150,7 +149,7 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'プロジェクト状況',
   },
   ontology: {
-    usage: 'musubix ontology <validate|stats>',
+    usage: 'musubix ontology <add|list|validate|stats> [args]',
     description: 'オントロジー管理',
   },
   cg: {
@@ -526,18 +525,89 @@ export async function handleInit(
 
 // ── Trace handler ──────────────────────────────────────────────────────────
 
+/** Matches a MUSUBIX requirement id such as REQ-AUT-001. */
+const REQ_ID_RE = /REQ-[A-Z]{3}-\d{3}/g;
+
+interface CodeTraceData {
+  requirementIds: string[];
+  fileIds: string[];
+  links: Array<{ source: string; target: string; verified: boolean }>;
+  refsByReq: Map<string, string[]>;
+}
+
+/**
+ * Build real traceability data by parsing requirement ids from the specs file
+ * and scanning source files for `REQ-XXX-NNN` references. A requirement is
+ * "covered" when at least one source file references it.
+ */
+export function buildCodeTraceData(specsFile: string, srcDir: string): CodeTraceData {
+  const reqIds: string[] = [];
+  if (existsSync(specsFile)) {
+    const content = readFileSync(specsFile, 'utf-8');
+    for (const line of content.split('\n')) {
+      const m = line.match(/^#{1,4}\s+(REQ-[A-Z]{3}-\d{3})\b/);
+      if (m) reqIds.push(m[1]);
+    }
+    if (reqIds.length === 0) {
+      // Fallback: any requirement id anywhere in the specs document.
+      for (const m of content.matchAll(REQ_ID_RE)) reqIds.push(m[0]);
+    }
+  }
+  const requirementIds = [...new Set(reqIds)];
+  const reqSet = new Set(requirementIds);
+
+  const refsByReq = new Map<string, string[]>();
+  const fileSet = new Set<string>();
+  const links: CodeTraceData['links'] = [];
+  if (existsSync(srcDir)) {
+    for (const file of collectFiles(srcDir, (ext) => ext in EXT_TO_LANG)) {
+      const code = readFileSync(file, 'utf-8');
+      const refs = new Set<string>();
+      for (const m of code.matchAll(REQ_ID_RE)) {
+        if (reqSet.has(m[0])) refs.add(m[0]);
+      }
+      for (const reqId of refs) {
+        fileSet.add(file);
+        links.push({ source: reqId, target: file, verified: false });
+        const arr = refsByReq.get(reqId) ?? [];
+        arr.push(file);
+        refsByReq.set(reqId, arr);
+      }
+    }
+  }
+  return { requirementIds, fileIds: [...fileSet].sort(), links, refsByReq };
+}
+
+function resolveTraceInputs(flags: Record<string, unknown>): { specsFile: string; srcDir: string } {
+  return {
+    specsFile: (flags['specs'] as string | undefined) ?? 'storage/specs/requirements.md',
+    srcDir: (flags['src'] as string | undefined) ?? (existsSync('src') ? 'src' : '.'),
+  };
+}
+
 export async function handleTrace(
   sub: string | undefined,
   args: string[],
+  flags: Record<string, unknown> = {},
 ): Promise<ExitCodeValue> {
   switch (sub) {
     case 'matrix': {
+      const { specsFile, srcDir } = resolveTraceInputs(flags);
+      const data = buildCodeTraceData(specsFile, srcDir);
+      if (data.requirementIds.length === 0) {
+        console.log(`No requirements found in ${specsFile} — nothing to trace.`);
+        console.log('ℹ Pass --specs <file> to point at your requirements document.');
+        return ExitCode.SUCCESS;
+      }
       const generator = createMatrixGenerator();
-      const report = generator.generate([], [], []);
+      const report = generator.generate(data.requirementIds, data.fileIds, data.links);
       console.log(generator.toMarkdown(report));
-      // The generator currently operates on empty inputs; be explicit rather
-      // than presenting an empty matrix as a complete one.
-      console.log('\nℹ No traceability data loaded — matrix is empty (completeness is N/A).');
+      const covered = data.requirementIds.filter((r) => (data.refsByReq.get(r)?.length ?? 0) > 0);
+      const pct = Math.round((covered.length / data.requirementIds.length) * 100);
+      console.log(
+        `\nRequirements: ${data.requirementIds.length}, referenced in code: ${covered.length} ` +
+          `(${pct}%), source files: ${data.fileIds.length} (scanned ${srcDir}).`,
+      );
       return ExitCode.SUCCESS;
     }
     case 'validate': {
@@ -569,24 +639,29 @@ export async function handleTrace(
 
 // ── Trace:verify handler ───────────────────────────────────────────────────
 
-export async function handleTraceVerify(): Promise<ExitCodeValue> {
-  const validator = createTraceabilityValidator();
-  const report = validator.validateCoverage([], [], [], []);
-  if (report.totalRequirements === 0) {
+export async function handleTraceVerify(
+  flags: Record<string, unknown> = {},
+): Promise<ExitCodeValue> {
+  const { specsFile, srcDir } = resolveTraceInputs(flags);
+  const data = buildCodeTraceData(specsFile, srcDir);
+  if (data.requirementIds.length === 0) {
     // Avoid the misleading "100% / No gaps" on an empty dataset.
-    console.log('No traceability data loaded — nothing to verify.');
+    console.log(`No requirements found in ${specsFile} — nothing to verify.`);
     console.log('ℹ Coverage cannot be computed with 0 requirements (reported as N/A).');
     return ExitCode.SUCCESS;
   }
-  console.log(`Coverage: ${report.coveragePercent}%`);
-  console.log(`Requirements: ${report.coveredRequirements}/${report.totalRequirements}`);
-  if (report.gaps.length > 0) {
-    console.log('Gaps:');
-    for (const gap of report.gaps) {
-      console.log(`  - ${JSON.stringify(gap)}`);
-    }
+  const covered = data.requirementIds.filter((r) => (data.refsByReq.get(r)?.length ?? 0) > 0);
+  const gaps = data.requirementIds.filter((r) => (data.refsByReq.get(r)?.length ?? 0) === 0);
+  const pct = Math.round((covered.length / data.requirementIds.length) * 100);
+  console.log(`Coverage: ${pct}%`);
+  console.log(`Requirements: ${covered.length}/${data.requirementIds.length} referenced in ${srcDir}`);
+  if (gaps.length > 0) {
+    console.log('Gaps (requirements not referenced in code):');
+    for (const id of gaps) console.log(`  - ${id}`);
+    // `--strict` turns uncovered requirements into a failing quality gate.
+    if (flags['strict'] === true) return ExitCode.VALIDATION_ERROR;
   } else {
-    console.log('No gaps found');
+    console.log('No gaps found — every requirement is referenced in code.');
   }
   return ExitCode.SUCCESS;
 }
@@ -643,23 +718,84 @@ export async function handlePolicy(
 
 // ── Ontology handler ───────────────────────────────────────────────────────
 
-export async function handleOntology(sub: string | undefined): Promise<ExitCodeValue> {
+const ONTOLOGY_STATE_FILE = '.musubix/ontology.json';
+
+interface StoredTriple {
+  subject: string;
+  predicate: string;
+  object: string;
+}
+
+/** Load persisted triples into a fresh store so state survives across runs. */
+function loadOntologyStore(): ReturnType<typeof createOntologyStore> {
+  const store = createOntologyStore();
+  try {
+    if (existsSync(ONTOLOGY_STATE_FILE)) {
+      const triples = JSON.parse(readFileSync(ONTOLOGY_STATE_FILE, 'utf-8')) as StoredTriple[];
+      store.addTriples(triples);
+    }
+  } catch {
+    // Corrupt/unreadable — start empty.
+  }
+  return store;
+}
+
+function saveOntologyStore(store: ReturnType<typeof createOntologyStore>): void {
+  mkdirSync(dirnamePath(ONTOLOGY_STATE_FILE), { recursive: true });
+  writeFileSync(ONTOLOGY_STATE_FILE, JSON.stringify(store.getAll(), null, 2), 'utf-8');
+}
+
+export async function handleOntology(
+  sub: string | undefined,
+  args: string[] = [],
+): Promise<ExitCodeValue> {
   switch (sub) {
+    case 'add': {
+      const [subject, predicate, object] = args;
+      if (!subject || !predicate || !object) {
+        console.error('❌ Usage: musubix ontology add <subject> <predicate> <object>');
+        return ExitCode.VALIDATION_ERROR;
+      }
+      const store = loadOntologyStore();
+      store.addTriple({ subject, predicate, object });
+      saveOntologyStore(store);
+      console.log(`✅ Added triple: ${subject} —[${predicate}]→ ${object}`);
+      console.log(`   Total triples: ${store.size()}`);
+      return ExitCode.SUCCESS;
+    }
+    case 'list': {
+      const store = loadOntologyStore();
+      const triples = store.getAll();
+      if (triples.length === 0) {
+        console.log('No triples stored yet. Add one with: musubix ontology add <s> <p> <o>');
+      } else {
+        console.log(`Triples (${triples.length}):`);
+        for (const t of triples) {
+          console.log(`  ${t.subject} —[${t.predicate}]→ ${t.object}`);
+        }
+      }
+      return ExitCode.SUCCESS;
+    }
     case 'validate': {
-      const store = createOntologyStore();
+      const store = loadOntologyStore();
       const validator = createConsistencyValidator();
       const result = validator.validate(store);
-      console.log(`Consistent: ${result.consistent ? '✅' : '❌'}`);
+      if (store.size() === 0) {
+        console.log('No triples stored — nothing to validate.');
+        return ExitCode.SUCCESS;
+      }
+      console.log(`Consistent: ${result.consistent ? '✅' : '❌'} (${store.size()} triples)`);
       if (result.violations.length > 0) {
         console.log('Violations:');
         for (const v of result.violations) {
           console.log(`  - ${JSON.stringify(v)}`);
         }
+        return ExitCode.VALIDATION_ERROR;
       }
       return ExitCode.SUCCESS;
     }
     case 'stats': {
-      const store = createOntologyStore();
+      const store = loadOntologyStore();
       console.log(`Triples: ${store.size()}`);
       return ExitCode.SUCCESS;
     }
@@ -1878,6 +2014,7 @@ export async function handleLearn(
 export async function handleSynthesis(
   sub: string | undefined,
   args: string[],
+  flags: Record<string, unknown> = {},
 ): Promise<ExitCodeValue> {
   switch (sub) {
     case 'fromExamples': {
@@ -1901,12 +2038,41 @@ export async function handleSynthesis(
       const builder = createDSLBuilder();
       const input = args[0];
       if (!input) {
-        console.error('❌ Usage: musubix synthesis dsl <input>');
+        console.error('❌ Usage: musubix synthesis dsl <input> --ops <op[:arg...],...>');
+        console.error('   ops: trim, upper, lower, reverse, capitalize, camelCase, snakeCase,');
+        console.error('        replace:from:to, prefixRemove:p, suffixAppend:s, repeat:n');
         return ExitCode.GENERAL_ERROR;
+      }
+      // Build the transform pipeline from --ops; without it the DSL is a no-op.
+      const opsSpec = (flags['ops'] as string | undefined) ?? '';
+      const ops = opsSpec.split(',').map((o) => o.trim()).filter(Boolean);
+      if (ops.length === 0) {
+        console.error('❌ No transforms given. Pass --ops <op,...> (e.g. --ops trim,camelCase).');
+        return ExitCode.VALIDATION_ERROR;
+      }
+      for (const op of ops) {
+        const [name, ...opArgs] = op.split(':');
+        switch (name) {
+          case 'trim': builder.trim(); break;
+          case 'upper': case 'toUpperCase': builder.toUpperCase(); break;
+          case 'lower': case 'toLowerCase': builder.toLowerCase(); break;
+          case 'reverse': builder.reverse(); break;
+          case 'capitalize': builder.capitalize(); break;
+          case 'camelCase': case 'camel': builder.camelCase(); break;
+          case 'snakeCase': case 'snake': builder.snakeCase(); break;
+          case 'replace': builder.replace(opArgs[0] ?? '', opArgs[1] ?? ''); break;
+          case 'prefixRemove': builder.prefixRemove(opArgs[0] ?? ''); break;
+          case 'suffixAppend': builder.suffixAppend(opArgs[0] ?? ''); break;
+          case 'repeat': builder.repeat(Number.parseInt(opArgs[0] ?? '1', 10) || 1); break;
+          default:
+            console.error(`❌ Unknown DSL op: ${name}`);
+            return ExitCode.VALIDATION_ERROR;
+        }
       }
       const result = builder.execute(input);
       console.log(`DSL output:`);
-      console.log(`  Input: ${input}`);
+      console.log(`  Input:  ${input}`);
+      console.log(`  Ops:    ${ops.join(' → ')}`);
       console.log(`  Result: ${result}`);
       return ExitCode.SUCCESS;
     }
@@ -2212,7 +2378,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        return await handleTrace(sub, positionalArgs);
+        return await handleTrace(sub, positionalArgs, args);
       },
     },
     {
@@ -2223,7 +2389,7 @@ export function getDefaultCommands(): CLICommand[] {
           console.log(showHelp('trace:verify'));
           return;
         }
-        return await handleTraceVerify();
+        return await handleTraceVerify(args);
       },
     },
     {
@@ -2248,7 +2414,8 @@ export function getDefaultCommands(): CLICommand[] {
           return;
         }
         const sub = args['subcommand'] as string | undefined;
-        return await handleOntology(sub);
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        return await handleOntology(sub, positionalArgs);
       },
     },
     {
@@ -2417,7 +2584,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        return await handleSynthesis(sub, positionalArgs);
+        return await handleSynthesis(sub, positionalArgs, args);
       },
     },
     {
