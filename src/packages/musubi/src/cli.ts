@@ -122,7 +122,7 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: '設計生成',
   },
   codegen: {
-    usage: 'musubix codegen [options]',
+    usage: 'musubix codegen [generate] <name> [--type class|interface|function|...]',
     description: 'コード生成',
   },
   tasks: {
@@ -242,7 +242,7 @@ export interface CLICommand {
   name: string;
   description: string;
   options?: Array<{ flag: string; description: string; default?: unknown }>;
-  action: (args: Record<string, unknown>) => Promise<void>;
+  action: (args: Record<string, unknown>) => Promise<ExitCodeValue | void>;
 }
 
 export interface CLIConfig {
@@ -280,14 +280,17 @@ export class CLIDispatcher {
     return [...this.commands.values()];
   }
 
-  async dispatch(commandName: string, args: Record<string, unknown> = {}): Promise<void> {
+  async dispatch(
+    commandName: string,
+    args: Record<string, unknown> = {},
+  ): Promise<ExitCodeValue | void> {
     const command = this.commands.get(commandName);
     if (!command) {
       throw new Error(
         `Unknown command: ${commandName}. Available: ${[...this.commands.keys()].join(', ')}`,
       );
     }
-    await command.action(args);
+    return await command.action(args);
   }
 
   getHelp(): string {
@@ -338,12 +341,13 @@ export class CLIDispatcher {
     }
 
     try {
-      await this.dispatch(parsed.command, {
+      const result = await this.dispatch(parsed.command, {
         subcommand: parsed.subcommand,
         args: parsed.args,
         ...parsed.flags,
       });
-      return ExitCode.SUCCESS;
+      // Actions may return an explicit ExitCode; default to SUCCESS when they return void.
+      return result ?? ExitCode.SUCCESS;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(message);
@@ -900,6 +904,25 @@ export async function handleReqValidate(filePath: string): Promise<ExitCodeValue
 
     if (requirements.length === 0) {
       console.log('No requirements found in file');
+      // Diagnose the common cause: REQ- tokens present but not in the required
+      // heading form. Silent failure here is a frequent first-run pitfall.
+      if (/REQ-/i.test(content)) {
+        const headingLike = /^#{1,4}\s+REQ-[A-Z]{3}-\d{3}:/m.test(content);
+        console.error(
+          '⚠ Found "REQ-" text but no parseable requirements. ' +
+            'Requirements must be Markdown headings shaped like:',
+        );
+        console.error('    ## REQ-XXX-000: <title>   (XXX = 3-letter domain code)');
+        console.error('    **要件**:');
+        console.error('    THE システム SHALL ...');
+        if (!headingLike) {
+          console.error(
+            'ℹ Hint: list items (e.g. "- REQ-001: ...") and IDs without a ' +
+              '3-letter domain code are not recognized.',
+          );
+        }
+        return ExitCode.VALIDATION_ERROR;
+      }
     }
     return hasIssues ? ExitCode.VALIDATION_ERROR : ExitCode.SUCCESS;
   } catch (err) {
@@ -1733,6 +1756,40 @@ export async function handleWatch(
 
 // ── Default commands ───────────────────────────────────────────────────────
 
+/**
+ * Resolve the file/name target for a command, tolerating an optional leading
+ * verb subcommand (e.g. `design generate <file>`, `codegen generate <name>`,
+ * `requirements analyze <file>`). When the parsed subcommand is one of the
+ * known verbs, it is treated as syntactic sugar and the real target is taken
+ * from the first positional argument instead.
+ */
+export function resolveTarget(args: Record<string, unknown>, verbs: string[]): string | undefined {
+  const positional = (args['args'] as string[] | undefined) ?? [];
+  const sub = args['subcommand'] as string | undefined;
+  const explicitFile = args['file'] as string | undefined;
+  if (explicitFile) return explicitFile;
+  if (sub && verbs.includes(sub.toLowerCase())) {
+    // Subcommand is a verb — the target is the next positional token.
+    return positional[0];
+  }
+  return sub ?? positional[0];
+}
+
+/** Shared action for `req` and its documented `requirements` alias. */
+async function reqAction(args: Record<string, unknown>): Promise<ExitCodeValue | void> {
+  if (args['help'] === true || args['h'] === true) {
+    console.log(showHelp('requirements'));
+    return;
+  }
+  // Tolerate documented `requirements analyze|validate <file>` forms.
+  const filePath = resolveTarget(args, ['analyze', 'validate']);
+  if (!filePath) {
+    console.error('❌ Usage: musubix requirements [analyze|validate] <file>');
+    return ExitCode.VALIDATION_ERROR;
+  }
+  return await handleReqValidate(filePath);
+}
+
 export function getDefaultCommands(): CLICommand[] {
   return [
     {
@@ -1781,7 +1838,7 @@ export function getDefaultCommands(): CLICommand[] {
 
         // Legacy mode: existing project init
         const targetPath = (args['subcommand'] as string) ?? (args['args'] as string[] | undefined)?.[0] ?? '.';
-        await handleInit(
+        return await handleInit(
           targetPath,
           args['name'] as string | undefined,
           args['force'] === true,
@@ -1804,39 +1861,32 @@ export function getDefaultCommands(): CLICommand[] {
           case 'validate':
             if (!filePath) {
               console.error('❌ Usage: musubix tasks validate <file>');
-              return;
+              return ExitCode.VALIDATION_ERROR;
             }
-            await handleTasksValidate(filePath);
+            return await handleTasksValidate(filePath);
             break;
           case 'list':
-            await handleTasksList(filePath);
+            return await handleTasksList(filePath);
             break;
           case 'stats':
-            await handleTasksStats(filePath);
+            return await handleTasksStats(filePath);
             break;
           default:
             console.log(showHelp('tasks'));
+            return;
         }
       },
     },
     {
       name: 'req',
       description: 'Analyze requirements (EARS validation)',
-      action: async (args) => {
-        if (args['help'] === true || args['h'] === true) {
-          console.log(showHelp('requirements'));
-          return;
-        }
-        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        const filePath = (args['file'] as string | undefined)
-          ?? (args['subcommand'] as string | undefined)
-          ?? positionalArgs[0];
-        if (!filePath) {
-          console.error('❌ Usage: musubix req <file>');
-          return;
-        }
-        await handleReqValidate(filePath);
-      },
+      action: reqAction,
+    },
+    {
+      // Alias matching the documented `musubix requirements <analyze|validate> <file>` form.
+      name: 'requirements',
+      description: 'Analyze/validate requirements (EARS validation)',
+      action: reqAction,
     },
     {
       name: 'req:wizard',
@@ -1846,7 +1896,7 @@ export function getDefaultCommands(): CLICommand[] {
           console.log(showHelp('requirements'));
           return;
         }
-        await handleReqWizard();
+        return await handleReqWizard();
       },
     },
     {
@@ -1857,7 +1907,7 @@ export function getDefaultCommands(): CLICommand[] {
           console.log(showHelp('requirements'));
           return;
         }
-        await handleReqInterview(args);
+        return await handleReqInterview(args);
       },
     },
     {
@@ -1868,15 +1918,21 @@ export function getDefaultCommands(): CLICommand[] {
           console.log(showHelp('design'));
           return;
         }
-        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        const filePath = (args['file'] as string | undefined)
-          ?? (args['subcommand'] as string | undefined)
-          ?? positionalArgs[0];
-        if (!filePath) {
-          console.error('❌ Usage: musubix design <requirements-file>');
-          return;
+        // Tolerate documented `design generate <file>` / `design verify <file>` forms.
+        if ((args['subcommand'] as string | undefined)?.toLowerCase() === 'verify') {
+          const vf = resolveTarget(args, ['verify']);
+          if (!vf) {
+            console.error('❌ Usage: musubix design verify <design-file>');
+            return ExitCode.VALIDATION_ERROR;
+          }
+          return await handleDesignVerify(vf);
         }
-        await handleDesignGenerate(filePath);
+        const filePath = resolveTarget(args, ['generate']);
+        if (!filePath) {
+          console.error('❌ Usage: musubix design [generate] <requirements-file>');
+          return ExitCode.VALIDATION_ERROR;
+        }
+        return await handleDesignGenerate(filePath);
       },
     },
     {
@@ -1893,10 +1949,10 @@ export function getDefaultCommands(): CLICommand[] {
           ?? positionalArgs[0];
         if (!filePath) {
           console.error('❌ Usage: musubix design:c4 <file> [--level context|container|component]');
-          return;
+          return ExitCode.VALIDATION_ERROR;
         }
         const level = (args['level'] as string | undefined) ?? 'context';
-        await handleDesignC4(filePath, level);
+        return await handleDesignC4(filePath, level);
       },
     },
     {
@@ -1913,9 +1969,9 @@ export function getDefaultCommands(): CLICommand[] {
           ?? positionalArgs[0];
         if (!filePath) {
           console.error('❌ Usage: musubix design:verify <design-file>');
-          return;
+          return ExitCode.VALIDATION_ERROR;
         }
-        await handleDesignVerify(filePath);
+        return await handleDesignVerify(filePath);
       },
     },
     {
@@ -1926,14 +1982,14 @@ export function getDefaultCommands(): CLICommand[] {
           console.log(showHelp('codegen'));
           return;
         }
-        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        const name = (args['subcommand'] as string | undefined) ?? positionalArgs[0];
+        // Tolerate documented `codegen generate <name>` form.
+        const name = resolveTarget(args, ['generate']);
         if (!name) {
-          console.error('❌ Usage: musubix codegen <name> [--type class|interface|function|...]');
-          return;
+          console.error('❌ Usage: musubix codegen [generate] <name> [--type class|interface|function|...]');
+          return ExitCode.VALIDATION_ERROR;
         }
         const type = (args['type'] as string | undefined) ?? 'class';
-        await handleCodegen(name, type);
+        return await handleCodegen(name, type);
       },
     },
     {
@@ -1950,9 +2006,9 @@ export function getDefaultCommands(): CLICommand[] {
           ?? positionalArgs[0];
         if (!filePath) {
           console.error('❌ Usage: musubix test:gen <source-file>');
-          return;
+          return ExitCode.VALIDATION_ERROR;
         }
-        await handleTestGen(filePath);
+        return await handleTestGen(filePath);
       },
     },
     {
@@ -1965,7 +2021,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleTrace(sub, positionalArgs);
+        return await handleTrace(sub, positionalArgs);
       },
     },
     {
@@ -1976,7 +2032,7 @@ export function getDefaultCommands(): CLICommand[] {
           console.log(showHelp('trace:verify'));
           return;
         }
-        await handleTraceVerify();
+        return await handleTraceVerify();
       },
     },
     {
@@ -1989,7 +2045,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handlePolicy(sub, positionalArgs);
+        return await handlePolicy(sub, positionalArgs);
       },
     },
     {
@@ -2001,7 +2057,7 @@ export function getDefaultCommands(): CLICommand[] {
           return;
         }
         const sub = args['subcommand'] as string | undefined;
-        await handleOntology(sub);
+        return await handleOntology(sub);
       },
     },
     {
@@ -2014,7 +2070,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleCodegraph(sub, positionalArgs);
+        return await handleCodegraph(sub, positionalArgs);
       },
     },
     {
@@ -2029,9 +2085,9 @@ export function getDefaultCommands(): CLICommand[] {
         const filePath = (args['subcommand'] as string) ?? positionalArgs[0];
         if (!filePath) {
           console.error('❌ Usage: musubix security <path>');
-          return;
+          return ExitCode.VALIDATION_ERROR;
         }
-        await handleSecurity(filePath);
+        return await handleSecurity(filePath);
       },
     },
     {
@@ -2044,7 +2100,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleWorkflow(sub, positionalArgs);
+        return await handleWorkflow(sub, positionalArgs);
       },
     },
     {
@@ -2055,7 +2111,7 @@ export function getDefaultCommands(): CLICommand[] {
           console.log(showHelp('status'));
           return;
         }
-        await handleStatus();
+        return await handleStatus();
       },
     },
     {
@@ -2068,7 +2124,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleSkills(sub, positionalArgs);
+        return await handleSkills(sub, positionalArgs);
       },
     },
     {
@@ -2081,7 +2137,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleKnowledge(sub, positionalArgs, args);
+        return await handleKnowledge(sub, positionalArgs, args);
       },
     },
     {
@@ -2094,7 +2150,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleDecision(sub, positionalArgs, args);
+        return await handleDecision(sub, positionalArgs, args);
       },
     },
     {
@@ -2107,7 +2163,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleDeepResearch(sub, positionalArgs);
+        return await handleDeepResearch(sub, positionalArgs);
       },
     },
     {
@@ -2118,7 +2174,7 @@ export function getDefaultCommands(): CLICommand[] {
           console.log(showHelp('repl'));
           return;
         }
-        await handleRepl();
+        return await handleRepl();
       },
     },
     {
@@ -2131,7 +2187,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleScaffold(sub, positionalArgs);
+        return await handleScaffold(sub, positionalArgs);
       },
     },
     {
@@ -2144,7 +2200,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
         const input = (args['subcommand'] as string | undefined) ?? positionalArgs[0];
-        await handleExplain(input);
+        return await handleExplain(input);
       },
     },
     {
@@ -2157,7 +2213,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleLearn(sub, positionalArgs);
+        return await handleLearn(sub, positionalArgs);
       },
     },
     {
@@ -2170,7 +2226,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        await handleSynthesis(sub, positionalArgs);
+        return await handleSynthesis(sub, positionalArgs);
       },
     },
     {
@@ -2183,7 +2239,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
         const pattern = (args['subcommand'] as string | undefined) ?? positionalArgs[0];
-        await handleWatch(pattern);
+        return await handleWatch(pattern);
       },
     },
     // P3-07: MCP server launcher

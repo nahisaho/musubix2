@@ -37,6 +37,27 @@ Phase 5: Complete
 | OPTIONAL | WHERE \<feature\>, THE システム SHALL... |
 | COMPLEX | IF \<condition\>, THEN THE システム SHALL... |
 
+## 要件定義書フォーマット（必須）
+
+`musubix requirements analyze <file>` は次の構造のみ解析できる。
+要件は **見出し** として記述し、ID は `REQ-<3文字ドメイン>-<3桁連番>` とすること。
+箇条書き（`- REQ-001: ...`）や 3 文字ドメインコードの無い ID は認識されない。
+
+```markdown
+## REQ-AUT-001: ユーザー登録
+**種別**: UBIQUITOUS
+**優先度**: P0
+**要件**:
+THE システム SHALL メールアドレスによるユーザー登録を提供する。
+
+**受入基準**:
+- [ ] 有効なメールで登録できる
+- [ ] 重複メールは拒否される
+```
+
+- `**要件**:` の次行に EARS 文を書く（この行がパターン分類の対象）。
+- 種別/優先度/受入基準は任意だが、受入基準が無いと validate で警告となる。
+
 ## スキル一覧
 
 {{SKILL_SECTION}}

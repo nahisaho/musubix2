@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-07-09
+
+Webアプリ開発（TaskFlow）でのドッグフーディングにより発見した CLI パイプラインの課題を改修。
+
+### Fixed
+
+- **エラー時に終了コード 0 を返す問題を修正** — コマンドの `action` クロージャが各ハンドラの戻り値（`ExitCodeValue`）を捨て、`run()` が dispatch 後に常に `SUCCESS` を返していた。ファイル不在（ENOENT）や引数不足でも exit 0 となり CI で検知不能だった。`action` の戻り型を `Promise<ExitCodeValue | void>` にし、`dispatch`→`run` まで終了コードを伝播（全 30 ハンドラ呼び出し・8 usage エラー）
+- **文書化されたサブコマンド形式が動かない問題を修正** — `requirements analyze <file>` は "Unknown command"、`design generate <file>` は `generate` をファイル名として開こうとし ENOENT、`codegen generate <file>` は `generate` という名のクラスを生成していた。verb 許容ヘルパー `resolveTarget()` を追加し、`requirements` エイリアスを新設。README / CLAUDE.md / help 記載の全形式が動作
+- **要件が解析できない際のサイレント失敗を改善** — `REQ-` を含むが見出し形式でない文書に対し "No requirements found" のみで exit 0 だったのを、必要な文書構造（`## REQ-XXX-000:` 見出し + `**要件**:` フィールド、3文字ドメインコード）を提示し `VALIDATION_ERROR` を返すよう変更
+
+### Added
+
+- **`init` が SDD ワークスペースを雛形生成** — `steering/` と `storage/specs/requirements.md`（パーサー準拠のスターター要件）を非破壊で作成。生成される CLAUDE.md の「ディレクトリ構成」を実 ls 出力から正規の SDD レイアウトに変更
+- **CLAUDE.md テンプレートに「要件定義書フォーマット（必須）」節を追加** — パーサーが要求する見出し + フィールド構造を明記（EARS 文パターンのみ記載でパース構造が未文書化だった課題に対応）
+
+### Tests
+
+- CLI 修正のリグレッションテスト 6 件を追加（verb 許容・終了コード伝播・パーサー診断）。musubi パッケージ 227 テスト green
+
 ## [0.5.0] - 2026-07-09
 
 ### Fixed

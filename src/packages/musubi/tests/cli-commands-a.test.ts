@@ -39,9 +39,9 @@ describe('handleReqValidate', () => {
       [
         '# Requirements',
         '',
-        '## REQ-001: System Login',
-        '',
-        '> When the user enters valid credentials, the system shall grant access.',
+        '## REQ-AUT-001: System Login',
+        '**要件**:',
+        'WHEN the user enters valid credentials, THE system SHALL grant access.',
         '',
       ].join('\n'),
     );
@@ -211,9 +211,9 @@ describe('Group A dispatcher integration', () => {
       [
         '# Reqs',
         '',
-        '## REQ-001: Test',
-        '',
-        '> The system shall work.',
+        '## REQ-SYS-001: Test',
+        '**要件**:',
+        'THE system SHALL work.',
         '',
       ].join('\n'),
     );
@@ -232,5 +232,60 @@ describe('Group A dispatcher integration', () => {
     const dispatcher = createCLIDispatcher();
     const code = await dispatcher.run(['codegen', 'MyClass', '--type', 'class']);
     expect(code).toBe(ExitCode.SUCCESS);
+  });
+});
+
+// ── v0.5.1 fixes: verb tolerance, exit-code propagation, parser diagnostic ──
+
+describe('v0.5.1 CLI fixes', () => {
+  function writeReqFixture(name: string): string {
+    const file = join(FIXTURE_DIR, name);
+    writeFileSync(
+      file,
+      [
+        '## REQ-AUT-001: Login',
+        '**要件**:',
+        'WHEN a user signs in, THE system SHALL issue a token.',
+        '',
+      ].join('\n'),
+    );
+    return file;
+  }
+
+  it('tolerates documented `requirements analyze <file>` alias form', async () => {
+    const file = writeReqFixture('alias.md');
+    const dispatcher = createCLIDispatcher();
+    expect(await dispatcher.run(['requirements', 'analyze', file])).toBe(ExitCode.SUCCESS);
+    expect(await dispatcher.run(['requirements', 'validate', file])).toBe(ExitCode.SUCCESS);
+  });
+
+  it('tolerates documented `design generate <file>` verb form', async () => {
+    const file = writeReqFixture('design.md');
+    const dispatcher = createCLIDispatcher();
+    expect(await dispatcher.run(['design', 'generate', file])).toBe(ExitCode.SUCCESS);
+  });
+
+  it('tolerates documented `codegen generate <name>` verb form', async () => {
+    const dispatcher = createCLIDispatcher();
+    expect(await dispatcher.run(['codegen', 'generate', 'TaskService'])).toBe(ExitCode.SUCCESS);
+  });
+
+  it('propagates non-zero exit code when a handler fails (design ENOENT)', async () => {
+    const dispatcher = createCLIDispatcher();
+    const code = await dispatcher.run(['design', 'generate', join(FIXTURE_DIR, 'missing.md')]);
+    expect(code).toBe(ExitCode.GENERAL_ERROR);
+  });
+
+  it('returns VALIDATION_ERROR for a missing required argument (tasks list)', async () => {
+    const dispatcher = createCLIDispatcher();
+    const code = await dispatcher.run(['tasks', 'list']);
+    expect(code).not.toBe(ExitCode.SUCCESS);
+  });
+
+  it('flags REQ- tokens that are not in parseable heading form', async () => {
+    const file = join(FIXTURE_DIR, 'listform.md');
+    writeFileSync(file, '- REQ-001: THE system SHALL do things.\n');
+    const code = await handleReqValidate(file);
+    expect(code).toBe(ExitCode.VALIDATION_ERROR);
   });
 });

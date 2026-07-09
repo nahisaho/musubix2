@@ -1,8 +1,8 @@
 /**
  * P3-04 / DES-INS-001: Init command orchestrator — detect → confirm → plan → render → merge → write.
  */
-import { readdirSync } from 'node:fs';
-import { basename } from 'node:path';
+import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import type {
   InitOptions,
   InitSummary,
@@ -26,6 +26,26 @@ import { TemplateRenderer } from '../../infrastructure/templates/template-render
 import { WorkspaceWriter } from '../../infrastructure/workspace/workspace-writer.js';
 import { ConfirmationResolver } from './confirmation-resolver.js';
 import { DryRunReporter } from './dry-run-reporter.js';
+
+/**
+ * Starter requirements document in the exact format the EARS parser accepts
+ * (`## REQ-XXX-000:` heading + `**要件**:` field). Gives `musubix requirements
+ * analyze` something parseable on first run.
+ */
+const STARTER_REQUIREMENTS = `# 要件定義書
+
+> \`musubix requirements analyze storage/specs/requirements.md\` で解析できます。
+> 要件は見出し形式・ID は \`REQ-<3文字ドメイン>-<3桁連番>\` で記述してください。
+
+## REQ-SMP-001: サンプル要件
+**種別**: UBIQUITOUS
+**優先度**: P1
+**要件**:
+THE システム SHALL ユーザーにサンプル機能を提供する。
+
+**受入基準**:
+- [ ] サンプル機能が動作する
+`;
 
 export class InitCommandHandler {
   constructor(
@@ -107,9 +127,15 @@ export class InitCommandHandler {
 
     const summary = await this.writer.execute([], true); // get summary structure
 
+    // 8. Scaffold the SDD workspace (steering/, storage/specs/) with a
+    // parseable starter requirements doc. Best-effort; never overwrites.
+    const scaffolded = options.dryRun
+      ? []
+      : this.scaffoldSddWorkspace(options.projectPath);
+
     return {
       detectedPlatforms: selection,
-      created: summary.created,
+      created: [...summary.created, ...scaffolded],
       updated: summary.updated,
       skipped: summary.skipped,
       warnings,
@@ -117,16 +143,44 @@ export class InitCommandHandler {
     };
   }
 
+  /**
+   * Create the SDD directory skeleton and a parseable starter requirements
+   * document. Idempotent and non-destructive — existing files are left as-is.
+   * Returns the relative paths of files/dirs actually created.
+   */
+  private scaffoldSddWorkspace(projectPath: string): string[] {
+    const created: string[] = [];
+    try {
+      for (const dir of ['steering', 'storage/specs']) {
+        const abs = join(projectPath, dir);
+        if (!existsSync(abs)) {
+          mkdirSync(abs, { recursive: true });
+          created.push(`${dir}/`);
+        }
+      }
+      const reqPath = join(projectPath, 'storage/specs/requirements.md');
+      if (!existsSync(reqPath)) {
+        writeFileSync(reqPath, STARTER_REQUIREMENTS, 'utf-8');
+        created.push('storage/specs/requirements.md');
+      }
+    } catch {
+      // Best-effort — scaffolding failure must not fail init.
+    }
+    return created;
+  }
+
   private buildProjectContext(projectPath: string): ProjectContext {
     const name = basename(projectPath);
-    let rootStructure: string[] = [];
-    try {
-      rootStructure = readdirSync(projectPath, { withFileTypes: true })
-        .slice(0, 20)
-        .map(d => d.isDirectory() ? `${d.name}/` : d.name);
-    } catch {
-      // ignore
-    }
+    // Document the canonical MUSUBIX2 SDD layout rather than a raw directory
+    // listing — the generated CLAUDE.md should teach the intended structure,
+    // not echo transient files like node_modules/.
+    const rootStructure: string[] = [
+      'steering/            # プロジェクトメモリ（決定前に参照）',
+      'storage/specs/       # requirements / design / tasks 仕様',
+      '.claude/skills/      # SDD Agent Skills',
+      'src/                 # 実装コード',
+      'tests/               # テストコード',
+    ];
 
     return {
       projectName: name,
