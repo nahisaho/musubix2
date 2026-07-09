@@ -1293,10 +1293,24 @@ export async function handleCodegen(
 
 export async function handleTestGen(filePath: string): Promise<ExitCodeValue> {
   try {
-    const content = readFileSync(filePath, 'utf-8');
+    if (!existsSync(filePath)) {
+      console.error(`❌ Path not found: ${filePath}`);
+      return ExitCode.GENERAL_ERROR;
+    }
     const generator = createUnitTestGenerator();
-    const suite = generator.generate(content, 'unit');
-    console.log(suite.code);
+    // Accept a single file or a directory (skeletons generated per file).
+    const files = collectFiles(filePath, (ext) => ext in EXT_TO_LANG);
+    if (files.length === 0) {
+      console.error(`❌ No source files found under: ${filePath}`);
+      return ExitCode.GENERAL_ERROR;
+    }
+    const single = files.length === 1;
+    for (const file of files) {
+      const content = readFileSync(file, 'utf-8');
+      const suite = generator.generate(content, 'unit');
+      if (!single) console.log(`// ── ${file} ──────────────────────────────`);
+      console.log(suite.code);
+    }
     return ExitCode.SUCCESS;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -1766,6 +1780,10 @@ export async function handleExplain(
 
   let code: string;
   if (existsSync(input)) {
+    if (statSync(input).isDirectory()) {
+      console.error(`❌ explain expects a file or code snippet, not a directory: ${input}`);
+      return ExitCode.GENERAL_ERROR;
+    }
     code = readFileSync(input, 'utf-8');
   } else {
     code = input;
@@ -2178,7 +2196,7 @@ export function getDefaultCommands(): CLICommand[] {
           ?? (args['subcommand'] as string | undefined)
           ?? positionalArgs[0];
         if (!filePath) {
-          console.error('❌ Usage: musubix test:gen <source-file>');
+          console.error('❌ Usage: musubix test:gen <source-file-or-dir>');
           return ExitCode.VALIDATION_ERROR;
         }
         return await handleTestGen(filePath);

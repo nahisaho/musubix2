@@ -199,6 +199,21 @@ describe('handleTestGen', () => {
     const code = await handleTestGen(join(FIXTURE_DIR, 'nope.ts'));
     expect(code).toBe(ExitCode.GENERAL_ERROR);
   });
+
+  // ISSUE-15: a directory argument must not crash with EISDIR.
+  it('accepts a directory and generates per-file skeletons', async () => {
+    const sub = join(FIXTURE_DIR, 'srcdir');
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(sub, 'a.ts'), 'export function a() { return 1; }\n');
+    writeFileSync(join(sub, 'b.ts'), 'export function b() { return 2; }\n');
+    const code = await handleTestGen(sub);
+    expect(code).toBe(ExitCode.SUCCESS);
+    const printed = (console.log as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .map((c) => String(c[0]))
+      .join('\n');
+    expect(printed).toContain('a.ts');
+    expect(printed).toContain('b.ts');
+  });
 });
 
 // ── Dispatcher integration ─────────────────────────────────────────────────

@@ -313,6 +313,18 @@ describe('CLI Commands C — Explain', () => {
     const code = await handleExplain(undefined);
     expect(code).toBe(ExitCode.GENERAL_ERROR);
   });
+
+  // ISSUE-16: a directory must yield a clear error, not a raw EISDIR crash.
+  it('explain on a directory returns a clear error', async () => {
+    const d = await mkdtemp(join(tmpdir(), 'musubix2-explain-'));
+    try {
+      const code = await handleExplain(d);
+      expect(code).toBe(ExitCode.GENERAL_ERROR);
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('not a directory'));
+    } finally {
+      await rm(d, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── Learn ──────────────────────────────────────────────────────────────────

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2026-07-09
+
+v0.5.4 の再ドッグフーディングで、残っていたディレクトリ入力クラッシュを改修。
+
+### Fixed
+
+- **`test:gen <dir>` がディレクトリで EISDIR クラッシュする問題を修正** — `readFileSync` 直呼びだったため「`src/` 全体のテスト雛形生成」という自然な用途でクラッシュしていた。`collectFiles()` でディレクトリ配下を走査し、ファイルごとに `// ── <file> ──` ヘッダ付きで雛形を出力（単一ファイル指定時は従来通り）
+- **`explain <dir>` の不親切な EISDIR クラッシュを修正** — ディレクトリ指定時に生の `EISDIR`（`❌` プレフィックスも無し）で落ちていた。「explain はファイルかコードスニペットを期待（ディレクトリ不可）」と明示するエラーに変更
+
+### Tests
+
+- test:gen ディレクトリ対応、explain ディレクトリの明示エラーのリグレッションテストを追加。全ワークスペース 1656 テスト green
+
 ## [0.5.4] - 2026-07-09
 
 v0.5.3 の再ドッグフーディングで、成功表示するのに実体が伴わない/クラッシュするコマンドを改修。
