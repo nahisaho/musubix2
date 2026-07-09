@@ -494,6 +494,48 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.30: cg path — shortest dependency chain between two files.
+  it('cg path finds the shortest dependency chain (directional)', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_path');
+    mkdirSync(dir, { recursive: true });
+    // a.c → b.c → c.c (a depends on b depends on c).
+    writeFileSync(join(dir, 'c.c'), 'int c_fn(int x)\n{\n\treturn x;\n}\n');
+    writeFileSync(join(dir, 'b.c'), 'int c_fn(int);\nint b_fn(int x)\n{\n\treturn c_fn(x);\n}\n');
+    writeFileSync(join(dir, 'a.c'), 'int b_fn(int);\nint a_fn(int x)\n{\n\treturn b_fn(x);\n}\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('path', ['a.c', 'c.c'])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('2 hop'); // a → b → c
+      expect(out).toContain('a.c');
+      expect(out).toContain('b.c');
+      expect(out).toContain('c.c');
+
+      // JSON output.
+      logSpy.mockClear();
+      expect(await handleCodegraph('path', ['a.c', 'c.c', '--json'])).toBe(ExitCode.SUCCESS);
+      const j = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+      expect(j.hops).toBe(2);
+      expect(j.path[0]).toContain('a.c');
+      expect(j.path[2]).toContain('c.c');
+
+      // No reverse path (c does not depend on a).
+      logSpy.mockClear();
+      expect(await handleCodegraph('path', ['c.c', 'a.c'])).toBe(ExitCode.SUCCESS);
+      expect(logSpy.mock.calls.map((c) => String(c[0])).join('\n')).toContain('No dependency path');
+
+      // Missing args → validation error.
+      expect(await handleCodegraph('path', ['a.c'])).toBe(ExitCode.VALIDATION_ERROR);
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.24: cg cycles — detect circular file dependencies (SCCs).
   it('cg cycles detects mutual file dependencies', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_cycles');

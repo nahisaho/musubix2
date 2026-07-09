@@ -153,8 +153,8 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'オントロジー管理',
   },
   cg: {
-    usage: 'musubix cg <index|search|stats|deps|impact|candidates|cycles|gate|export|diff|languages> [args]',
-    description: 'コードグラフ分析 (impact 影響、candidates 候補、cycles 循環、gate CI品質ゲート、export、diff)',
+    usage: 'musubix cg <index|search|stats|deps|impact|path|candidates|cycles|gate|export|diff|languages> [args]',
+    description: 'コードグラフ分析 (impact 影響、path 依存経路、candidates 候補、cycles 循環、gate CI ゲート、export、diff)',
   },
   security: {
     usage: 'musubix security <path> [--fail-on critical|high|medium|low|info] [--exclude-tests]',
@@ -1158,6 +1158,11 @@ const CG_SUBCOMMAND_HELP: Record<string, string> = {
     '  Rank files by suitability for an isolated rewrite (e.g. to Rust):\n' +
     '  score = (functions + dependents) / (1 + external deps). Test files are\n' +
     '  excluded. N limits the number of rows (default 15). --json for automation.',
+  path:
+    'musubix cg path <from-fragment> <to-fragment> [--json]\n' +
+    '  Show the shortest dependency chain from a file matching <from> to one\n' +
+    '  matching <to> (over depends-on edges). Answers "why does A need B?".\n' +
+    '  --json for machine-readable output.',
   cycles:
     'musubix cg cycles [path-fragment] [N] [--json]\n' +
     '  Detect circular file dependencies (strongly-connected components of the\n' +
@@ -1602,6 +1607,67 @@ export async function handleCodegraph(
       console.log(
         `\n  Total: ${affected.size} file(s) affected${scope} (${direct.size} direct, ${indirect.length} indirect).`,
       );
+      return ExitCode.SUCCESS;
+    }
+    case 'path': {
+      // Shortest dependency chain from a file matching <from> to one matching
+      // <to>, over forward (depends-on) file edges. Answers "why does A need B?"
+      const asJson = args.includes('--json');
+      const positional = args.filter((a) => !a.startsWith('--'));
+      const fromFrag = positional[0];
+      const toFrag = positional[1];
+      if (!fromFrag || !toFrag) {
+        console.error('❌ Usage: musubix cg path <from-fragment> <to-fragment> [--json]');
+        return ExitCode.VALIDATION_ERROR;
+      }
+      const { nodes, edges } = loadCodeGraphData();
+      if (nodes.length === 0) {
+        console.log('No indexed graph. Run `musubix cg index <path>` first.');
+        return ExitCode.SUCCESS;
+      }
+      const rels = [...resolveFileEdges(nodes, edges).values()];
+      const adj = new Map<string, Set<string>>();
+      for (const r of rels) {
+        const set = adj.get(r.from) ?? new Set<string>();
+        set.add(r.to);
+        adj.set(r.from, set);
+      }
+      const allFiles = [...new Set(nodes.map((n) => n.filePath))];
+      const froms = allFiles.filter((f) => f.includes(fromFrag));
+      const isTarget = (f: string) => f.includes(toFrag);
+      if (froms.length === 0) {
+        console.log(`No indexed file matches '${fromFrag}'.`);
+        return ExitCode.SUCCESS;
+      }
+      // Multi-source BFS to the nearest target file.
+      const prev = new Map<string, string | null>();
+      const queue: string[] = [];
+      for (const f of froms) { prev.set(f, null); queue.push(f); }
+      let found: string | undefined;
+      // A `from` file that is itself a target is a zero-hop path.
+      for (const f of froms) if (isTarget(f)) { found = f; break; }
+      while (!found && queue.length > 0) {
+        const f = queue.shift()!;
+        for (const dep of adj.get(f) ?? []) {
+          if (prev.has(dep)) continue;
+          prev.set(dep, f);
+          if (isTarget(dep)) { found = dep; break; }
+          queue.push(dep);
+        }
+      }
+      if (!found) {
+        if (asJson) console.log(JSON.stringify({ from: fromFrag, to: toFrag, path: null }, null, 2));
+        else console.log(`No dependency path from '${fromFrag}' to '${toFrag}'.`);
+        return ExitCode.SUCCESS;
+      }
+      const path: string[] = [];
+      for (let n: string | null | undefined = found; n != null; n = prev.get(n)) path.unshift(n);
+      if (asJson) {
+        console.log(JSON.stringify({ from: fromFrag, to: toFrag, hops: path.length - 1, path }, null, 2));
+      } else {
+        console.log(`Dependency path (${path.length - 1} hop(s)):`);
+        path.forEach((f, i) => console.log(`  ${i === 0 ? '◉' : '→'} ${f}`));
+      }
       return ExitCode.SUCCESS;
     }
     case 'cycles': {

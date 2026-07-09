@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.30] - 2026-07-10
+
+CodeGraph に**依存経路探索 `cg path`** を追加。2 ファイル間の最短依存チェーンを表示し、「なぜ A が B に依存するのか」を可視化する。
+
+### Added
+
+- **`cg path <from-fragment> <to-fragment> [--json]`** — `<from>` にマッチするファイルから `<to>` にマッチするファイルへの最短依存経路（depends-on エッジ上の BFS）を表示。経路がなければ「No dependency path」、`--json` で `{ from, to, hops, path[] }` を出力
+- `impact`（影響を受ける集合）に対し、`path` は実際の依存チェーンを示す補完的な分析
+
+### Impact
+
+- Linux カーネルコアで `cg path printk/printk.c lib/cmdline.c` は 1 ホップ（直接呼び出し）、`cg path kernel/audit.c lib/cmdline.c` は 3 ホップの推移チェーンを表示。`cg path lib/cmdline.c kernel/audit.c` は `cmdline.c → vsprintf.c → capability.c → audit.c` という（一見意外だが実在する）連鎖を発見 — カーネルのユーティリティ層の密結合を可視化
+
+### Tests
+
+- musubi: 方向付き最短経路（a→b→c の 2 ホップ）、逆方向の経路なし、JSON 出力、引数不足エラーを検証（71 → 72）
+
 ## [0.5.29] - 2026-07-10
 
 CodeGraph の `cg export` に**ディレクトリクラスタリング `--cluster`** を追加し、大規模グラフを Graphviz で見やすく出力できるようにした。

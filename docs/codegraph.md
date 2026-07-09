@@ -40,6 +40,7 @@ persisted graph exactly.
 | `cg stats` | Node/edge counts, kind breakdowns, most-called functions |
 | `cg deps [fragment]` | Outgoing dependencies per file (`→ header`, `→ name() [call]`) |
 | `cg impact <fragment>` | Reverse reachability — what depends on the target |
+| `cg path <from> <to>` | Shortest dependency chain from one file to another |
 | `cg candidates [N]` | Rank files by rewrite suitability (self-containment × usage) |
 | `cg cycles [fragment] [N]` | Circular file dependencies (strongly-connected components) |
 | `cg gate …` | CI quality gate — non-zero exit on rule violations |
@@ -59,6 +60,18 @@ npx musubix cg impact lib/cmdline.c            # full transitive closure
 npx musubix cg impact lib/cmdline.c --direct   # only immediate callers
 npx musubix cg impact lib/cmdline.c --depth 2  # up to 2 hops
 npx musubix cg impact lib/cmdline.c --json     # machine-readable
+```
+
+### `cg path <from-fragment> <to-fragment> [--json]`
+
+Shows the shortest dependency chain from a file matching `<from>` to one
+matching `<to>` (over depends-on edges) — answers "why does A need B?".
+
+```bash
+npx musubix cg path src/api.ts src/db.ts
+#   ◉ src/api.ts
+#   → src/service.ts
+#   → src/db.ts
 ```
 
 ### `cg candidates [N] [--json]`
