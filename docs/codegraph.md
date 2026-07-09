@@ -168,6 +168,14 @@ a forbidden layering edge is introduced. A ready-to-copy workflow lives at
   (`obj.method()` resolves; standard-library names are never mistaken for user
   methods).
 - **Python** — functions and class/nested `def` methods (indented) are captured
-  and resolved.
-- **Java, Go, Rust, and others** — function/method definitions via the
-  language parser; call-edge resolution uses the same unique-name heuristic.
+  and resolved; Python builtins/str-methods are not mistaken for user defs.
+- **Rust** — functions and methods; std trait/Option-Result methods
+  (`clone`/`as_ref`/`unwrap`/…) are not mistaken for user defs.
+- **Ruby** — modules, classes (including nested), and `def` methods are captured.
+- **Go, Java, PHP** — function/method definitions via the language parser;
+  these self-filter well (constructor conventions, overridden `equals`/`String`,
+  non-redefinable builtins). Call-edge resolution uses the unique-name heuristic.
+
+Builtin/stdlib call suppression is scoped per caller language, so a name that is
+a builtin in one language never suppresses a genuine method of the same name in
+another.

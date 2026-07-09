@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.34] - 2026-07-10
+
+PHP（Laravel）・Ruby（Rails）での dogfooding。Ruby の**ネストした class/module 未検出**バグを発見・修正。
+
+### Fixed
+
+- **Ruby のネスト class/module 検出** — Ruby の class/module 正規表現が `^class`/`^module`（行頭）を要求していたため、module 内にネストした定義（Rails 流のコードでは大半）が検出されず、Rails activerecord では `class` ノードがわずか 1 個だった。`^\s*class`/`^\s*module` に変更し、インデントされたネスト定義を捕捉（Python の `def` 修正 0.5.31 と同種）
+
+### Impact / Validation
+
+- **Ruby (Rails activerecord/lib)**: `class` ノード 1 → 602、`module` 399 → 958（ネスト定義 1,100+ 個を回収）。コール解決は元々クリーン（`_read_attribute`/`association` 等の実 Rails メソッドが上位、組み込み衝突なし）— Ruby 用 denylist は不要と判断
+- **PHP (Laravel src)**: クリーンと確認。トップは Laravel ヘルパー関数（`enum_value`/`class_basename`/`app`/`data_get`/`__`）。PHP 組み込み関数は再定義不可（fatal error）のため偽エッジを生まない
+- 他言語（C/Python/Rust/Go/Java）は Ruby 正規表現変更の影響なし
+
+### Docs
+
+- `docs/codegraph.md` の言語サポート節を更新（Ruby ネスト検出、Rust/Python 組み込み抑制、言語別スコープを明記）
+
+### Tests
+
+- codegraph: ネストした Ruby module/class の検出を検証（41 → 42）
+
 ## [0.5.33] - 2026-07-10
 
 Go（Kubernetes）・Rust（ripgrep）・Java（Spring）での dogfooding により、コールグラフ解決の組み込み名 denylist を**呼び出し元の言語ごとにスコープ**する設計へ刷新。

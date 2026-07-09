@@ -179,6 +179,26 @@ describe('DES-CG-001: ASTParser', () => {
     expect(classes).toEqual(['real_def']);
   });
 
+  it('should detect nested Ruby classes and modules (indented)', () => {
+    const parser = createASTParser();
+    const src = [
+      'module ActiveRecord',
+      '  module Associations',
+      '    class Association',
+      '      def initialize(owner)',
+      '      end',
+      '    end',
+      '  end',
+      'end',
+    ].join('\n');
+    const nodes = parser.parse(src, 'ruby');
+    const modules = nodes.filter((n) => n.kind === 'module').map((n) => n.name);
+    const classes = nodes.filter((n) => n.kind === 'class').map((n) => n.name);
+    expect(modules).toContain('ActiveRecord');
+    expect(modules).toContain('Associations'); // nested module
+    expect(classes).toContain('Association'); // class nested in modules
+  });
+
   it('should mark C function linkage (static) in metadata', () => {
     const parser = createASTParser();
     const src = [

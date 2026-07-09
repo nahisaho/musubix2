@@ -190,8 +190,10 @@ const LANGUAGE_PATTERNS: Record<string, LanguagePatterns> = {
     { kind: 'variable', regex: /(?:public|private|protected)\s+(?:static\s+)?(?:readonly\s+)?\w+\s+(\w+)\s*[=;{]/ },
   ],
   ruby: [
-    { kind: 'class', regex: /^class\s+(\w+)/ },
-    { kind: 'module', regex: /^module\s+(\w+)/ },
+    // Allow leading indentation so classes/modules nested in a module (the norm
+    // in Rails-style code) are captured, not just top-level ones.
+    { kind: 'class', regex: /^\s*class\s+(\w+)/ },
+    { kind: 'module', regex: /^\s*module\s+(\w+)/ },
     { kind: 'function', regex: /^\s*def\s+(?:self\.)?(\w+)/ },
     { kind: 'import', regex: /require(?:_relative)?\s+['"](.[^'"]+)['"]/ },
     { kind: 'variable', regex: /^\s*(\w+)\s*=/ },
