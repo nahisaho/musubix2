@@ -188,6 +188,8 @@ npx musubix cg index <file|dir> # Code graph analysis — see docs/codegraph.md
 npx musubix cg impact <frag>    # Reverse dependency impact (--direct, --depth N, --json)
 npx musubix cg gate --max-cycles 0 --forbid "ui/:db/"   # CI architecture gate (non-zero exit)
 npx musubix security <file|dir> # Security scanning (--fail-on <sev>, --exclude-tests)
+npx musubix verify <requirements.md>      # Formal EARS→SMT verification & consistency check
+npx musubix dfg <file>          # Data-flow analysis; flags unused definitions (--unused)
 npx musubix policy              # Policy verification
 npx musubix ontology add <s> <p> <o>      # Ontology management (add|list|validate|stats, persisted)
 
@@ -195,6 +197,7 @@ npx musubix ontology add <s> <p> <o>      # Ontology management (add|list|valida
 npx musubix knowledge           # Knowledge graph operations (put|get|link|query|stats, persisted)
 npx musubix decision            # ADR management (create|list|get|accept|deprecate, persisted)
 npx musubix deep-research       # Deep research queries
+npx musubix search <query> --corpus <dir> # TF-IDF semantic search over a corpus (--top N)
 
 # Neurosymbolic
 npx musubix explain <file|code> # Code explanation

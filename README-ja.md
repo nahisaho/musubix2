@@ -186,6 +186,8 @@ npx musubix cg index <file|dir> # コードグラフ解析 — docs/codegraph.md
 npx musubix cg impact <frag>    # 逆依存の影響分析（--direct, --depth N, --json）
 npx musubix cg gate --max-cycles 0 --forbid "ui/:db/"   # CI アーキテクチャゲート（非ゼロ終了）
 npx musubix security <file|dir> # セキュリティスキャン（--fail-on <sev>, --exclude-tests）
+npx musubix verify <requirements.md>      # EARS→SMT 形式検証と論理整合性チェック
+npx musubix dfg <file>          # データフロー解析、未使用定義を検出（--unused）
 npx musubix policy              # ポリシー検証
 npx musubix ontology add <s> <p> <o>      # オントロジー管理（add|list|validate|stats、永続化）
 
@@ -193,6 +195,7 @@ npx musubix ontology add <s> <p> <o>      # オントロジー管理（add|list|
 npx musubix knowledge           # 知識グラフ操作（put|get|link|query|stats、永続化）
 npx musubix decision            # ADR 管理（create|list|get|accept|deprecate、永続化）
 npx musubix deep-research       # ディープリサーチ
+npx musubix search <query> --corpus <dir> # コーパス内の TF-IDF セマンティック検索（--top N）
 
 # ニューロシンボリック
 npx musubix explain <file|code> # コード説明
