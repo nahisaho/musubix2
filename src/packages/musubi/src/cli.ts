@@ -1303,17 +1303,52 @@ function findDependencyCycles(
 /** Load a persisted code graph from an arbitrary path (for cg diff). */
 function loadGraphFromPath(
   path: string,
-): { nodes: StoredGraphNode[]; edges: StoredGraphEdge[] } | null {
+): { nodes: StoredGraphNode[]; edges: StoredGraphEdge[]; files?: string[] } | null {
   try {
     if (!existsSync(path)) {return null;}
     const data = JSON.parse(readFileSync(path, 'utf-8')) as {
       nodes?: StoredGraphNode[];
       edges?: StoredGraphEdge[];
+      files?: string[];
     };
-    return { nodes: data.nodes ?? [], edges: data.edges ?? [] };
+    // Preserve `files` so a file-level `cg export --format json` snapshot can be
+    // used as a `cg diff` baseline (it has no `nodes`).
+    return { nodes: data.nodes ?? [], edges: data.edges ?? [], files: data.files };
   } catch {
     return null;
   }
+}
+
+/**
+ * Normalize either graph shape to a file-level view for diffing:
+ *  - symbol-level `{nodes, edges}` (raw codegraph.json) → files from node paths,
+ *    edges resolved via resolveFileEdges;
+ *  - file-level `{files, edges:[{from,to,kind}]}` (cg export --format json) → used
+ *    directly. Both produce the same `from\tto\tkind` edge keys.
+ */
+function toFileGraph(data: {
+  nodes?: StoredGraphNode[];
+  edges?: StoredGraphEdge[];
+  files?: string[];
+}): { files: Set<string>; edges: Map<string, { from: string; to: string; kind: string }> } {
+  if (Array.isArray(data.files)) {
+    const files = new Set<string>(data.files);
+    const edges = new Map<string, { from: string; to: string; kind: string }>();
+    for (const e of (data.edges ?? []) as Array<{ from?: string; to?: string; kind?: string }>) {
+      if (e && e.from && e.to) {
+        files.add(e.from);
+        files.add(e.to);
+        const kind = e.kind ?? 'imports';
+        edges.set(`${e.from}\t${e.to}\t${kind}`, { from: e.from, to: e.to, kind });
+      }
+    }
+    return { files, edges };
+  }
+  const nodes = data.nodes ?? [];
+  return {
+    files: new Set(nodes.map((n) => n.filePath)),
+    edges: resolveFileEdges(nodes, data.edges ?? []),
+  };
 }
 
 /** Detailed per-subcommand help for `cg`. */
@@ -2020,17 +2055,19 @@ export async function handleCodegraph(
         console.error(`❌ Current graph not found or unreadable: ${currentPath}`);
         return ExitCode.GENERAL_ERROR;
       }
-      if (current.nodes.length === 0) {
+      const base = toFileGraph(baseline);
+      const cur = toFileGraph(current);
+      if (cur.files.size === 0) {
         console.log('Current graph is empty. Run `musubix cg index <path>` first.');
         return ExitCode.SUCCESS;
       }
-      const baseFiles = new Set(baseline.nodes.map((n) => n.filePath));
-      const curFiles = new Set(current.nodes.map((n) => n.filePath));
+      const baseFiles = base.files;
+      const curFiles = cur.files;
       const filesAdded = [...curFiles].filter((f) => !baseFiles.has(f)).sort();
       const filesRemoved = [...baseFiles].filter((f) => !curFiles.has(f)).sort();
 
-      const baseEdges = resolveFileEdges(baseline.nodes, baseline.edges);
-      const curEdges = resolveFileEdges(current.nodes, current.edges);
+      const baseEdges = base.edges;
+      const curEdges = cur.edges;
       const fmt = (r: { from: string; to: string; kind: string }) =>
         `${r.from} → ${r.to}${r.kind === 'calls' ? ' [call]' : ''}`;
       const edgesAdded = [...curEdges.entries()].filter(([k]) => !baseEdges.has(k)).map(([, v]) => v);
@@ -2113,7 +2150,14 @@ export async function handleCodegraph(
         }
       }
       const rels = [...fileEdges.values()];
+      // Seed the file set from ALL indexed files (respecting the filter), not
+      // just edge endpoints — otherwise an isolated file with no dependencies
+      // is dropped from the export, and a `cg diff` baseline of such files
+      // looks empty (every file then reported as "added").
       const fileSet = new Set<string>();
+      for (const f of new Set(nodes.map((n) => n.filePath))) {
+        if (!filter || f.includes(filter)) {fileSet.add(f);}
+      }
       for (const r of rels) { fileSet.add(r.from); fileSet.add(r.to); }
 
       let output: string;

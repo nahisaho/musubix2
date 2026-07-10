@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.70] - 2026-07-11
+
+dogfooding 実装テスト 10 本を実施し、3 件の不具合を発見・修正。
+
+### Fixed
+
+- **Go の SQL インジェクションが検出されなかった** — taint 解析に 3 つのギャップ: (1) Go の `:=` 短縮変数宣言を代入として認識していなかった、(2) シンク照合が大文字始まりのメソッド名（Go/Java/C# の `db.Query`/`Execute`/`QueryRow`、`executeQuery`）に一致していなかった、(3) シンク正規表現を再構築する際に元のフラグ（`i`）を捨てて `g` 固定にしていた。3 点すべて修正し、`q := "…"+id; db.Query(q)` のような Go のインジェクションを検出できるようになった（パラメータ化クエリは誤検出しない）
+- **`cg export` が依存の無い孤立ファイルを出力から欠落** — ファイル一覧をエッジの端点からのみ構築していたため、import/参照を持たない単一ファイルが export（DOT/JSON）に含まれなかった。全インデックス済みファイルから一覧を構成するよう修正
+- **`cg export --format json` の出力を `cg diff` のベースラインに使えなかった** — export は `{files, edges}`（ファイルレベル）を書き出す一方、`cg diff` は `{nodes, edges}`（シンボルレベル）の `nodes` を読んでいたため、export したスナップショットをベースラインにすると全ファイルが「追加」と誤報告されていた。両フォーマットを受理するよう `cg diff` を修正（生の codegraph.json ベースラインも従来どおり動作）
+
 ## [0.5.69] - 2026-07-11
 
 dogfooding 実装テスト（複数ドメインの大きめ要件セット）で 2 件を発見・修正。

@@ -621,7 +621,9 @@ interface TaintSink {
 export class TaintDataflowAnalyzer {
   private readonly sinks: TaintSink[] = [
     {
-      re: /\b(?:execute|executemany|query|raw|prepare)\s*\(\s*(\$?\w+)\s*[,)]/g,
+      // Case-insensitive + `\w*` so Go/Java/C# forms match too: db.Query(q),
+      // QueryRow/QueryContext, stmt.executeQuery(q), executeUpdate(q).
+      re: /\b(?:execute\w*|query\w*|raw|prepare)\s*\(\s*(\$?\w+)\s*[,)]/gi,
       severity: 'high', type: 'injection', cweId: 'CWE-89',
       label: 'SQL injection — a dynamically-built string flows into a query',
       suggestion: 'Use parameterized queries; never pass a formatted/concatenated string to the DB.',
@@ -683,7 +685,9 @@ export class TaintDataflowAnalyzer {
     // `$var = …` / `var = …` at statement start (not ==, <=, >=, !=). Also
     // accepts JS/TS declarations (`const`/`let`/`var`) with an optional type
     // annotation — without this, taint never propagates through TS variables.
-    const assignRe = /^\s*(?:(?:const|let|var)\s+)?(\$?[A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=)\s*(.+)$/;
+    // Accepts JS/TS declarations (`const`/`let`/`var`), an optional `: T` type
+    // annotation, and Go's `:=` short declaration (the `:?` before `=`).
+    const assignRe = /^\s*(?:(?:const|let|var)\s+)?(\$?[A-Za-z_]\w*)\s*(?::[^=]+)?:?=(?!=)\s*(.+)$/;
 
     // Collect tainted variables (name → 1-based definition line), propagating
     // taint through assignments to a fixpoint (bounded).
@@ -717,7 +721,9 @@ export class TaintDataflowAnalyzer {
     const seen = new Set<string>();
     lines.forEach((line, i) => {
       for (const sink of this.sinks) {
-        const re = new RegExp(sink.re.source, 'g');
+        // Preserve the sink's own flags (e.g. `i` for Go/Java `Query`/`Execute`);
+        // ensure `g` so exec() iterates all matches on the line.
+        const re = new RegExp(sink.re.source, sink.re.flags.includes('g') ? sink.re.flags : sink.re.flags + 'g');
         let m: RegExpExecArray | null;
         while ((m = re.exec(line)) !== null) {
           const arg = m[1];

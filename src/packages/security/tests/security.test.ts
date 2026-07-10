@@ -289,6 +289,17 @@ describe('TaintDataflowAnalyzer', () => {
     expect(df.analyze('const g = `Hello, ${name}!`;\nconsole.log(g);', 'ok.ts')).toHaveLength(0);
     expect(df.analyze('const sql = "SELECT * FROM t WHERE id = ?";\ndb.query(sql, [id]);', 'ok.ts')).toHaveLength(0);
   });
+
+  // v0.5.70 — Go: `:=` short declaration + capitalized sink (db.Query).
+  it('tracks taint through Go := and a capitalized Query sink', () => {
+    const code = 'q := "SELECT * FROM u WHERE id = " + id\ndb.Query(q)\n';
+    expect(df.analyze(code, 'h.go').some((f) => f.cweId === 'CWE-89')).toBe(true);
+  });
+
+  it('matches capitalized SQL sinks (Go Exec / QueryRow)', () => {
+    expect(df.analyze('q := "DELETE " + id\ndb.Execute(q)', 'h.go').length).toBeGreaterThan(0);
+    expect(df.analyze('q := "SELECT " + id\ndb.QueryRow(q)', 'h.go').length).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

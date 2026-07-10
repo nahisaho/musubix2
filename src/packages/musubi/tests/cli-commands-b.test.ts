@@ -915,6 +915,42 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.70: an isolated file (no edges) must still appear in the export, and a
+  // file-level JSON export must be usable as a `cg diff` baseline.
+  it('cg export includes isolated files and round-trips through cg diff', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_iso');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'lonely.ts'), 'export function lonely(): number { return 1; }\n');
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      // Isolated file (0 edges) appears in the JSON export.
+      logSpy.mockClear();
+      expect(await handleCodegraph('export', ['--format', 'json'])).toBe(ExitCode.SUCCESS);
+      const parsed = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+      expect(parsed.files.some((f: string) => f.includes('lonely.ts'))).toBe(true);
+
+      // Snapshot it, then add a dependent file and diff: only the new file/edge
+      // should be reported (baseline is a file-level export, not raw nodes).
+      const baseline = join(dir, 'base.json');
+      expect(await handleCodegraph('export', ['--out', baseline, '--format', 'json'])).toBe(ExitCode.SUCCESS);
+      writeFileSync(join(dir, 'user.ts'), "import { lonely } from './lonely.js';\nexport function u(): number { return lonely(); }\n");
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      logSpy.mockClear();
+      expect(await handleCodegraph('diff', [baseline, '--json'])).toBe(ExitCode.SUCCESS);
+      const diff = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+      expect(diff.filesAdded.some((f: string) => f.includes('user.ts'))).toBe(true);
+      expect(diff.filesAdded.some((f: string) => f.includes('lonely.ts'))).toBe(false); // in baseline
+      expect(diff.counts.filesRemoved).toBe(0);
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.26: cg diff — compare two graph snapshots.
   it('cg diff reports added files and dependencies', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_diff');
