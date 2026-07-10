@@ -2,8 +2,8 @@
 
 CodeGraph builds a symbol- and file-level dependency graph from source code and
 provides analysis, diagnosis, visualization, and CI-gating on top of it. It
-parses **C, C++, TypeScript, JavaScript, Python, Java, Go, Rust** and more; C
-and TypeScript/JS are the most thoroughly validated.
+parses **C, C++, TypeScript, JavaScript, Python, Java, Go, Rust, Ruby, PHP** and
+more; C and TypeScript/JS are the most thoroughly validated.
 
 The graph is persisted to `.musubix/codegraph.json` under the current directory,
 so `index` runs once and every other subcommand reads that snapshot.
@@ -21,8 +21,9 @@ npx musubix cg gate --max-cycles 0   # CI: fail on any circular dependency
 
 `cg index` extracts, per file:
 
-- **Definitions** — functions, class methods (`obj.method()`), structs/unions/
-  enums (C), classes/interfaces (TS).
+- **Definitions** — functions and methods, plus type definitions per language:
+  structs/unions/enums (C, Go, Rust), classes/interfaces (TS/Java/PHP), traits
+  (Rust/PHP), and modules (Ruby/Go). Methods are nested under their owning type.
 - **Import edges** — `#include` / `import` / `use` … (file → module).
 - **Call edges** — cross-file function and method calls, resolved to the unique
   defining file. C internal linkage (`static`) binds locally; standard-library
@@ -169,12 +170,20 @@ a forbidden layering edge is introduced. A ready-to-copy workflow lives at
   methods).
 - **Python** — functions and class/nested `def` methods (indented) are captured
   and resolved; Python builtins/str-methods are not mistaken for user defs.
-- **Rust** — functions and methods; std trait/Option-Result methods
-  (`clone`/`as_ref`/`unwrap`/…) are not mistaken for user defs.
+- **Rust** — functions, structs/enums, traits and their methods. An inherent
+  `impl Type` attaches its methods to the existing struct/enum node instead of
+  emitting a duplicate type node; a trait impl (`impl Trait for Type`) is kept
+  as its own node. std trait/Option-Result methods (`clone`/`as_ref`/`unwrap`/…)
+  are not mistaken for user defs.
+- **Go** — package functions, structs, interfaces and receiver methods. A
+  receiver method is attached to its struct/interface even when declared
+  **before** the type (Go allows this); interface method signatures are captured
+  as members; generic functions and methods (`func Map[T any](…)`) are parsed.
 - **Ruby** — modules, classes (including nested), and `def` methods are captured.
-- **Go, Java, PHP** — function/method definitions via the language parser;
-  these self-filter well (constructor conventions, overridden `equals`/`String`,
-  non-redefinable builtins). Call-edge resolution uses the unique-name heuristic.
+- **Java, PHP** — function/method definitions via the language parser (PHP
+  captures traits and their methods); these self-filter well (constructor
+  conventions, overridden `equals`/`String`, non-redefinable builtins).
+  Call-edge resolution uses the unique-name heuristic.
 
 Builtin/stdlib call suppression is scoped per caller language, so a name that is
 a builtin in one language never suppresses a genuine method of the same name in
