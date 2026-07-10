@@ -46,6 +46,24 @@ describe('DES-COD-003: SecretDetector', () => {
     expect(findings.some((f) => f.description.includes('JWT'))).toBe(true);
   });
 
+  // v0.5.72 — AWS *secret* access key value (the AKIA rule catches only the id).
+  it('detects an AWS secret access key', () => {
+    const code = 'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
+    expect(detector.scan(code, 'a.env').some((f) => f.description.includes('AWS secret'))).toBe(true);
+  });
+
+  // v0.5.72 — config-style `key: value` secrets (YAML/env), with placeholder guards.
+  it('detects config-style api_key / password secrets and skips placeholders', () => {
+    expect(detector.scan('api_key: abcdef1234567890abcdef1234567890', 'c.yml')
+      .some((f) => f.type === 'hardcoded-credential')).toBe(true);
+    expect(detector.scan('password: supersecret123456', 'c.yml')
+      .some((f) => f.type === 'hardcoded-credential')).toBe(true);
+    // Placeholders / env refs / booleans are not secrets.
+    for (const line of ['password: changeme', 'api_key: ${API_KEY}', 'api_key: your-api-key-here', 'password: null', 'password: abc']) {
+      expect(detector.scan(line, 'c.yml').filter((f) => f.type === 'hardcoded-credential')).toHaveLength(0);
+    }
+  });
+
   it('returns empty findings for clean code', () => {
     const code = 'const x = 1;\nconst y = x + 2;\n';
     const findings = detector.scan(code, 'clean.ts');

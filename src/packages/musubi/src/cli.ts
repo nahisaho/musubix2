@@ -942,6 +942,15 @@ const EXT_TO_LANG: Record<string, SupportedLanguage> = {
   kt: 'kotlin', scala: 'scala', hs: 'haskell', lua: 'lua',
 };
 
+// Config / infra file types that commonly hold hardcoded secrets. The security
+// scan includes these (for secret/credential detection) in addition to the
+// source languages in EXT_TO_LANG. Files without an extension (Dockerfile) map
+// to '' below via the basename fallback in the scan's ext derivation.
+const SECRET_SCAN_EXT = new Set([
+  'env', 'yml', 'yaml', 'json', 'toml', 'ini', 'cfg', 'conf', 'config',
+  'properties', 'xml', 'sh', 'bash', 'zsh', 'tf', 'tfvars', 'pem', 'txt',
+]);
+
 const WALK_IGNORE = new Set(['node_modules', '.git', 'dist', 'coverage', '.next', 'build']);
 
 /**
@@ -2263,9 +2272,13 @@ export async function handleSecurity(
 
     // Accept a single file or a directory (recursively scanned). Vendored and
     // minified third-party files are always skipped (they aren't the user's code
-    // and dominate the noise, e.g. bundled jquery/select2).
-    const allFiles = collectFiles(filePath, (ext) => ext in EXT_TO_LANG)
-      .filter((f) => !isVendorOrMinified(f));
+    // and dominate the noise, e.g. bundled jquery/select2). Config/secret-bearing
+    // file types (.env/.yml/.json/…) are scanned too — hardcoded credentials
+    // most often live there, not in source code.
+    const allFiles = collectFiles(
+      filePath,
+      (ext) => ext in EXT_TO_LANG || SECRET_SCAN_EXT.has(ext),
+    ).filter((f) => !isVendorOrMinified(f));
     const files = excludeTests ? allFiles.filter((f) => !isTestFile(f)) : allFiles;
     const skipped = allFiles.length - files.length;
     const rawFindings: SecurityFinding[] = [];
@@ -2997,6 +3010,18 @@ export async function handleCodegen(
       }
       console.error(`✅ Generated ${targets.length} skeleton(s) from ${nameOrFile}`);
       return ExitCode.SUCCESS;
+    }
+    // A path-like argument that doesn't exist is a mistyped file, not a class
+    // name — don't silently generate a class named after the path.
+    if (/[\\/]/.test(nameOrFile) || /\.(md|json|ts|tsx|js|jsx|ya?ml)$/i.test(nameOrFile)) {
+      console.error(`❌ File not found: ${nameOrFile}`);
+      return ExitCode.GENERAL_ERROR;
+    }
+    // Reject an unknown --type instead of emitting `undefined`.
+    const validTypes = generator.getTemplateTypes();
+    if (!validTypes.includes(type as (typeof validTypes)[number])) {
+      console.error(`❌ Unknown --type "${type}". Valid: ${validTypes.join(', ')}`);
+      return ExitCode.VALIDATION_ERROR;
     }
     // A plain identifier → one skeleton (kept as-is if already valid).
     const safeName = /^[A-Za-z_$][\w$]*$/.test(nameOrFile) ? nameOrFile : toPascalCase(nameOrFile);

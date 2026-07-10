@@ -260,6 +260,20 @@ describe('handleCodegen', () => {
     expect(code).toBe(ExitCode.SUCCESS);
   });
 
+  // v0.5.72 — an unknown --type must error, not print `undefined`.
+  it('rejects an unknown template type', async () => {
+    const code = await handleCodegen('Foo', 'bogus');
+    expect(code).toBe(ExitCode.VALIDATION_ERROR);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Unknown --type'));
+  });
+
+  // v0.5.72 — a path-like arg that doesn't exist is a mistyped file, not a class.
+  it('errors on a nonexistent path-like argument', async () => {
+    const code = await handleCodegen('/no/such/file.md', 'class');
+    expect(code).toBe(ExitCode.GENERAL_ERROR);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('File not found'));
+  });
+
   // v0.5.43 — pipeline: codegen consumes design artifacts / requirements files.
   it('generates a skeleton per requirement from a Markdown file', async () => {
     const file = join(FIXTURE_DIR, 'codegen-reqs.md');

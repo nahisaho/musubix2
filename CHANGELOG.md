@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.72] - 2026-07-11
+
+dogfooding 実装テスト 50 本（第 2 巡）を実施し、5 件の不具合＋テスト分離を修正。
+
+### Fixed
+
+- **セキュリティスキャンが設定ファイルを検査していなかった** — `.env`/`.yml`/`.yaml`/`.json`/`.toml`/`.ini` などが `EXT_TO_LANG` に含まれず走査対象外だった。ハードコードされた秘密情報が最も多く存在するのは設定ファイルであるため、シークレット検出対象に設定/インフラ系拡張子を追加（package-lock.json の整合ハッシュ等は誤検出しない）
+- **AWS シークレットアクセスキーが検出されなかった** — `AKIA…` のアクセスキー ID は検出していたが、40 文字のシークレットキー値（`AWS_SECRET_ACCESS_KEY=…`）は未検出だった。変数名アンカー＋40 文字 base64 のパターンを追加
+- **設定形式のハードコード秘密情報（`api_key: …` / `password: …`）が未検出** — 既存の password 検出は `=` とクォート必須で YAML/env 形式（`:`・クォート無し）を拾えなかった。プレースホルダ・環境変数参照・boolean を除外するバリデータ付きのパターンを追加
+- **`codegen --type <不正値>` が `undefined` を出力** — 未知のテンプレート種別で `undefined` を標準出力していた。有効な種別一覧を示してエラーにするよう修正
+- **`codegen <存在しないパス>` がパス名からクラスを生成** — 存在しないファイルパスをクラス名として扱い無意味なクラスを生成していた。パス様の引数が存在しない場合は「File not found」エラーにするよう修正
+
+### Tests
+
+- ontology の CLI テストの一部が cwd の `.musubix` を汚染し、実行順序により空ストア前提のテストが不安定だった。一時ディレクトリで分離するよう修正
+
+MCP サーバー 61 ツールも直接検証し、全カテゴリで正常動作を確認。
+
 ## [0.5.71] - 2026-07-11
 
 dogfooding 実装テスト 50 本を実施し、5 件の不具合を発見・修正。

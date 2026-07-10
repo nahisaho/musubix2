@@ -184,6 +184,26 @@ export function isNotUrlPlaceholder(matchText: string): boolean {
 }
 
 /**
+ * For a config-style `key: value` / `key = value` secret match, reject obvious
+ * non-secrets: placeholders, env/variable references, and boolean/null values.
+ * Keeps false positives down on templates and example configs.
+ */
+export function isLikelyConfigSecret(matchText: string): boolean {
+  const v = matchText
+    .replace(/^[^:=]*[:=]\s*/, '') // drop the key and separator
+    .replace(/^['"]|['"]\s*$/g, '') // strip surrounding quotes
+    .trim();
+  if (v.length < 8) {return false;}
+  // Placeholders / examples / defaults.
+  if (/^(change[_-]?me|your[_-].*|example.*|sample.*|placeholder|redacted|secret|password|passwd|token|none|null|true|false|undefined|xxx+|\*+|todo|tbd)$/i.test(v)) {
+    return false;
+  }
+  // Env / variable / template references, not literals.
+  if (/[$#]\{|\$\w|<[^>]+>|\{\{|%\(|process\.env|os\.environ|getenv/i.test(v)) {return false;}
+  return true;
+}
+
+/**
  * Blank out comments and string-literal interiors while preserving byte offsets
  * and line breaks, so injection patterns (eval/exec/innerHTML/…) don't match
  * inside a docblock (`* @method … eval()`) or a string literal (`'eval()'`).
@@ -291,6 +311,29 @@ export class SecretDetector {
       suggestion: 'Remove the AWS key and use environment variables or a secrets manager',
       cweId: 'CWE-798',
       confidence: 0.95,
+    },
+    {
+      // AWS *secret* access key: anchored on the well-known variable name plus a
+      // 40-char base64 value (the AKIA rule only catches the access-key *id*).
+      regex: /\baws_secret_access_key\b['"\s]*[=:]\s*['"]?[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+])/gi,
+      severity: 'critical',
+      type: 'secret-leak',
+      description: 'AWS secret access key detected',
+      suggestion: 'Remove the AWS secret key and use environment variables or a secrets manager',
+      cweId: 'CWE-798',
+      confidence: 0.9,
+    },
+    {
+      // Config-style hardcoded secret (`api_key: …`, `password = …`) in code or
+      // YAML/env. `validate` rejects placeholders, env refs, and booleans.
+      regex: /\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|password|passwd)\b\s*[:=]\s*['"]?[^\s'"#]{8,}['"]?/gi,
+      severity: 'high',
+      type: 'hardcoded-credential',
+      description: 'Hardcoded API key / secret assignment detected',
+      suggestion: 'Load secrets from environment variables or a secrets manager',
+      cweId: 'CWE-798',
+      confidence: 0.7,
+      validate: isLikelyConfigSecret,
     },
     {
       regex: /-----BEGIN[A-Z ]*PRIVATE KEY-----/g,

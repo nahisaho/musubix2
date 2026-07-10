@@ -231,13 +231,23 @@ describe('CLI Commands B — Policy', () => {
 
 describe('CLI Commands B — Ontology', () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
+  let prevCwd: string;
+  let dir: string;
 
   beforeEach(() => {
+    // Isolate in a fresh cwd so the empty-store assertions are deterministic —
+    // the ontology store lives at `.musubix/ontology.json` under cwd.
+    dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_onto_empty');
+    mkdirSync(dir, { recursive: true });
+    prevCwd = process.cwd();
+    process.chdir(dir);
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
+    process.chdir(prevCwd);
     logSpy.mockRestore();
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('ontology validate returns SUCCESS (empty store reports no data)', async () => {
@@ -1116,6 +1126,23 @@ describe('CLI Commands B — Security', () => {
       expect(code).toBe(ExitCode.SUCCESS);
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Security scan'));
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Total findings'));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // v0.5.72 — secrets in config files (.env/.yml) must be scanned, not just code.
+  it('scans config files for hardcoded secrets', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_sec_cfg');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'app.env'), 'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n');
+    writeFileSync(join(dir, 'conf.yml'), 'api_key: abcdef1234567890abcdef1234567890\n');
+    try {
+      const code = await handleSecurity(dir);
+      expect(code).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toMatch(/AWS secret access key/i);
+      expect(out).toMatch(/API key|secret/i);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
