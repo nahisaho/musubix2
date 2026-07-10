@@ -99,6 +99,13 @@ const FUNCTION_SIG_RE = /function\s+(\w+)\s*\(([^)]*)\)/g;
 const ARROW_FN_RE = /(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)/g;
 const METHOD_RE = /(\w+)\s*\(([^)]*)\)\s*\{/g;
 
+// Control-flow keywords that look like calls (`if (...) {`, `for (...) {`) but
+// are not functions/methods; excluded so they aren't learned as patterns.
+const CONTROL_KEYWORDS = new Set([
+  'if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'do', 'else',
+  'with', 'await', 'yield', 'typeof', 'delete', 'void', 'in', 'of', 'new',
+]);
+
 interface ParsedSignature {
   name: string;
   arity: number;
@@ -115,7 +122,7 @@ function parseSignatures(snippet: string): ParsedSignature[] {
     let match: RegExpExecArray | null;
     while ((match = re.exec(snippet)) !== null) {
       const name = match[1];
-      if (seen.has(name)) {continue;}
+      if (seen.has(name) || CONTROL_KEYWORDS.has(name)) {continue;}
       seen.add(name);
       const paramStr = match[2] ?? '';
       const params = paramStr

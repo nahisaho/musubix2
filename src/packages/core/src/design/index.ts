@@ -42,14 +42,20 @@ const OPERATION_STOPWORDS = new Set([
   'system', 'shall', 'will', 'must', 'should',
 ]);
 
-/**
- * Derive a camelCase operation name from an EARS requirement.
- *
- * Prefers the verb phrase following `SHALL` (e.g. "…SHALL create a user
- * account" → `createUserAccount`); a `SHALL NOT` phrase becomes `reject…`.
- * Falls back to the requirement title, then to `execute`.
- */
-export function deriveOperation(text: string, fallbackTitle = ''): string {
+/** Verbs whose operations return a truthy/falsey result. */
+const BOOLEAN_VERBS = new Set([
+  'validate', 'verify', 'check', 'ensure', 'confirm', 'authenticate', 'authorize',
+  'allow', 'reject', 'prevent', 'deny', 'is', 'has', 'can', 'match', 'compare',
+]);
+/** Verbs whose operations produce/return a value (return type = object noun). */
+const VALUE_VERBS = new Set([
+  'create', 'issue', 'generate', 'produce', 'build', 'make', 'fetch', 'get',
+  'load', 'find', 'return', 'retrieve', 'compute', 'calculate', 'resolve', 'render',
+]);
+/** Verbs whose operations return a collection. */
+const LIST_VERBS = new Set(['list', 'query', 'search', 'collect', 'enumerate']);
+
+function operationParts(text: string, fallbackTitle: string): { negated: boolean; words: string[] } {
   const shall = /\bSHALL\s+(NOT\s+)?([^.。\n]+)/i.exec(text);
   const negated = Boolean(shall?.[1]);
   const phrase = (shall?.[2] ?? fallbackTitle ?? '').trim();
@@ -58,11 +64,60 @@ export function deriveOperation(text: string, fallbackTitle = ''): string {
     .map((w) => w.replace(/[^A-Za-z0-9]/g, ''))
     .filter((w) => w.length > 0 && !OPERATION_STOPWORDS.has(w.toLowerCase()))
     .slice(0, 4);
-  const parts = negated ? ['reject', ...words] : words;
-  if (parts.length === 0) {return 'execute';}
+  return { negated, words };
+}
+
+function camelJoin(parts: string[]): string {
   return parts
     .map((w, i) => (i === 0 ? w.charAt(0).toLowerCase() + w.slice(1) : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
     .join('');
+}
+
+function pascalJoin(parts: string[]): string {
+  return parts.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+}
+
+/**
+ * Derive a camelCase operation name from an EARS requirement.
+ *
+ * Prefers the verb phrase following `SHALL` (e.g. "…SHALL create a user
+ * account" → `createUserAccount`); a `SHALL NOT` phrase becomes `reject…`.
+ * Falls back to the requirement title, then to `execute`.
+ */
+export function deriveOperation(text: string, fallbackTitle = ''): string {
+  const { negated, words } = operationParts(text, fallbackTitle);
+  const parts = negated ? ['reject', ...words] : words;
+  if (parts.length === 0) {return 'execute';}
+  return camelJoin(parts);
+}
+
+/**
+ * Derive a full method signature (name, params, return type) from an EARS
+ * requirement. Return type is inferred from the verb: boolean-ish verbs
+ * (validate/authenticate/…) → `boolean`, value-producing verbs
+ * (create/issue/get/…) → the object noun as a type, collection verbs
+ * (list/query/…) → `T[]`; everything else → `void`. `SHALL NOT` → `boolean`
+ * (a guard that reports whether the unwanted case was blocked).
+ */
+export function deriveMethodSignature(
+  text: string,
+  fallbackTitle = '',
+): { name: string; params: string; returnType: string } {
+  const { negated, words } = operationParts(text, fallbackTitle);
+  const name = deriveOperation(text, fallbackTitle);
+  if (words.length === 0) {return { name, params: '', returnType: 'void' }; }
+
+  const verb = words[0].toLowerCase();
+  const objectWords = words.slice(1);
+  let returnType = 'void';
+  if (negated || BOOLEAN_VERBS.has(verb)) {
+    returnType = 'boolean';
+  } else if (LIST_VERBS.has(verb)) {
+    returnType = objectWords.length > 0 ? `${pascalJoin(objectWords)}[]` : 'unknown[]';
+  } else if (VALUE_VERBS.has(verb) && objectWords.length > 0) {
+    returnType = pascalJoin(objectWords);
+  }
+  return { name, params: '', returnType };
 }
 
 export interface DesignDocument {
@@ -234,12 +289,12 @@ export class DesignGenerator {
 
   private deriveComponents(reqs: ParsedRequirementInput[]): DesignComponent[] {
     return reqs.map((r) => {
-      const op = deriveOperation(r.text, r.title);
-      const compName = this.pascal(r.title || op) + (/(service|manager|controller|repository)$/i.test(r.title) ? '' : 'Service');
+      const sig = deriveMethodSignature(r.text, r.title);
+      const compName = this.pascal(r.title || sig.name) + (/(service|manager|controller|repository)$/i.test(r.title) ? '' : 'Service');
       return {
         name: compName,
         responsibility: r.title || `Handle ${r.id}`,
-        methods: [{ name: op, params: '', returnType: 'void' }],
+        methods: [sig],
         requirementIds: [r.id],
       };
     });

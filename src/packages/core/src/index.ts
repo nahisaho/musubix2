@@ -168,6 +168,7 @@ export {
   createDesignGenerator,
   createSOLIDValidator,
   deriveOperation,
+  deriveMethodSignature,
   type DesignDocument,
   type DesignSection,
   type DesignComponent,

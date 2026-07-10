@@ -13,7 +13,7 @@ import {
   createCLIDispatcher,
 } from '../src/cli.js';
 import { ExitCode } from '@musubix2/core';
-import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const FIXTURE_DIR = join(import.meta.dirname ?? '.', '__fixtures_a__');
@@ -266,6 +266,19 @@ describe('handleCodegen', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  // v0.5.46 — codegen infers a return type and can write to a file for test:gen.
+  it('infers a return type and writes the skeleton to --out', async () => {
+    const reqs = join(FIXTURE_DIR, 'codegen-out-reqs.md');
+    const out = join(FIXTURE_DIR, 'codegen-out.ts');
+    writeFileSync(reqs, '## REQ-USR-002: User Login\n**要件**: THE system SHALL issue a session token.\n');
+    expect(await handleCodegen(reqs, 'class', out)).toBe(ExitCode.SUCCESS);
+    expect(existsSync(out)).toBe(true);
+    const written = readFileSync(out, 'utf-8');
+    expect(written).toContain('issueSessionToken(): SessionToken');
+    // The written file must be consumable by test:gen (round-trip).
+    expect(await handleTestGen(out)).toBe(ExitCode.SUCCESS);
   });
 
   // v0.5.45 — codegen prefers a design document's components (which carry methods).

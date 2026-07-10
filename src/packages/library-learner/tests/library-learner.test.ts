@@ -113,6 +113,20 @@ describe('DES-LRN-003: LibraryLearner', () => {
     expect(patterns.some((p) => p.name === 'processData')).toBe(true);
   });
 
+  // v0.5.46 — control-flow keywords look like calls but must not be learned.
+  it('does not learn control-flow keywords as patterns', () => {
+    const patterns = learner.learn([
+      'function add(a, b) { if (a > 0) { return a + b; } for (;;) {} return helper(b); }',
+      'function helper(x) { while (x) { switch (x) {} } return x; }',
+    ]);
+    const names = patterns.map((p) => p.name);
+    expect(names).toContain('add');
+    expect(names).toContain('helper');
+    for (const kw of ['if', 'for', 'while', 'switch', 'return', 'catch']) {
+      expect(names).not.toContain(kw);
+    }
+  });
+
   it('should count frequency of repeated patterns', () => {
     const patterns = learner.learn([
       'function handle(req) {}',

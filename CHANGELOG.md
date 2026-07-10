@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.46] - 2026-07-10
+
+4 テーマ（A: 生成品質の深掘り、B: MCP 実地検証、C: CodeGraph パーサ精度、D: 未ドッグフーディング パッケージ）を設計・実装。各テーマはドッグフーディングで実バグを発見して修正。
+
+### A. 生成品質の深掘り
+
+- **codegen の戻り値型推論** — メソッドが `(): void` 固定だったのを、動詞から型を推論。生成/取得系（create/issue/get…）→ 目的語の型（`issueSessionToken(): SessionToken`）、検証系（validate/authenticate/`SHALL NOT`…）→ `boolean`、収集系（list/query…）→ `T[]`、それ以外 → `void`
+- **`codegen generate --out <file>`** — 生成コードをファイル出力し、そのまま `test:gen` に渡せるように（要件 → 設計 → コード → テストの一気通貫）
+- core から `deriveMethodSignature()` を export（`deriveOperation` と共通化）
+
+### B. MCP サーバーの実地検証
+
+- **JSON-RPC ワイヤ経路の E2E テストを追加** — `handleJsonRpc`（stdio トランスポートと同一経路）で `initialize` → `tools/list`（61 ツール）→ `tools/call` を駆動し、requirements → design → codegen のフローが CLI と同等に動くことを検証。未知メソッドの -32601、失敗ツールの `isError`＋実エラー surface も確認
+
+### C. CodeGraph パーサ精度（Rust）
+
+- **struct/impl の重複ノードを解消** — 継承 impl（`impl S { … }`）が `struct:S` とは別に `class:S` を生成して型が二重計上されていた問題を修正。impl のメソッドは既存の struct/enum ノードに集約（trait impl `impl T for S` は従来通り別ノード）
+- impl/struct/enum ブロック内の `fn` を `method` として正しく分類
+
+### D. 未ドッグフーディング パッケージ（library-learner）
+
+- **`learn analyze` が制御構文キーワードをパターン誤検出** — `if (…) {`／`for`／`while`／`switch` 等を関数/メソッドとして学習していた問題を修正（`METHOD_RE` にキーワード除外を追加）。`explain` / `deep-research query` / `watch` は正常動作を確認
+
+### Tests
+
+- 全 **1799 テスト**緑 / lint 0 errors / branch coverage 80.3% / clean `tsc -b`
+- core: `deriveMethodSignature` の型推論、mcp-server: JSON-RPC E2E、codegraph: Rust struct/impl 集約、library-learner: 制御構文の除外、musubi: codegen `--out`→test:gen 往復・learn のキーワード除外
+
 ## [0.5.45] - 2026-07-10
 
 0.5.44 の「生成品質」で積み残していた 2 項目を実装 — **design セクションの詳細化**と **codegen のメソッド生成**。SDD パイプライン（要件 → 設計 → コード）が「空クラス」ではなく実際のメソッド付き骨格を出力するようになった。

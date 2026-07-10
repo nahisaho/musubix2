@@ -420,6 +420,24 @@ describe('CLI Commands C — Learn', () => {
     }
   });
 
+  // v0.5.46 — control-flow keywords must not be reported as learned patterns.
+  it('learn analyze does not report control-flow keywords', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'musubix2-learn-kw-'));
+    try {
+      writeFileSync(
+        join(dir, 'c.js'),
+        'function add(a, b) { if (a > 0) { return a + b; } return helper(b); }\nfunction helper(x) { return x * 2; }\n',
+      );
+      expect(await handleLearn('analyze', [dir])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('- add:');
+      expect(out).toContain('- helper:');
+      expect(out).not.toMatch(/- if:/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('learn unknown subcommand shows usage', async () => {
     const code = await handleLearn(undefined, []);
     expect(code).toBe(ExitCode.SUCCESS);

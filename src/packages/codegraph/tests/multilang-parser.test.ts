@@ -733,6 +733,30 @@ impl Config {
     expect(impl!.children[0].returnType).toBe('Self');
   });
 
+  // v0.5.46 — an inherent impl attaches its methods to the existing struct
+  // rather than emitting a duplicate `class:Type` node.
+  it('attaches inherent impl methods to the struct without duplicating it', () => {
+    const result = parser.parse(`
+struct Counter {
+    value: i32,
+}
+
+impl Counter {
+    pub fn increment(&mut self) {
+    }
+    pub fn value(&self) -> i32 {
+        self.value
+    }
+}
+`);
+    const named = result.nodes.filter((n) => n.name === 'Counter');
+    expect(named).toHaveLength(1); // no duplicate struct + class
+    const counter = named[0];
+    expect(counter.type).toBe('struct');
+    expect(counter.children.map((c) => c.name)).toEqual(['increment', 'value']);
+    expect(counter.children.every((c) => c.type === 'method')).toBe(true);
+  });
+
   it('should detect impl Trait for Type', () => {
     const result = parser.parse(`
 impl Display for Config {

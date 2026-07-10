@@ -2290,7 +2290,7 @@ import {
   createUnitTestGenerator,
   createRequirementsInterviewer,
   createRequirementsDocGenerator,
-  deriveOperation,
+  deriveMethodSignature,
   type RequirementsInterviewer as RequirementsInterviewerType,
 } from '@musubix2/core';
 
@@ -2705,11 +2705,10 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
   const parser = new MarkdownEARSParser();
   const targets: CodegenTarget[] = [];
   for (const req of parser.parse(content)) {
-    const op = deriveOperation(req.text, req.title);
     targets.push({
       name: toPascalCase(req.title || req.id),
       type: 'class',
-      methods: [{ name: op, params: '', returnType: 'void' }],
+      methods: [deriveMethodSignature(req.text, req.title)],
     });
   }
   return targets;
@@ -2718,6 +2717,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
 export async function handleCodegen(
   nameOrFile: string,
   type: string = 'class',
+  outPath?: string,
 ): Promise<ExitCodeValue> {
   try {
     const generator = createCodeGenerator();
@@ -2732,13 +2732,25 @@ export async function handleCodegen(
         );
         return ExitCode.VALIDATION_ERROR;
       }
+      const blocks: string[] = [];
       for (const t of targets) {
         const result = generator.generate({
           templateType: t.type as Parameters<typeof generator.generate>[0]['templateType'],
           name: t.name,
           methods: t.methods.length > 0 ? t.methods : undefined,
         });
-        console.log(result.code);
+        blocks.push(result.code);
+      }
+      const code = blocks.join('\n\n');
+      if (outPath) {
+        // Write a single source file so it can be fed straight into `test:gen`.
+        writeFileSync(outPath, code + '\n', 'utf-8');
+        console.error(`✅ Wrote ${targets.length} skeleton(s) to ${outPath}`);
+        console.error(`   Next: musubix test:gen ${outPath}`);
+        return ExitCode.SUCCESS;
+      }
+      for (const block of blocks) {
+        console.log(block);
         console.log('');
       }
       console.error(`✅ Generated ${targets.length} skeleton(s) from ${nameOrFile}`);
@@ -2750,6 +2762,12 @@ export async function handleCodegen(
       templateType: type as Parameters<typeof generator.generate>[0]['templateType'],
       name: safeName,
     });
+    if (outPath) {
+      writeFileSync(outPath, result.code + '\n', 'utf-8');
+      console.error(`✅ Wrote skeleton to ${outPath}`);
+      console.error(`   Next: musubix test:gen ${outPath}`);
+      return ExitCode.SUCCESS;
+    }
     console.log(result.code);
     return ExitCode.SUCCESS;
   } catch (err) {
@@ -3756,11 +3774,11 @@ export function getDefaultCommands(): CLICommand[] {
         // Tolerate documented `codegen generate <name>` form.
         const name = resolveTarget(args, ['generate']);
         if (!name) {
-          console.error('❌ Usage: musubix codegen [generate] <name> [--type class|interface|function|...]');
+          console.error('❌ Usage: musubix codegen [generate] <name> [--type class|interface|function|...] [--out <file>]');
           return ExitCode.VALIDATION_ERROR;
         }
         const type = (args['type'] as string | undefined) ?? 'class';
-        return await handleCodegen(name, type);
+        return await handleCodegen(name, type, args['out'] as string | undefined);
       },
     },
     {

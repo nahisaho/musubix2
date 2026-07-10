@@ -5,6 +5,7 @@ import {
   createDesignGenerator,
   createSOLIDValidator,
   deriveOperation,
+  deriveMethodSignature,
   type ParsedRequirementInput,
   type DesignDocument,
 } from '../../src/design/index.js';
@@ -24,6 +25,30 @@ describe('deriveOperation', () => {
 
   it('falls back to execute when nothing usable is present', () => {
     expect(deriveOperation('the system shall the a of')).toBe('execute');
+  });
+});
+
+describe('deriveMethodSignature (v0.5.46)', () => {
+  it('infers a value return type from a producing verb', () => {
+    const sig = deriveMethodSignature('THE system SHALL issue a session token.');
+    expect(sig.name).toBe('issueSessionToken');
+    expect(sig.returnType).toBe('SessionToken');
+  });
+
+  it('infers boolean for validating verbs', () => {
+    expect(deriveMethodSignature('THE system SHALL validate the credentials.').returnType).toBe('boolean');
+  });
+
+  it('infers boolean for SHALL NOT guards', () => {
+    expect(deriveMethodSignature('THE system SHALL NOT expose personal data.').returnType).toBe('boolean');
+  });
+
+  it('infers an array for collection verbs', () => {
+    expect(deriveMethodSignature('THE system SHALL list active sessions.').returnType).toBe('ActiveSessions[]');
+  });
+
+  it('defaults to void for verbs with no clear result', () => {
+    expect(deriveMethodSignature('THE system SHALL email a reset link.').returnType).toBe('void');
   });
 });
 

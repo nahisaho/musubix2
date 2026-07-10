@@ -1169,18 +1169,31 @@ export class RustParser implements LanguageParser {
         const consumedAttrs = pendingAttrs.splice(0);
         for (const a of consumedAttrs) {modifiers.push(`#[${a.name}]`);}
 
-        const node: ASTNode = {
-          type: 'class', // impl blocks act like class extensions
-          name,
-          startLine: consumedAttrs.length > 0
-            ? consumedAttrs[0].line
-            : lineNum,
-          endLine: lineNum,
-          children: [],
-          modifiers,
-          language: 'rust',
-        };
-        nodes.push(node);
+        // For an inherent `impl Type`, attach the methods to the existing
+        // struct/enum node rather than emitting a duplicate `class:Type` node.
+        const existingType = !traitName
+          ? nodes.find(
+              (n) => n.name === typeName && (n.type === 'struct' || n.type === 'enum' || n.type === 'class'),
+            )
+          : undefined;
+
+        let node: ASTNode;
+        if (existingType) {
+          node = existingType;
+        } else {
+          node = {
+            type: 'class', // impl blocks act like class extensions
+            name,
+            startLine: consumedAttrs.length > 0
+              ? consumedAttrs[0].line
+              : lineNum,
+            endLine: lineNum,
+            children: [],
+            modifiers,
+            language: 'rust',
+          };
+          nodes.push(node);
+        }
 
         const blk: BlockInfo = { type: 'impl', name, startLine: lineNum };
         tracker.pushBlock(blk);
@@ -1224,7 +1237,9 @@ export class RustParser implements LanguageParser {
         const isMethod =
           parentNode !== undefined &&
           (parentNode.type === 'class' ||
-            parentNode.type === 'trait');
+            parentNode.type === 'trait' ||
+            parentNode.type === 'struct' ||
+            parentNode.type === 'enum');
 
         const node: ASTNode = {
           type: isMethod ? 'method' : 'function',
