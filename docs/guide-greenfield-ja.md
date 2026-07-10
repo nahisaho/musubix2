@@ -4,7 +4,7 @@
 （Specification Driven Development）ワークフローで開発する手順を、実際のコマンドと
 出力とともに解説します。題材は **URL短縮サービス** です。
 
-> このガイド内のコマンド出力は MUSUBIX2 `v0.5.60` で実際に実行して取得したものです。
+> このガイド内のコマンド出力は MUSUBIX2 `v0.5.63` で実際に実行して取得したものです。
 
 ---
 
@@ -69,7 +69,7 @@ url-shortener/
 ### AI エージェント連携（任意）
 
 `--platform`（`claude` / `copilot` / `both`）を付けると、上記に加えて
-`CLAUDE.md`・`.mcp.json`（MCP サーバー：61 ツール）・`.claude/skills/`（9 つの
+`CLAUDE.md`・`.mcp.json`（MCP サーバー：61 ツール）・`.claude/skills/`（8 つの
 SDD スキル）がセットアップされ、Claude Code / GitHub Copilot から MUSUBIX2 を
 使えるようになります。
 
@@ -146,11 +146,13 @@ MUSUBIX2 は **ドメイン（ID プレフィックス）ごとに要件を凝�
 | セクション | 検出パターン | コンポーネント（メソッド） |
 |-----------|-------------|--------------------------|
 | REQ-LINK | Observer, State | `LinkService(createShortLink / redirectOriginalUrl / resolveLink)` |
-| REQ-STAT | Observer | `Service(recordClickEvent)` |
+| REQ-STAT | Observer | `RecordClickEventService(recordClickEvent)` |
 | REQ-SEC | Strategy | `SecService(rejectRequest / rejectStoreClientIpAddresses)` |
 
-> ヒント: コンポーネント名は要件タイトルから導出されます。日本語タイトルだと名前が
-> 空になりがちなので、タイトルは英語にするか ID から命名されるのを許容します。
+複数要件のドメイン（LINK, SEC）は 1 つの凝集サービス（`LinkService` / `SecService`、
+ドメイン名由来）にまとまります。単一要件の REQ-STAT はタイトル由来ですが、タイトルが
+日本語（非ASCII）のため、SHALL 句から導出した操作名にフォールバックして
+`RecordClickEventService` になります。
 
 ### SOLID 検証
 

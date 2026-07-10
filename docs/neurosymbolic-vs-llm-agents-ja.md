@@ -1,6 +1,6 @@
 # MUSUBIX2 は何が違うのか — ニューロシンボリックと LLM コーディングエージェント（Claude Code / Codex / Devin）
 
-> 本記事の主張は、MUSUBIX2 `v0.5.61` で **実際にコマンドを実行した結果** に基づいています。
+> 本記事の主張は、MUSUBIX2 `v0.5.63` で **実際にコマンドを実行した結果** に基づいています。
 > 出力はすべて再現可能です。
 
 ## 要旨（先に結論）
@@ -29,7 +29,7 @@ LLM エージェントに「記号的な背骨」を与えます（[自然言語
 | 中核 | LLM（確率的推論） | LLM ＋ 決定的な記号エンジン |
 | 出力の再現性 | 実行ごとに変わりうる | **同一入力 → 同一出力** |
 | コード理解 | LLM が読んで推測 | **CodeGraph による厳密な依存グラフ** |
-| 整合性チェック | LLM が「たぶん大丈夫」 | **EARS→SMT-LIB2 形式化**（z3 で検査可能） |
+| 整合性チェック | LLM が「たぶん大丈夫」 | **EARS→SMT で矛盾を検出**（z3 なしでも基本ケース） |
 | 要件↔コード | 対応は暗黙 | **トレーサビリティ行列（厳密な被覆率）** |
 | 実行コスト | トークン・ネットワーク | **ローカル・ミリ秒・トークン 0** |
 | 得意領域 | 曖昧な指示からの生成、探索 | 保証・検証・ゲート・再現性 |
@@ -124,21 +124,36 @@ Gaps (requirements not referenced in code):
 
 ## 実験4: 形式検証 — EARS から SMT-LIB2 へ
 
-MUSUBIX2 は EARS 要件を **SMT-LIB2**（形式論理のソルバー入力）に決定的に変換します。
+MUSUBIX2 は EARS 要件を **SMT-LIB2**（形式論理のソルバー入力）に決定的に変換し、
+**論理的な矛盾を検出** します。矛盾する 2 要件を与えてみます。
+
+```
+## REQ-ACC-001: Grant
+**要件**: THE system SHALL grant access.
+## REQ-ACC-002: Deny
+**要件**: THE system SHALL NOT grant access.
+```
 
 ```bash
-musubix verify reqs.md
+musubix verify contradiction.md
 ```
 
 ```
-✓ REQ-SEC-001 [unwanted] → (assert (not store_the_full_card_number))
+  ✓ REQ-ACC-001 [ubiquitous] → (assert (=> true grant_access))
+  ✓ REQ-ACC-002 [unwanted]   → (assert (not grant_access))
+
+⚠ Requirements are inconsistent — 1 conflict(s):
+  - Combined assertions are unsatisfiable — potential conflict detected.
+# 終了コード: 1（矛盾を検出して CI を落とせる）
 ```
 
-生成される SMT-LIB2 は **z3 などのソルバーで検査可能な成果物** です（`(check-sat)` を
-含む完全なスクリプト）。z3 を導入すれば、要件間の論理的矛盾を数学的に検出できます。
-z3 が無い環境ではモックソルバーにフォールバックするため、**矛盾検出には z3 が必要** です
-（形式化そのものは決定的で常に動作します）。ここが「LLM が読んで大丈夫そう」と判断
-するのとの決定的な違いで、**検証を外部ソルバーに委ねられる** 点にあります。
+`grant_access` を「真」と「偽」の両方で要求しているため、**充足不能（unsat）**として
+検出されます。基本的な矛盾（同一命題の肯定と否定）は **z3 が無くても** 検出できます。
+生成される SMT-LIB2 は `(check-sat)` を含む完全なスクリプトで、**z3 を導入すれば
+条件付きのより複雑な矛盾も** 数学的に検査できます（内蔵チェックは健全＝誤検出なし・
+不完全＝取りこぼしは z3 が補完）。
+
+LLM に「この要件、矛盾してない？」と聞くのと違い、答えは **決定的で監査可能** です。
 
 ---
 
