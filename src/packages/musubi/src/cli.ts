@@ -951,6 +951,16 @@ const SECRET_SCAN_EXT = new Set([
   'properties', 'xml', 'sh', 'bash', 'zsh', 'tf', 'tfvars', 'pem', 'txt',
 ]);
 
+// TS/JS reserved words that cannot be used bare as a type/identifier name.
+const RESERVED_WORDS = new Set([
+  'class', 'interface', 'enum', 'function', 'const', 'let', 'var', 'return',
+  'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue',
+  'new', 'delete', 'typeof', 'instanceof', 'void', 'this', 'super', 'extends',
+  'implements', 'import', 'export', 'default', 'try', 'catch', 'finally',
+  'throw', 'in', 'of', 'yield', 'async', 'await', 'static', 'public', 'private',
+  'protected', 'package', 'null', 'true', 'false', 'with', 'debugger',
+]);
+
 const WALK_IGNORE = new Set(['node_modules', '.git', 'dist', 'coverage', '.next', 'build']);
 
 /**
@@ -2748,11 +2758,17 @@ function deriveC4FromRequirements(content: string): {
 export async function handleDesignC4(
   filePath: string,
   level: string = 'context',
+  format: string = 'mermaid',
 ): Promise<ExitCodeValue> {
   try {
     if (!existsSync(filePath)) {
       console.error(`❌ Path not found: ${filePath}`);
       return ExitCode.GENERAL_ERROR;
+    }
+    const fmt = format.toLowerCase();
+    if (fmt !== 'mermaid' && fmt !== 'plantuml') {
+      console.error(`❌ Unknown --format "${format}". Use mermaid or plantuml.`);
+      return ExitCode.VALIDATION_ERROR;
     }
     const content = readFileSync(filePath, 'utf-8');
     let data: {
@@ -2782,8 +2798,7 @@ export async function handleDesignC4(
 
     const c4Level = level as 'context' | 'container' | 'component' | 'code';
     const diagram = generator.generateDiagram(c4Level, data.title ?? 'System');
-    const mermaid = generator.toMermaid(diagram);
-    console.log(mermaid);
+    console.log(fmt === 'plantuml' ? generator.toPlantUML(diagram) : generator.toMermaid(diagram));
     return ExitCode.SUCCESS;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -3024,7 +3039,10 @@ export async function handleCodegen(
       return ExitCode.VALIDATION_ERROR;
     }
     // A plain identifier → one skeleton (kept as-is if already valid).
-    const safeName = /^[A-Za-z_$][\w$]*$/.test(nameOrFile) ? nameOrFile : toPascalCase(nameOrFile);
+    let safeName = /^[A-Za-z_$][\w$]*$/.test(nameOrFile) ? nameOrFile : toPascalCase(nameOrFile);
+    // A reserved word as a type name emits non-compiling code (`class class {`).
+    // Suffix `_` so the skeleton still type-checks (mirrors the leading-digit fix).
+    if (RESERVED_WORDS.has(safeName)) {safeName = `${safeName}_`;}
     const result = generator.generate({
       templateType: type as Parameters<typeof generator.generate>[0]['templateType'],
       name: safeName,
@@ -4234,11 +4252,12 @@ export function getDefaultCommands(): CLICommand[] {
           ?? (args['subcommand'] as string | undefined)
           ?? positionalArgs[0];
         if (!filePath) {
-          console.error('❌ Usage: musubix design:c4 <file> [--level context|container|component]');
+          console.error('❌ Usage: musubix design:c4 <file> [--level context|container|component] [--format mermaid|plantuml]');
           return ExitCode.VALIDATION_ERROR;
         }
         const level = (args['level'] as string | undefined) ?? 'context';
-        return await handleDesignC4(filePath, level);
+        const c4Format = (args['format'] as string | undefined) ?? 'mermaid';
+        return await handleDesignC4(filePath, level, c4Format);
       },
     },
     {

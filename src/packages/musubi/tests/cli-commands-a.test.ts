@@ -178,6 +178,23 @@ describe('handleDesignC4', () => {
     expect(code).toBe(ExitCode.GENERAL_ERROR);
   });
 
+  // v0.5.73 — --format plantuml is honored (was always Mermaid); bad format errors.
+  it('emits PlantUML when --format plantuml is requested', async () => {
+    const file = join(FIXTURE_DIR, 'c4fmt.json');
+    writeFileSync(file, JSON.stringify({
+      title: 'Sys', elements: [{ id: 'sys', name: 'System', type: 'system', description: 'x' }], relationships: [],
+    }));
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleDesignC4(file, 'context', 'plantuml')).toBe(ExitCode.SUCCESS);
+      expect(logs.join('\n')).toContain('@startuml');
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await handleDesignC4(file, 'context', 'svg')).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
   // v0.5.40 — dogfooding: accept Markdown requirements, not only JSON models.
   it('derives a C4 model from a Markdown requirements file', async () => {
     const file = join(FIXTURE_DIR, 'reqs-c4.md');
@@ -272,6 +289,20 @@ describe('handleCodegen', () => {
     const code = await handleCodegen('/no/such/file.md', 'class');
     expect(code).toBe(ExitCode.GENERAL_ERROR);
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('File not found'));
+  });
+
+  // v0.5.73 — a reserved word as a name must not emit `class class {`.
+  it('sanitizes a reserved word used as a name', async () => {
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleCodegen('class', 'class')).toBe(ExitCode.SUCCESS);
+      const out = logs.join('\n');
+      expect(out).toContain('class class_');
+      expect(out).not.toMatch(/\bclass class\s*\{/); // never the bare reserved word
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   // v0.5.43 — pipeline: codegen consumes design artifacts / requirements files.

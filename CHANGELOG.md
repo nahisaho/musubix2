@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.73] - 2026-07-11
+
+dogfooding 実装テスト 50 本（第 3 巡）を実施し、2 件の不具合を修正。MCP サーバー 61 ツールを正しいパラメータで再検証し、全ツールのロジックが正常であることを確認。
+
+### Fixed
+
+- **`codegen <予約語>` が非コンパイルコードを生成** — `codegen class` が `export class class {`（TS 予約語）を出力し `tsc` が通らなかった。予約語（class/interface/function/return/… など）が名前として渡された場合は `_` を付与してサニタイズ（`class_`）。既存の先頭数字サニタイズ（`3Foo`→`_3Foo`）と一貫した挙動
+- **`design:c4 --format plantuml` が無視されていた** — 常に Mermaid を出力していた（生成器に `toPlantUML` があるにもかかわらず未接続）。`--format mermaid|plantuml` を尊重するよう接続し、未知のフォーマットはエラーとするよう修正
+
+### Verified
+
+- MCP 61 ツールを全カテゴリ（formal-verify / synthesis / neural / research / workflow / policy 等）で正しいパラメータ実行し、ロジックの正常性を確認（例: workflow ゲートが未承認遷移を正しく拒否、version-space が `startsWithUpper` 仮説を学習）
+- SOLID 検証（ISP/DIP 違反検出）、依存スキャナ（child_process 検出）、多言語 CodeGraph（Python/Go/Rust/Java）、decision フルライフサイクル、cg gate（循環・禁止エッジ）が正常動作
+
 ## [0.5.72] - 2026-07-11
 
 dogfooding 実装テスト 50 本（第 2 巡）を実施し、5 件の不具合＋テスト分離を修正。
