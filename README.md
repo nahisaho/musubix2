@@ -254,8 +254,9 @@ npx prettier --write "packages/*/src/**/*.ts" # Format
 
 ## Documentation
 
-- [開発ガイド ① 要件定義から (日本語)](docs/guide-greenfield-ja.md) — greenfield SDD walkthrough
+- [開発ガイド ① 要件定義から (日本語)](docs/guide-greenfield-ja.md) — greenfield SDD walkthrough (CLI)
 - [開発ガイド ② CodeGraph リファクタリング (日本語)](docs/guide-refactoring-ja.md) — analyze & refactor an existing codebase
+- [開発ガイド ③ 自然言語 (日本語)](docs/guide-natural-language-ja.md) — drive the SDD workflow via an AI agent + MCP
 - [CodeGraph (`cg`) reference](docs/codegraph.md) — dependency analysis, impact, cycles, CI gate
 - [日本語 README](README-ja.md)
 - [Contributing Guide (日本語)](CONTRIBUTING.md)

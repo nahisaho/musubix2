@@ -251,8 +251,9 @@ npx prettier --write "packages/*/src/**/*.ts" # フォーマット
 
 ## ドキュメント
 
-- [開発ガイド ① 要件定義からはじめる](docs/guide-greenfield-ja.md) — 新規開発（グリーンフィールド）の手順
+- [開発ガイド ① 要件定義からはじめる](docs/guide-greenfield-ja.md) — 新規開発（コマンドベース）
 - [開発ガイド ② CodeGraph リファクタリング](docs/guide-refactoring-ja.md) — 既存コードの分析とリファクタリング
+- [開発ガイド ③ 自然言語ではじめる](docs/guide-natural-language-ja.md) — AI エージェント + MCP で SDD を進める
 - [CodeGraph (`cg`) リファレンス](docs/codegraph.md) — 依存分析・影響範囲・循環・CI ゲート
 - [English README](README.md)
 - [Contributing Guide](CONTRIBUTING.md)
