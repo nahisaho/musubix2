@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.45] - 2026-07-10
+
+0.5.44 の「生成品質」で積み残していた 2 項目を実装 — **design セクションの詳細化**と **codegen のメソッド生成**。SDD パイプライン（要件 → 設計 → コード）が「空クラス」ではなく実際のメソッド付き骨格を出力するようになった。
+
+### Improved（design セクションの詳細化）
+
+これまで design generate の各セクションは `This section covers N requirement(s): …` の一行のみだった。以下を追加し、実装の指針になる設計文書を出力:
+
+- **責務（Responsibilities）** — 要件ごとに導出した操作名と概要
+- **コンポーネント（Components）** — 要件から導いた PascalCase のクラス名＋**メソッドシグネチャ**（例: `UserRegistrationService.createUserAccount()`）
+- **データエンティティ** — 要件タイトルから抽出した名詞候補
+- 既存の Interfaces / Patterns も CLI 出力に表示（従来は生成のみで非表示だった）
+- `DesignSection` に `responsibilities` / `components` / `dataEntities` を追加（後方互換）
+- 共有ヘルパー `deriveOperation(text, fallback)` を core から export — EARS の `SHALL <動詞句>` から camelCase 操作名を導出（`SHALL NOT` は `reject…`）
+
+### Improved（codegen のメソッド生成）
+
+`codegen generate` が**空のコンストラクタのみ**のクラスを出力していた問題を解消:
+
+- **要件 Markdown** → 各要件の `SHALL` 句からメソッドを導出（例: 「SHALL create a user account」→ `createUserAccount(): void`）
+- **design JSON** → セクションの `components[].methods` を優先的に消費し、メソッド付きクラスを生成
+- 生成メソッド本体は `throw new Error('Not implemented')`（実装待ちを明示）
+
+### Tests
+
+- core: `deriveOperation` の 4 ケース、design セクション enrichment（責務/コンポーネント/メソッド/データエンティティ、Service 二重付与の回避）
+- musubi: codegen が要件・design 双方からメソッドを生成すること、design 出力が責務/コンポーネント/メソッドを表示すること
+- 全 1785 テスト緑・lint 0 errors・branch coverage 80.4%
+
 ## [0.5.44] - 2026-07-10
 
 3 領域を検証・修正: ① MCP サーバー、② 生成品質、③ 細かい分析の正確性。

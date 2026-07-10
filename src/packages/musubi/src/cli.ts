@@ -2290,6 +2290,7 @@ import {
   createUnitTestGenerator,
   createRequirementsInterviewer,
   createRequirementsDocGenerator,
+  deriveOperation,
   type RequirementsInterviewer as RequirementsInterviewerType,
 } from '@musubix2/core';
 
@@ -2505,7 +2506,28 @@ export async function handleDesignGenerate(
     console.log(`Design: ${design.title} (v${design.version})`);
     for (const section of design.sections) {
       console.log(`\n## ${section.title}`);
-      console.log(section.description);
+      console.log(`Requirements: ${section.requirementIds.join(', ')}`);
+      if (section.responsibilities.length > 0) {
+        console.log('\nResponsibilities:');
+        for (const r of section.responsibilities) {console.log(`  - ${r}`);}
+      }
+      if (section.components.length > 0) {
+        console.log('\nComponents:');
+        for (const c of section.components) {
+          const sigs = c.methods.map((m) => `${m.name}(${m.params}): ${m.returnType}`).join(', ');
+          console.log(`  - ${c.name} — ${c.responsibility}`);
+          if (sigs) {console.log(`      methods: ${sigs}`);}
+        }
+      }
+      if (section.interfaces.length > 0) {
+        console.log(`\nInterfaces: ${section.interfaces.join(', ')}`);
+      }
+      if (section.patterns.length > 0) {
+        console.log(`Patterns: ${section.patterns.join(', ')}`);
+      }
+      if (section.dataEntities.length > 0) {
+        console.log(`Data entities: ${section.dataEntities.join(', ')}`);
+      }
     }
     return ExitCode.SUCCESS;
   } catch (err) {
@@ -2632,31 +2654,63 @@ function toPascalCase(s: string): string {
  *  - a design JSON with `elements` → one class per component/container element
  *  - a Markdown requirements doc → one class per requirement (named from title)
  */
-function extractCodegenTargets(content: string): Array<{ name: string; type: string }> {
+interface CodegenMethod {
+  name: string;
+  params: string;
+  returnType: string;
+}
+interface CodegenTarget {
+  name: string;
+  type: string;
+  methods: CodegenMethod[];
+}
+
+function extractCodegenTargets(content: string): CodegenTarget[] {
   const trimmed = content.trimStart();
   if (trimmed.startsWith('{')) {
     try {
       const data = JSON.parse(content) as {
         elements?: Array<{ id?: string; name?: string; type?: string }>;
-        sections?: Array<{ id?: string; title?: string }>;
+        sections?: Array<{
+          id?: string;
+          title?: string;
+          components?: Array<{ name?: string; methods?: CodegenMethod[] }>;
+        }>;
       };
+      // Prefer the design document's components — they carry method signatures
+      // derived from the requirements, so the skeleton isn't just empty classes.
+      const comps = (data.sections ?? []).flatMap((s) => s.components ?? []);
+      if (comps.length > 0) {
+        return comps.map((c) => ({
+          name: toPascalCase(c.name ?? 'Component'),
+          type: 'class',
+          methods: c.methods ?? [],
+        }));
+      }
       const els = (data.elements ?? []).filter((e) => e.type === 'component' || e.type === 'container');
       if (els.length > 0) {
-        return els.map((e) => ({ name: toPascalCase(e.name ?? e.id ?? 'Component'), type: 'class' }));
+        return els.map((e) => ({ name: toPascalCase(e.name ?? e.id ?? 'Component'), type: 'class', methods: [] }));
       }
       if (data.sections?.length) {
-        return data.sections.map((s) => ({ name: toPascalCase(s.title ?? s.id ?? 'Section'), type: 'class' }));
+        return data.sections.map((s) => ({ name: toPascalCase(s.title ?? s.id ?? 'Section'), type: 'class', methods: [] }));
       }
     } catch {
       /* fall through */
     }
     return [];
   }
-  const reqRe = /^#{1,4}\s+(REQ-[A-Z]{3}-\d{3}):\s*(.*)$/gm;
-  const targets: Array<{ name: string; type: string }> = [];
-  let m: RegExpExecArray | null;
-  while ((m = reqRe.exec(content)) !== null) {
-    targets.push({ name: toPascalCase(m[2] || m[1]), type: 'class' });
+  // Markdown requirements → one class per requirement, with a method derived
+  // from the requirement's SHALL clause (e.g. "SHALL create a user account"
+  // → createUserAccount()).
+  const parser = new MarkdownEARSParser();
+  const targets: CodegenTarget[] = [];
+  for (const req of parser.parse(content)) {
+    const op = deriveOperation(req.text, req.title);
+    targets.push({
+      name: toPascalCase(req.title || req.id),
+      type: 'class',
+      methods: [{ name: op, params: '', returnType: 'void' }],
+    });
   }
   return targets;
 }
@@ -2682,6 +2736,7 @@ export async function handleCodegen(
         const result = generator.generate({
           templateType: t.type as Parameters<typeof generator.generate>[0]['templateType'],
           name: t.name,
+          methods: t.methods.length > 0 ? t.methods : undefined,
         });
         console.log(result.code);
         console.log('');

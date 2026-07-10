@@ -4,9 +4,56 @@ import {
   SOLIDValidator,
   createDesignGenerator,
   createSOLIDValidator,
+  deriveOperation,
   type ParsedRequirementInput,
   type DesignDocument,
 } from '../../src/design/index.js';
+
+describe('deriveOperation', () => {
+  it('derives a camelCase operation from a SHALL clause', () => {
+    expect(deriveOperation('THE system SHALL create a user account.')).toBe('createUserAccount');
+  });
+
+  it('prefixes SHALL NOT clauses with reject', () => {
+    expect(deriveOperation('THE system SHALL NOT expose personal data.')).toBe('rejectExposePersonalData');
+  });
+
+  it('falls back to the title when there is no SHALL clause', () => {
+    expect(deriveOperation('no keyword here', 'Password Reset')).toBe('passwordReset');
+  });
+
+  it('falls back to execute when nothing usable is present', () => {
+    expect(deriveOperation('the system shall the a of')).toBe('execute');
+  });
+});
+
+describe('DesignGenerator — enriched sections (v0.5.45)', () => {
+  it('derives responsibilities, components with methods, and data entities', () => {
+    const gen = new DesignGenerator();
+    const doc = gen.generate([
+      { id: 'REQ-USR-001', title: 'User Registration', text: 'WHEN a visitor signs up, THE system SHALL create a user account.', pattern: 'event-driven' },
+      { id: 'REQ-USR-002', title: 'User Login', text: 'THE system SHALL issue a session token.', pattern: 'ubiquitous' },
+    ]);
+    const section = doc.sections[0];
+    expect(section.responsibilities).toHaveLength(2);
+    expect(section.components.map((c) => c.name)).toContain('UserRegistrationService');
+    const reg = section.components.find((c) => c.name === 'UserRegistrationService')!;
+    expect(reg.methods[0].name).toBe('createUserAccount');
+    expect(reg.requirementIds).toEqual(['REQ-USR-001']);
+    expect(section.dataEntities).toContain('User');
+    // The description now enumerates responsibilities and components.
+    expect(section.description).toContain('Components:');
+    expect(section.description).toContain('createUserAccount()');
+  });
+
+  it('does not double-suffix a component whose title already ends in Service', () => {
+    const gen = new DesignGenerator();
+    const doc = gen.generate([
+      { id: 'REQ-PAY-001', title: 'Payment Service', text: 'THE system SHALL charge a card.', pattern: 'ubiquitous' },
+    ]);
+    expect(doc.sections[0].components[0].name).toBe('PaymentService');
+  });
+});
 
 describe('DES-DES-001: DesignGenerator', () => {
   it('should generate a design document from requirements', () => {

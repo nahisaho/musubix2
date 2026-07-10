@@ -99,6 +99,23 @@ describe('handleDesignGenerate', () => {
     const code = await handleDesignGenerate(join(FIXTURE_DIR, 'nope.md'));
     expect(code).toBe(ExitCode.GENERAL_ERROR);
   });
+
+  // v0.5.45 — the printed design now includes responsibilities, components and methods.
+  it('prints responsibilities, components and derived methods', async () => {
+    const file = join(FIXTURE_DIR, 'reqs-detail.md');
+    writeFileSync(file, '## REQ-USR-001: User Registration\n**要件**: THE system SHALL create a user account.\n');
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleDesignGenerate(file)).toBe(ExitCode.SUCCESS);
+      const out = logs.join('\n');
+      expect(out).toContain('Responsibilities:');
+      expect(out).toContain('Components:');
+      expect(out).toContain('createUserAccount');
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 // ── handleDesignC4 ─────────────────────────────────────────────────────────
@@ -230,6 +247,43 @@ describe('handleCodegen', () => {
     const file = join(FIXTURE_DIR, 'codegen-empty.md');
     writeFileSync(file, '# Just a heading\nno requirements here');
     expect(await handleCodegen(file)).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
+  // v0.5.45 — codegen derives method stubs from the requirement's SHALL clause.
+  it('generates a method per requirement instead of an empty class', async () => {
+    const file = join(FIXTURE_DIR, 'codegen-methods.md');
+    writeFileSync(
+      file,
+      '## REQ-USR-001: User Registration\n**要件**: WHEN a visitor signs up, THE system SHALL create a user account.\n',
+    );
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleCodegen(file)).toBe(ExitCode.SUCCESS);
+      const out = logs.join('\n');
+      expect(out).toContain('createUserAccount(');
+      expect(out).toContain("throw new Error('Not implemented')");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // v0.5.45 — codegen prefers a design document's components (which carry methods).
+  it('generates classes with methods from a design artifact', async () => {
+    const reqs = join(FIXTURE_DIR, 'codegen-design-reqs.md');
+    const design = join(FIXTURE_DIR, 'codegen-design.json');
+    writeFileSync(reqs, '## REQ-USR-002: User Login\n**要件**: THE system SHALL issue a session token.\n');
+    await handleDesignGenerate(reqs, design);
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleCodegen(design)).toBe(ExitCode.SUCCESS);
+      const out = logs.join('\n');
+      expect(out).toContain('class UserLoginService');
+      expect(out).toContain('issueSessionToken(');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

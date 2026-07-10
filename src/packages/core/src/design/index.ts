@@ -10,6 +10,17 @@ export interface ParsedRequirementInput {
   pattern: string;
 }
 
+export interface DesignComponent {
+  /** PascalCase component/class name. */
+  name: string;
+  /** One-line statement of what the component is responsible for. */
+  responsibility: string;
+  /** Method signatures (camelCase name + params + return type) this component exposes. */
+  methods: Array<{ name: string; params: string; returnType: string }>;
+  /** Requirement IDs this component realises. */
+  requirementIds: string[];
+}
+
 export interface DesignSection {
   id: string;
   title: string;
@@ -17,6 +28,41 @@ export interface DesignSection {
   description: string;
   interfaces: string[];
   patterns: string[];
+  /** High-level responsibilities of this section (one per requirement). */
+  responsibilities: string[];
+  /** Concrete components with method signatures, derived from the requirements. */
+  components: DesignComponent[];
+  /** Candidate data entities/nouns referenced by the requirements. */
+  dataEntities: string[];
+}
+
+const OPERATION_STOPWORDS = new Set([
+  'a', 'an', 'the', 'to', 'of', 'with', 'for', 'and', 'or', 'its', 'their', 'on',
+  'in', 'into', 'from', 'that', 'this', 'these', 'those', 'all', 'any', 'each',
+  'system', 'shall', 'will', 'must', 'should',
+]);
+
+/**
+ * Derive a camelCase operation name from an EARS requirement.
+ *
+ * Prefers the verb phrase following `SHALL` (e.g. "…SHALL create a user
+ * account" → `createUserAccount`); a `SHALL NOT` phrase becomes `reject…`.
+ * Falls back to the requirement title, then to `execute`.
+ */
+export function deriveOperation(text: string, fallbackTitle = ''): string {
+  const shall = /\bSHALL\s+(NOT\s+)?([^.。\n]+)/i.exec(text);
+  const negated = Boolean(shall?.[1]);
+  const phrase = (shall?.[2] ?? fallbackTitle ?? '').trim();
+  const words = phrase
+    .split(/[\s,、]+/)
+    .map((w) => w.replace(/[^A-Za-z0-9]/g, ''))
+    .filter((w) => w.length > 0 && !OPERATION_STOPWORDS.has(w.toLowerCase()))
+    .slice(0, 4);
+  const parts = negated ? ['reject', ...words] : words;
+  if (parts.length === 0) {return 'execute';}
+  return parts
+    .map((w, i) => (i === 0 ? w.charAt(0).toLowerCase() + w.slice(1) : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .join('');
 }
 
 export interface DesignDocument {
@@ -72,14 +118,20 @@ export class DesignGenerator {
     // Group requirements by common prefixes/categories
     const groups = this.groupRequirements(requirements);
 
-    const sections: DesignSection[] = groups.map((group, idx) => ({
-      id: `${docId}-SEC-${String(idx + 1).padStart(3, '0')}`,
-      title: group.title,
-      requirementIds: group.requirements.map((r) => r.id),
-      description: this.generateDescription(group.requirements),
-      interfaces: this.suggestInterfaces(group.requirements),
-      patterns: this.suggestPatterns(group.requirements),
-    }));
+    const sections: DesignSection[] = groups.map((group, idx) => {
+      const components = this.deriveComponents(group.requirements);
+      return {
+        id: `${docId}-SEC-${String(idx + 1).padStart(3, '0')}`,
+        title: group.title,
+        requirementIds: group.requirements.map((r) => r.id),
+        description: this.generateDescription(group.title, group.requirements, components),
+        interfaces: this.suggestInterfaces(group.requirements),
+        patterns: this.suggestPatterns(group.requirements),
+        responsibilities: this.deriveResponsibilities(group.requirements),
+        components,
+        dataEntities: this.deriveDataEntities(group.requirements),
+      };
+    });
 
     return {
       id: docId,
@@ -150,8 +202,68 @@ export class DesignGenerator {
     }));
   }
 
-  private generateDescription(reqs: ParsedRequirementInput[]): string {
-    return `This section covers ${reqs.length} requirement(s): ${reqs.map((r) => r.id).join(', ')}.`;
+  private generateDescription(
+    title: string,
+    reqs: ParsedRequirementInput[],
+    components: DesignComponent[],
+  ): string {
+    const lines: string[] = [];
+    lines.push(
+      `Design for ${title}, realising ${reqs.length} requirement(s): ${reqs.map((r) => r.id).join(', ')}.`,
+    );
+    lines.push('');
+    lines.push('Responsibilities:');
+    for (const r of reqs) {
+      lines.push(`- ${r.id}: ${r.title || r.text}`);
+    }
+    lines.push('');
+    lines.push('Components:');
+    for (const c of components) {
+      const sigs = c.methods.map((m) => `${m.name}()`).join(', ') || '(no operations inferred)';
+      lines.push(`- ${c.name} — ${c.responsibility} [${sigs}]`);
+    }
+    return lines.join('\n');
+  }
+
+  private deriveResponsibilities(reqs: ParsedRequirementInput[]): string[] {
+    return reqs.map((r) => {
+      const op = deriveOperation(r.text, r.title);
+      return `${r.id}: ${op}${r.title ? ` — ${r.title}` : ''}`;
+    });
+  }
+
+  private deriveComponents(reqs: ParsedRequirementInput[]): DesignComponent[] {
+    return reqs.map((r) => {
+      const op = deriveOperation(r.text, r.title);
+      const compName = this.pascal(r.title || op) + (/(service|manager|controller|repository)$/i.test(r.title) ? '' : 'Service');
+      return {
+        name: compName,
+        responsibility: r.title || `Handle ${r.id}`,
+        methods: [{ name: op, params: '', returnType: 'void' }],
+        requirementIds: [r.id],
+      };
+    });
+  }
+
+  private deriveDataEntities(reqs: ParsedRequirementInput[]): string[] {
+    const entities = new Set<string>();
+    for (const req of reqs) {
+      // Capture "<Capitalised Noun>" phrases and known domain nouns from the title.
+      for (const m of (req.title ?? '').matchAll(/\b([A-Z][a-z]+)\b/g)) {
+        if (!OPERATION_STOPWORDS.has(m[1].toLowerCase())) {entities.add(m[1]);}
+      }
+    }
+    return [...entities];
+  }
+
+  private pascal(text: string): string {
+    const words = text.split(/[\s_\-,、]+/).filter(Boolean);
+    if (words.length === 0) {return 'Component';}
+    return words
+      .map((w) => w.replace(/[^A-Za-z0-9]/g, ''))
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join('');
   }
 
   private suggestInterfaces(reqs: ParsedRequirementInput[]): string[] {
