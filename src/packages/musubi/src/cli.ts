@@ -2206,16 +2206,27 @@ export async function handleSecurity(
       .filter((f) => !isVendorOrMinified(f));
     const files = excludeTests ? allFiles.filter((f) => !isTestFile(f)) : allFiles;
     const skipped = allFiles.length - files.length;
-    const findings: SecurityFinding[] = [];
+    const rawFindings: SecurityFinding[] = [];
     for (const file of files) {
       const code = readFileSync(file, 'utf-8');
-      findings.push(
+      rawFindings.push(
         ...secrets.scan(code, file),
         ...taint.analyze(code, file),
         ...dataflow.analyze(code, file),
         ...deps.scan(code, file),
       );
     }
+
+    // Several detectors can flag the same issue (e.g. the taint and dataflow
+    // analysers both report one SQL injection). Collapse duplicates by
+    // (file, line, type), keeping the highest-confidence finding.
+    const dedup = new Map<string, SecurityFinding>();
+    for (const f of rawFindings) {
+      const key = `${f.location.file}:${f.location.line ?? 0}:${f.type}`;
+      const prev = dedup.get(key);
+      if (!prev || f.confidence > prev.confidence) {dedup.set(key, f);}
+    }
+    const findings = [...dedup.values()];
 
     const bySeverity = new Map<Severity, SecurityFinding[]>();
     for (const f of findings) {
@@ -2405,13 +2416,13 @@ export async function handleReqValidate(filePath: string): Promise<ExitCodeValue
           '⚠ Found "REQ-" text but no parseable requirements. ' +
             'Requirements must be Markdown headings shaped like:',
         );
-        console.error('    ## REQ-XXX-000: <title>   (XXX = 3-letter domain code)');
+        console.error('    ## REQ-XXX-000: <title>   (XXX = 2–6 letter domain code)');
         console.error('    **要件**:');
         console.error('    THE システム SHALL ...');
         if (!headingLike) {
           console.error(
             'ℹ Hint: list items (e.g. "- REQ-001: ...") and IDs without a ' +
-              '3-letter domain code are not recognized.',
+              '2–6 letter domain code are not recognized.',
           );
         }
         return ExitCode.VALIDATION_ERROR;

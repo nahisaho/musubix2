@@ -44,6 +44,17 @@ describe('deriveMethodSignature (v0.5.46)', () => {
     expect(sig.returnType).toBe('SessionToken');
   });
 
+  // v0.5.64 — parameters are inferred from an input clause.
+  it('infers parameters from a "submits …" clause', () => {
+    const sig = deriveMethodSignature('WHEN a user submits an email and password, THE system SHALL create an account.');
+    expect(sig.name).toBe('createAccount');
+    expect(sig.params).toBe('email: string, password: string');
+  });
+
+  it('leaves params empty when there is no input clause', () => {
+    expect(deriveMethodSignature('THE system SHALL issue a session token.').params).toBe('');
+  });
+
   it('infers boolean for validating verbs', () => {
     expect(deriveMethodSignature('THE system SHALL validate the credentials.').returnType).toBe('boolean');
   });

@@ -61,6 +61,22 @@ describe('handleReqValidate', () => {
     expect(code).toBe(ExitCode.SUCCESS);
     expect(console.log).toHaveBeenCalledWith('No requirements found in file');
   });
+
+  // v0.5.64 — the diagnostic hint reflects the real rule (2–6 letter domain).
+  it('diagnoses a malformed id with the correct 2–6 letter hint', async () => {
+    const file = join(FIXTURE_DIR, 'malformed.md');
+    writeFileSync(file, '## REQ-X-1: x\n**要件**: THE system SHALL x.\n');
+    const errs: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((m?: unknown) => { errs.push(String(m)); });
+    try {
+      await handleReqValidate(file);
+      const out = errs.join('\n');
+      expect(out).toContain('2–6 letter domain code');
+      expect(out).not.toContain('3-letter');
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 // ── handleReqWizard ────────────────────────────────────────────────────────

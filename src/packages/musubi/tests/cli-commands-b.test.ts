@@ -1051,6 +1051,24 @@ describe('CLI Commands B — Security', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // v0.5.64 — the same issue on the same line is reported once, not per detector.
+  it('deduplicates findings from multiple detectors on the same line', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_sec_dup');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'app.ts'),
+      "app.get('/u', (req, res) => {\n  db.query(\"SELECT * FROM users WHERE n = '\" + req.query.n + \"'\");\n});\n",
+    );
+    try {
+      await handleSecurity(dir);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      const sqlCount = out.split('\n').filter((l) => /SQL injection/i.test(l)).length;
+      expect(sqlCount).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── Workflow ───────────────────────────────────────────────────────────────

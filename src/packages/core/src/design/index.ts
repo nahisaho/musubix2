@@ -110,13 +110,43 @@ export function deriveOperation(text: string, fallbackTitle = ''): string {
   return camelJoin(parts);
 }
 
+/** Verbs that introduce an input to the operation (its parameters). */
+const INPUT_VERBS = /\b(?:submits?|provides?|sends?|enters?|supplies|accepts?|receives?|uploads?|passes?)\b/i;
+const PARAM_STOPWORDS = new Set(['a', 'an', 'the', 'valid', 'new', 'their', 'its', 'his', 'her', 'each', 'any']);
+
+/**
+ * Infer method parameters from an input-introducing clause in the requirement
+ * (e.g. "WHEN a user submits an email and password …" → `email, password`).
+ * Returns a signature fragment like `email: string, password: string`, or ''.
+ */
+export function deriveParams(text: string): string {
+  const m = new RegExp(INPUT_VERBS.source + '\\s+([^.。\\n]+?)(?:,|\\bTHE\\b|\\bSHALL\\b|$)', 'i').exec(text);
+  if (!m) {return '';}
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const chunk of m[1].split(/\s*(?:,|、|\band\b|\bor\b)\s*/i)) {
+    const words = chunk
+      .split(/\s+/)
+      .map((w) => w.replace(/[^A-Za-z0-9]/g, ''))
+      .filter((w) => w.length > 0 && !PARAM_STOPWORDS.has(w.toLowerCase()));
+    if (words.length === 0) {continue;}
+    const name = camelJoin(words.slice(-2)); // last 1–2 words → e.g. sessionToken
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
+  }
+  return names.slice(0, 3).map((n) => `${n}: string`).join(', ');
+}
+
 /**
  * Derive a full method signature (name, params, return type) from an EARS
  * requirement. Return type is inferred from the verb: boolean-ish verbs
  * (validate/authenticate/…) → `boolean`, value-producing verbs
  * (create/issue/get/…) → the object noun as a type, collection verbs
  * (list/query/…) → `T[]`; everything else → `void`. `SHALL NOT` → `boolean`
- * (a guard that reports whether the unwanted case was blocked).
+ * (a guard that reports whether the unwanted case was blocked). Parameters are
+ * inferred from an input clause ("…submits an email and password…").
  */
 export function deriveMethodSignature(
   text: string,
@@ -124,7 +154,8 @@ export function deriveMethodSignature(
 ): { name: string; params: string; returnType: string } {
   const { negated, words } = operationParts(text, fallbackTitle);
   const name = deriveOperation(text, fallbackTitle);
-  if (words.length === 0) {return { name, params: '', returnType: 'void' }; }
+  const params = deriveParams(text);
+  if (words.length === 0) {return { name, params, returnType: 'void' }; }
 
   const verb = words[0].toLowerCase();
   const objectWords = words.slice(1);
@@ -136,7 +167,7 @@ export function deriveMethodSignature(
   } else if (VALUE_VERBS.has(verb) && objectWords.length > 0) {
     returnType = pascalJoin(objectWords);
   }
-  return { name, params: '', returnType };
+  return { name, params, returnType };
 }
 
 export interface DesignDocument {

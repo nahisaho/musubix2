@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.64] - 2026-07-11
+
+実装実験で見つけた 3 件の改善を実施。
+
+### Fixed
+
+- **セキュリティ検出の重複** — taint と dataflow の両アナライザが同一の SQL injection を報告し、同じ行の同じ問題が 2 件出ていた。`(ファイル, 行, 種別)` で重複排除し、信頼度の高い方を残すよう修正
+- **要件が見つからない時のヒントが古い ID ルールを表示** — 「3-letter domain code」と案内していたが、実際のルールは **2〜6 文字**（0.5.49 で変更済み）。メッセージを「2–6 letter domain code」に更新
+
+### Improved
+
+- **codegen のパラメータ推論** — メソッドが常に引数なし `()` だったのを、要件の入力句から引数を推論。`WHEN a user submits an email and password, …` → `createAccount(email: string, password: string): Account`（入力導入動詞: submits/provides/sends/enters/supplies/accepts/receives/uploads/passes）。入力句が無ければ従来どおり引数なし。core から `deriveParams` を追加
+
+### Tests
+
+- core: 入力句からのパラメータ推論、入力句なしで引数空
+- musubi: 同一行の重複検出が 1 件に集約、ID 診断メッセージが「2–6 letter」
+- 全 **1913 テスト**緑 / lint 0 errors / branch coverage 81.7% / clean `tsc -b`
+
 ## [0.5.63] - 2026-07-11
 
 監査で見つかった 2 件を修正。
