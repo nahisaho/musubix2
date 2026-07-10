@@ -172,9 +172,11 @@ npx musubix design generate <file>        # 設計生成（または: design <fi
 npx musubix design:c4 <file>    # C4 ダイアグラム生成（--level context|container|component）
 npx musubix design:verify <file># 設計検証（SOLID）
 npx musubix tasks               # タスク分解管理（validate|list|stats）
-npx musubix codegen generate <name>       # コード生成（--type class|interface|function）
+npx musubix codegen generate <name|file>  # 名前 / design.json / requirements.md からコード生成
+                                #   （--type class|..., --out <file>; // Implements: REQ- コメントを付与）
 npx musubix test:gen <file|dir> # テスト生成（ファイル/ディレクトリ対応）
 npx musubix trace matrix        # 要件 → コード カバレッジマトリクス（--specs <file> --src <dir>）
+npx musubix trace impact <REQ-ID>         # シンボル単位の影響分析（実装コード + 結合要件）
 npx musubix trace:verify        # カバレッジ検証（--specs --src [--strict]）
 npx musubix workflow            # ワークフロー管理（status|approve|transition、永続化）
 npx musubix status              # ステータス表示
