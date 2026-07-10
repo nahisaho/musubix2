@@ -4,7 +4,7 @@
 （Specification Driven Development）ワークフローで開発する手順を、実際のコマンドと
 出力とともに解説します。題材は **URL短縮サービス** です。
 
-> このガイド内のコマンド出力は MUSUBIX2 `v0.5.59` で実際に実行して取得したものです。
+> このガイド内のコマンド出力は MUSUBIX2 `v0.5.60` で実際に実行して取得したものです。
 
 ---
 
@@ -33,35 +33,55 @@ MUSUBIX2 は「要件 → 設計 → コード → テスト」を**トレーサ
 npm install -g musubix2       # もしくは各コマンドを npx musubix2 … で実行
 ```
 
-プロジェクトを初期化します。`--platform` で対象エージェント（`claude` / `copilot`
-/ `both`）を指定すると、`CLAUDE.md`・`.mcp.json`・`.claude/skills/`・
-`storage/specs/requirements.md` などがスキャフォールドされます。
+プロジェクトを初期化します。基本形は SDD の骨格（`steering/`・`storage/specs/`・
+`musubix.config.json`）を生成します。
 
 ```bash
-musubix init url-shortener --platform claude --name "URLShortener"
+musubix init url-shortener --name "URLShortener"
 ```
 
 ```
-✅ Platform setup complete (13ms)
-   Platforms: copilot=false, claude=true
-   Created: 3 files
+✅ Initialized project "URLShortener" at url-shortener
+  url-shortener/steering/product.ja.md
+  …
 ```
 
-生成される主なファイル:
+生成される構造:
 
 ```
 url-shortener/
-├── CLAUDE.md                       # AI エージェント向けガイド
-├── .mcp.json                       # MCP サーバー設定（61 ツール）
-├── .claude/skills/                 # 9 つの SDD スキル
-└── storage/specs/requirements.md   # 要件のひな形
+├── steering/                       # プロジェクトメモリ（Article IV）
+│   ├── product.ja.md               #   プロダクト概要
+│   ├── structure.ja.md             #   構造
+│   ├── tech.ja.md                  #   技術スタック
+│   ├── project.yml
+│   └── rules/constitution.md       #   9 憲法条項
+├── storage/specs/
+│   ├── requirements/               #   要件（.md を配置）
+│   ├── designs/  plans/  reviews/
+├── storage/tasks/tasks.md
+└── musubix.config.json
+```
+
+> **冪等**: 再実行しても既存ファイルは上書きされません（編集済みの steering
+> ドキュメントは保護されます）。テンプレートを初期化し直したい場合は `--force`。
+
+### AI エージェント連携（任意）
+
+`--platform`（`claude` / `copilot` / `both`）を付けると、上記に加えて
+`CLAUDE.md`・`.mcp.json`（MCP サーバー：61 ツール）・`.claude/skills/`（9 つの
+SDD スキル）がセットアップされ、Claude Code / GitHub Copilot から MUSUBIX2 を
+使えるようになります。
+
+```bash
+musubix init url-shortener --platform claude --name "URLShortener"
 ```
 
 ---
 
 ## 2. 要件定義（EARS）
 
-`storage/specs/requirements.md` に EARS 形式で要件を記述します。ID は
+`storage/specs/requirements/requirements.md` に EARS 形式で要件を記述します。ID は
 `REQ-<ドメイン>-<番号>`（ドメインコードは 2〜6 文字）とします。
 
 ```markdown
@@ -89,7 +109,7 @@ url-shortener/
 ### EARS 検証
 
 ```bash
-musubix requirements analyze storage/specs/requirements.md
+musubix requirements analyze storage/specs/requirements/requirements.md
 ```
 
 ```
@@ -113,7 +133,7 @@ REQ-SEC-002: pattern=unwanted, confidence=0.95
 codegen / design:verify / design:c4 に渡せる再利用可能な JSON になります。
 
 ```bash
-musubix design generate storage/specs/requirements.md --out design.json
+musubix design generate storage/specs/requirements/requirements.md --out design.json
 ```
 
 ```
@@ -223,7 +243,7 @@ musubix test:gen src/link.ts
 なければ mock ソルバーにフォールバックします。
 
 ```bash
-musubix verify storage/specs/requirements.md
+musubix verify storage/specs/requirements/requirements.md
 ```
 
 ```
@@ -247,7 +267,7 @@ EARS パターンごとに正しい意味論で SMT 化されます — IF-THEN 
 計測できます。
 
 ```bash
-musubix trace matrix --specs storage/specs/requirements.md --src src
+musubix trace matrix --specs storage/specs/requirements/requirements.md --src src
 ```
 
 ```
@@ -257,7 +277,7 @@ Requirements: 6, referenced in code: 6 (100%), source files: 1
 特定要件を変更したときの影響範囲は**シンボル（クラス/関数）単位**で分析されます。
 
 ```bash
-musubix trace impact REQ-LINK-001 --specs storage/specs/requirements.md --src src
+musubix trace impact REQ-LINK-001 --specs storage/specs/requirements/requirements.md --src src
 ```
 
 ```
@@ -292,15 +312,15 @@ Total findings: 0
 ## 9. まとめ — 一気通貫のフロー
 
 ```bash
-musubix init myapp --platform claude          # 0. 初期化
-# storage/specs/requirements.md を EARS で記述
-musubix requirements analyze storage/specs/requirements.md   # 1. 要件検証
-musubix design generate  storage/specs/requirements.md --out design.json  # 2. 設計
+musubix init myapp --name myapp               # 0. 初期化（--platform で AI 連携も）
+# storage/specs/requirements/requirements.md を EARS で記述
+musubix requirements analyze storage/specs/requirements/requirements.md   # 1. 要件検証
+musubix design generate  storage/specs/requirements/requirements.md --out design.json  # 2. 設計
 musubix design:verify    design.json          #    SOLID 検証
 musubix codegen generate design.json --out src/app.ts        # 3. コード
 musubix test:gen         src/app.ts           # 4. テスト
-musubix verify           storage/specs/requirements.md        # 5. 形式検証
-musubix trace matrix     --specs storage/specs/requirements.md --src src  # 6. トレース
+musubix verify           storage/specs/requirements/requirements.md        # 5. 形式検証
+musubix trace matrix     --specs storage/specs/requirements/requirements.md --src src  # 6. トレース
 musubix security         src                  # 7. セキュリティ
 ```
 
