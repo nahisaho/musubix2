@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.59] - 2026-07-10
+
+design の interface 抽象を codegen に活用。凝集サービスに interface を生成し `implements` するとともに、生成コードが型チェックを通るよう推論エンティティ型のスタブも出力。
+
+### Improved
+
+- **凝集サービスの interface 抽出（DIP）** — 複数の操作を持つサービスに対し、その公開メソッドを宣言する `interface I<Service>` を生成し、クラスに `implements` させる:
+  - 例: `PayService`（charge/refund/capture）→ `export interface IPayService { … } export class PayService implements IPayService`
+  - **単一メソッドのクラスは具象のまま**（過度な抽象化を避ける。憲法 Article VIII: Anti-Abstraction）
+  - パターン雛形（Observer の `on`/`emit` 等）は実装詳細として interface に含めない
+- **推論エンティティ型のスタブ生成** — 戻り値型推論で生成される未定義エンティティ型（例: 「issue a session token」→ `SessionToken`）に対し、`export interface <Type> { /* TODO */ }` のプレースホルダ宣言を出力。これで**生成ファイル全体が `tsc --strict` を通過**するようになった（従来はエンティティ戻り型が未宣言でコンパイル不能だった潜在バグを解消）
+
+### Tests
+
+- core: interface 抽出＋implements、Observer 雛形を contract から除外
+- musubi: 複数操作サービスの interface 抽出、エンティティ型スタブ、単一メソッドは具象維持
+- 全 **1906 テスト**緑 / lint 0 errors / branch coverage 81.7% / clean `tsc -b`
+
 ## [0.5.58] - 2026-07-10
 
 0.5.57 の State パターン雛形を強化。プレースホルダ（Idle/Active/Done）ではなく、要件の WHILE 節から実際の状態名を推論するようにした。

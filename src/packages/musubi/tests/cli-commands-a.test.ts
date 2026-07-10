@@ -320,6 +320,36 @@ describe('handleCodegen', () => {
     expect(code).toContain('if (!this.enabled)');
   });
 
+  // v0.5.59 — a cohesive multi-operation service is generated with an extracted
+  // interface, and inferred entity return types get placeholder declarations so
+  // the file type-checks. A single-method domain stays concrete.
+  it('extracts an interface for a multi-operation service and stubs entity types', async () => {
+    const reqs = join(FIXTURE_DIR, 'codegen-iface-reqs.md');
+    const design = join(FIXTURE_DIR, 'codegen-iface-design.json');
+    const out = join(FIXTURE_DIR, 'codegen-iface.ts');
+    writeFileSync(
+      reqs,
+      [
+        '## REQ-PAY-001: Charge',
+        '**要件**: THE system SHALL charge a card.',
+        '## REQ-PAY-002: Token',
+        '**要件**: THE system SHALL issue a session token.',
+        '## REQ-AUTH-001: Verify',
+        '**要件**: THE system SHALL validate the token.',
+      ].join('\n'),
+    );
+    await handleDesignGenerate(reqs, design);
+    expect(await handleCodegen(design, 'class', out)).toBe(ExitCode.SUCCESS);
+    const code = readFileSync(out, 'utf-8');
+    // PAY has two operations → interface + implements.
+    expect(code).toContain('export interface IPayService {');
+    expect(code).toContain('implements IPayService');
+    // "issue a session token" → SessionToken return type gets a stub.
+    expect(code).toContain('export interface SessionToken {');
+    // AUTH has one operation → concrete, no interface.
+    expect(code).not.toContain('interface IVerifyService');
+  });
+
   // v0.5.45 — codegen prefers a design document's components (which carry methods).
   it('generates classes with methods from a design artifact', async () => {
     const reqs = join(FIXTURE_DIR, 'codegen-design-reqs.md');

@@ -28,6 +28,11 @@ export interface CodeGenOptions {
   patterns?: string[];
   /** State names (from WHILE clauses) for a State-pattern enum. */
   states?: string[];
+  /**
+   * When set, emit an interface of this name declaring the class's methods and
+   * make the class implement it (used for cohesive multi-operation services).
+   */
+  interfaceName?: string;
 }
 
 export interface GeneratedCode {
@@ -91,13 +96,30 @@ export class CodeGenerator {
 
   private renderClass(options: CodeGenOptions): string {
     const desc = options.description ? `\n * ${options.description}` : '';
-    const impl = options.implements ? ` implements ${options.implements}` : '';
     const patterns = new Set(options.patterns ?? []);
     const hasToggle = patterns.has('Feature Toggle');
     const hasState = patterns.has('State');
     const hasObserver = patterns.has('Observer');
 
     const preamble: string[] = []; // declarations emitted before the class (e.g. state enum)
+
+    // Interface extraction (DIP): a cohesive service declares its operations in
+    // an interface that the class implements. Only the public operation methods
+    // form the contract — pattern scaffolding (on/emit) is an implementation
+    // detail and stays off the interface.
+    const methodList = options.methods ?? [];
+    const emitInterface = Boolean(options.interfaceName) && methodList.length > 0;
+    if (emitInterface) {
+      preamble.push(
+        `export interface ${options.interfaceName} {`,
+        ...methodList.map((m) => `  ${m.name}(${m.params}): ${m.returnType};`),
+        '}',
+        '',
+      );
+    }
+    const implementsList = [options.implements, emitInterface ? options.interfaceName : undefined]
+      .filter(Boolean);
+    const impl = implementsList.length > 0 ? ` implements ${implementsList.join(', ')}` : '';
     const fields: string[] = [];
     const extraMethods: string[] = [];
 

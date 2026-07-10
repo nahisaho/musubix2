@@ -2827,6 +2827,26 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
   return targets;
 }
 
+/** TypeScript builtins / library types that never need a generated declaration. */
+const BUILTIN_RETURN_TYPES = new Set([
+  'void', 'boolean', 'string', 'number', 'bigint', 'symbol', 'unknown', 'any',
+  'never', 'object', 'undefined', 'null', 'Date', 'Promise', 'Array',
+]);
+
+/** Emit placeholder `interface` declarations for inferred entity return types. */
+function renderEntityTypeStubs(targets: CodegenTarget[]): string[] {
+  const types = new Set<string>();
+  for (const t of targets) {
+    for (const m of t.methods) {
+      const base = m.returnType.replace(/\[\]$/, '').trim();
+      if (/^[A-Z][A-Za-z0-9]*$/.test(base) && !BUILTIN_RETURN_TYPES.has(base)) {
+        types.add(base);
+      }
+    }
+  }
+  return [...types].sort().map((t) => `export interface ${t} {\n  // TODO: define the ${t} shape\n}`);
+}
+
 export async function handleCodegen(
   nameOrFile: string,
   type: string = 'class',
@@ -2853,6 +2873,9 @@ export async function handleCodegen(
           methods: t.methods.length > 0 ? t.methods : undefined,
           patterns: t.patterns.length > 0 ? t.patterns : undefined,
           states: t.states.length > 0 ? t.states : undefined,
+          // Extract an interface only for a cohesive multi-operation service;
+          // a single-method class stays concrete (Anti-Abstraction, Article VIII).
+          interfaceName: t.methods.length >= 2 ? `I${t.name}` : undefined,
         });
         // Emit a traceability comment (Article V) so `trace matrix` can link the
         // generated code back to the requirement(s) it implements.
@@ -2861,7 +2884,11 @@ export async function handleCodegen(
           : '';
         blocks.push(trace + result.code);
       }
-      const code = blocks.join('\n\n');
+      // Declare placeholder types for inferred entity return types (e.g. a
+      // "SHALL issue a session token" → `issue(): SessionToken`) so the emitted
+      // file type-checks instead of referencing undeclared names.
+      const entityDecls = renderEntityTypeStubs(targets);
+      const code = [...entityDecls, ...blocks].join('\n\n');
       if (outPath) {
         // Write a single source file so it can be fed straight into `test:gen`.
         writeFileSync(outPath, code + '\n', 'utf-8');

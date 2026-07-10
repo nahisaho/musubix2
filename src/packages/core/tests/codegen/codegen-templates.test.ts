@@ -100,6 +100,39 @@ describe('REQ-COD-001: CodeGenerator — 12 template types', () => {
       expect(r.code).toContain('private readonly listeners');
     });
 
+    it('extracts an interface and implements it when interfaceName is set', () => {
+      const r = gen.generate({
+        templateType: 'class',
+        name: 'PayService',
+        methods: [
+          { name: 'charge', params: '', returnType: 'void' },
+          { name: 'refund', params: '', returnType: 'void' },
+        ],
+        interfaceName: 'IPayService',
+      });
+      expect(r.code).toContain('export interface IPayService {');
+      expect(r.code).toContain('  charge(): void;');
+      expect(r.code).toContain('  refund(): void;');
+      expect(r.code).toContain('export class PayService implements IPayService');
+    });
+
+    it('keeps the Observer scaffolding off the interface contract', () => {
+      const r = gen.generate({
+        templateType: 'class',
+        name: 'FeedService',
+        methods: [
+          { name: 'publish', params: '', returnType: 'void' },
+          { name: 'refresh', params: '', returnType: 'void' },
+        ],
+        patterns: ['Observer'],
+        interfaceName: 'IFeedService',
+      });
+      // `on`/`emit` are implementation detail, not part of the interface.
+      const iface = r.code.slice(r.code.indexOf('interface IFeedService'), r.code.indexOf('export class'));
+      expect(iface).not.toContain('on(');
+      expect(iface).not.toContain('emit(');
+    });
+
     it('is unchanged when no patterns are supplied', () => {
       const r = gen.generate({
         templateType: 'class',
