@@ -69,8 +69,8 @@ function sddCoreTools(): CatalogEntry[] {
             valid: validation.valid,
             issues: validation.issues,
           });
-        } catch {
-          return fail('Core package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -91,8 +91,8 @@ function sddCoreTools(): CatalogEntry[] {
             return { text, pattern: analysis.pattern, valid: validation.valid, issues: validation.issues };
           });
           return ok({ results, allValid: results.every((r) => r.valid) });
-        } catch {
-          return fail('Core package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -106,8 +106,8 @@ function sddCoreTools(): CatalogEntry[] {
           const { MarkdownEARSParser } = await import('@musubix2/core');
           const parsed = new MarkdownEARSParser().parse((params['markdown'] as string) ?? '');
           return ok(parsed.map((r) => ({ id: r.id, title: r.title, pattern: r.pattern, text: r.text })));
-        } catch {
-          return fail('Core package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -127,8 +127,8 @@ function sddCoreTools(): CatalogEntry[] {
             pattern: String(r['pattern'] ?? 'ubiquitous'),
           }));
           return ok(createDesignGenerator().generate(mapped));
-        } catch {
-          return fail('Core package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -149,8 +149,8 @@ function sddCoreTools(): CatalogEntry[] {
           }));
           const design = createDesignGenerator().generate(mapped);
           return ok(createSOLIDValidator().validate(design));
-        } catch {
-          return fail('Core package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -172,8 +172,8 @@ function sddCoreTools(): CatalogEntry[] {
             description: params['description'] as string | undefined,
           });
           return ok(code);
-        } catch {
-          return fail('Core package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -193,8 +193,8 @@ function sddCoreTools(): CatalogEntry[] {
             (params['style'] as string ?? 'unit') as never,
           );
           return ok(suite);
-        } catch {
-          return fail('Core package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -226,8 +226,8 @@ function sddCoreTools(): CatalogEntry[] {
             gaps,
             complete: gaps.length === 0 && reqIds.length > 0,
           });
-        } catch {
-          return fail('Trace verification failed');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -243,8 +243,8 @@ function sddCoreTools(): CatalogEntry[] {
           const interviewer = core.createRequirementsInterviewer();
           const result = interviewer.analyzeInput(params['input'] as string);
           return ok(result);
-        } catch {
-          return fail('Requirements interviewer not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -272,8 +272,8 @@ function sddCoreTools(): CatalogEntry[] {
             params['response'] as string,
           );
           return ok(result);
-        } catch {
-          return fail('Requirements interviewer not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -287,8 +287,8 @@ function sddCoreTools(): CatalogEntry[] {
           const core = await import('@musubix2/core') as any;
           const interviewer = core.createRequirementsInterviewer();
           return ok(interviewer.getState());
-        } catch {
-          return fail('Requirements interviewer not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -304,8 +304,8 @@ function sddCoreTools(): CatalogEntry[] {
           const context = params['context'] as Record<string, unknown>;
           const doc = generator.generate(context as never);
           return ok(doc);
-        } catch {
-          return fail('Requirements doc generator not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -333,8 +333,8 @@ function knowledgeTools(): CatalogEntry[] {
           await store.load();
           const entity = await store.getEntity(params['id'] as string);
           return entity ? ok(entity) : fail('Entity not found');
-        } catch {
-          return fail('Knowledge package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -360,8 +360,8 @@ function knowledgeTools(): CatalogEntry[] {
           } as any);
           await store.save();
           return ok({ id: params['id'], type: params['type'], saved: true });
-        } catch {
-          return fail('Knowledge package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -381,8 +381,8 @@ function knowledgeTools(): CatalogEntry[] {
           const deleted = await store.deleteEntity(params['id'] as string);
           if (deleted) await store.save();
           return ok({ id: params['id'], deleted });
-        } catch {
-          return fail('Knowledge package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -408,8 +408,8 @@ function knowledgeTools(): CatalogEntry[] {
           } as any);
           await store.save();
           return ok({ from: params['from'], to: params['to'], type: params['type'], added: true });
-        } catch {
-          return fail('Knowledge package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -429,8 +429,8 @@ function knowledgeTools(): CatalogEntry[] {
           await store.load();
           const results = await store.search(params['query'] as string, { limit: (params['limit'] as number) ?? 10 });
           return ok(results);
-        } catch {
-          return fail('Knowledge package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -450,8 +450,8 @@ function knowledgeTools(): CatalogEntry[] {
           await store.load();
           const result = await store.traverse(params['startId'] as string, { depth: (params['depth'] as number) ?? 2 });
           return ok(result);
-        } catch {
-          return fail('Knowledge package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -467,8 +467,8 @@ function knowledgeTools(): CatalogEntry[] {
           await store.load();
           const stats = store.getStats();
           return ok(stats);
-        } catch {
-          return fail('Knowledge package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -585,8 +585,8 @@ function ontologyTools(): CatalogEntry[] {
           });
           await saveTripleStore(store, file);
           return ok({ added: true, total: store.size() });
-        } catch {
-          return fail('Ontology package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -609,8 +609,8 @@ function ontologyTools(): CatalogEntry[] {
             object: params['object'] as string | undefined,
           });
           return ok({ results, count: results.length });
-        } catch {
-          return fail('Ontology package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -626,8 +626,8 @@ function ontologyTools(): CatalogEntry[] {
           const result = createRuleEngine(true).applyRules(store);
           await saveTripleStore(store, file);
           return ok(result);
-        } catch {
-          return fail('Ontology package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -641,8 +641,8 @@ function ontologyTools(): CatalogEntry[] {
           const { createConsistencyValidator } = await import('@musubix2/ontology-mcp');
           const { store } = await loadTripleStore((params['basePath'] as string) ?? '.');
           return ok(createConsistencyValidator().validate(store));
-        } catch {
-          return fail('Ontology package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -665,8 +665,8 @@ function ontologyTools(): CatalogEntry[] {
             object: params['object'] as string | undefined,
           });
           return ok({ bindings, count: bindings.length });
-        } catch {
-          return fail('Ontology package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -695,8 +695,8 @@ function codeAnalysisTools(): CatalogEntry[] {
             (params['language'] as string ?? 'typescript') as never,
           );
           return ok({ nodes, count: nodes.length });
-        } catch {
-          return fail('Codegraph package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -727,8 +727,8 @@ function codeAnalysisTools(): CatalogEntry[] {
           }
           const stats = engine.getStats();
           return ok({ nodeCount: stats.nodeCount, edgeCount: stats.edgeCount, languages: [...stats.languages] });
-        } catch {
-          return fail('Codegraph package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -762,8 +762,8 @@ function codeAnalysisTools(): CatalogEntry[] {
           }
           const results = new GraphRAGSearch(engine).globalSearch((params['query'] as string) ?? '');
           return ok({ query: params['query'], results });
-        } catch {
-          return fail('Codegraph package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -783,8 +783,8 @@ function codeAnalysisTools(): CatalogEntry[] {
             (params['scope'] as string) ?? 'global',
           );
           return ok(dfg);
-        } catch {
-          return fail('DFG package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -820,8 +820,8 @@ function securityTools(): CatalogEntry[] {
           const { createSecurityScanner } = await import('@musubix2/security');
           const result = createSecurityScanner().scan(sourceOf(params), (params['filePath'] as string) ?? 'inline');
           return ok({ findings: result.findings, severity: severityOf(result.findings) });
-        } catch {
-          return fail('Security package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -838,8 +838,8 @@ function securityTools(): CatalogEntry[] {
           const { createSecretDetector } = await import('@musubix2/security');
           const secrets = createSecretDetector().scan(sourceOf(params), (params['filePath'] as string) ?? 'inline');
           return ok({ secrets, count: secrets.length });
-        } catch {
-          return fail('Security package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -856,8 +856,8 @@ function securityTools(): CatalogEntry[] {
           const { TaintAnalyzer } = await import('@musubix2/security');
           const tainted = new TaintAnalyzer().analyze(sourceOf(params), (params['filePath'] as string) ?? 'inline');
           return ok({ tainted, count: tainted.length });
-        } catch {
-          return fail('Security package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -874,8 +874,8 @@ function securityTools(): CatalogEntry[] {
           const { createComplianceChecker } = await import('@musubix2/security');
           const result = createComplianceChecker().check(sourceOf(params), (params['filePath'] as string) ?? 'inline', []);
           return ok(result);
-        } catch {
-          return fail('Security package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -905,8 +905,8 @@ function researchTools(): CatalogEntry[] {
             sources,
           );
           return ok(result);
-        } catch {
-          return fail('Deep-research package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -928,8 +928,8 @@ function researchTools(): CatalogEntry[] {
             () => sources,
           );
           return ok(result);
-        } catch {
-          return fail('Deep-research package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -950,8 +950,8 @@ function researchTools(): CatalogEntry[] {
           const acc = createKnowledgeAccumulator();
           acc.accumulate(result);
           return ok({ evidence: acc.query(topic), summary: result.summary, confidence: result.confidence });
-        } catch {
-          return fail('Deep-research package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1011,8 +1011,8 @@ function neuralTools(): CatalogEntry[] {
           }
           const hits = engine.search(await embedder.embed((params['query'] as string) ?? ''), (params['topK'] as number) ?? 10);
           return ok({ query: params['query'], hits });
-        } catch {
-          return fail('Neural-search package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1031,8 +1031,8 @@ function neuralTools(): CatalogEntry[] {
           }
           const vector = await model.embed(text);
           return ok({ vector, dimensions: Array.isArray(vector) ? vector.length : (vector as { values?: number[] }).values?.length ?? 0 });
-        } catch {
-          return fail('Neural-search package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1046,8 +1046,8 @@ function neuralTools(): CatalogEntry[] {
           const { createWakePhase } = await import('@musubix2/wake-sleep');
           const items = ((params['items'] as unknown[]) ?? []).map(String);
           return ok(createWakePhase().process(items));
-        } catch {
-          return fail('Wake-sleep package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1061,8 +1061,8 @@ function neuralTools(): CatalogEntry[] {
           const { createSleepPhase } = await import('@musubix2/wake-sleep');
           const patterns = ((params['patterns'] as unknown[]) ?? []).map(String);
           return ok(createSleepPhase().consolidate(patterns));
-        } catch {
-          return fail('Wake-sleep package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1077,8 +1077,8 @@ function neuralTools(): CatalogEntry[] {
           const snippets = ((params['snippets'] as unknown[]) ?? []).map(String);
           const patterns = createLibraryLearner().learn(snippets);
           return ok({ patterns, count: patterns.length });
-        } catch {
-          return fail('Library-learner package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1122,8 +1122,8 @@ function synthesisTools(): CatalogEntry[] {
           }
           const result = builder.execute((params['input'] as string) ?? '');
           return ok({ input: params['input'], ops, result });
-        } catch {
-          return fail('Synthesis package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1141,8 +1141,8 @@ function synthesisTools(): CatalogEntry[] {
           }));
           const rule = createSynthesisEngine().synthesize(examples);
           return ok({ rule, synthesized: rule !== null });
-        } catch {
-          return fail('Synthesis package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1164,8 +1164,8 @@ function synthesisTools(): CatalogEntry[] {
           for (const p of (params['positive'] as string[]) ?? []) mgr.addPositive(name, p);
           for (const n of (params['negative'] as string[]) ?? []) mgr.addNegative(name, n);
           return ok({ name, hypotheses: mgr.getConsistentHypotheses(name), spaces: mgr.getSpaces().size });
-        } catch {
-          return fail('Synthesis package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1214,8 +1214,8 @@ function formalVerifyTools(): CatalogEntry[] {
         try {
           const { createEarsToSmtConverter } = await import('@musubix2/formal-verify');
           return ok(createEarsToSmtConverter().convert(await buildSpecFromParams(params) as never));
-        } catch {
-          return fail('Formal-verify package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1246,8 +1246,8 @@ function formalVerifyTools(): CatalogEntry[] {
         try {
           const { createEarsToLeanConverter } = await import('@musubix2/lean');
           return ok(createEarsToLeanConverter().convert(await buildSpecFromParams(params) as never));
-        } catch {
-          return fail('Lean package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1324,8 +1324,8 @@ function workflowTools(): CatalogEntry[] {
             currentPhase: state.currentPhase,
             approvals: PHASE_ORDER.map((p) => ({ phase: p, approved: tracker.isApproved(p) })),
           });
-        } catch {
-          return fail('Workflow-engine package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1344,8 +1344,8 @@ function workflowTools(): CatalogEntry[] {
           const result = await createPhaseController(tracker).transitionTo(params['targetPhase'] as never);
           if (result.success) await saveTracker(tracker, file);
           return ok(result);
-        } catch {
-          return fail('Workflow-engine package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1364,8 +1364,8 @@ function workflowTools(): CatalogEntry[] {
           const target = (params['targetPhase'] ?? params['gate']) as never;
           const canTransition = await createPhaseController(tracker).canTransition(target);
           return ok({ targetPhase: target, canTransition });
-        } catch {
-          return fail('Workflow-engine package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1384,8 +1384,8 @@ function workflowTools(): CatalogEntry[] {
           tracker.approve(phase as never);
           await saveTracker(tracker, file);
           return ok({ phase, approved: true });
-        } catch {
-          return fail('Workflow-engine package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1420,8 +1420,8 @@ function decisionsTools(): CatalogEntry[] {
             consequences: (params['consequences'] as string) ?? '',
           });
           return ok(adr);
-        } catch {
-          return fail('Decisions package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1436,8 +1436,8 @@ function decisionsTools(): CatalogEntry[] {
           const mgr = createDecisionManager((params['basePath'] as string) ?? '.decisions');
           await mgr.load();
           return ok(await mgr.list());
-        } catch {
-          return fail('Decisions package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1455,8 +1455,8 @@ function decisionsTools(): CatalogEntry[] {
           const mgr = createDecisionManager((params['basePath'] as string) ?? '.decisions');
           await mgr.load();
           return ok(await mgr.search(params['query'] as string));
-        } catch {
-          return fail('Decisions package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1497,8 +1497,8 @@ function skillsTools(): CatalogEntry[] {
         try {
           const mgr = await getSkillManager();
           return ok(mgr.getAvailableSkills().map((s) => ({ id: s.id, name: s.metadata.name, status: s.status })));
-        } catch {
-          return fail('Skill-manager package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1525,8 +1525,8 @@ function skillsTools(): CatalogEntry[] {
             async (input: Record<string, unknown>) => ({ skill: name, output: input }),
           );
           return ok({ id: skill.id, name, registered: true });
-        } catch {
-          return fail('Skill-manager package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),
@@ -1546,8 +1546,8 @@ function skillsTools(): CatalogEntry[] {
           if (!match) return fail(`Skill not registered in this session: ${name}`);
           const output = await match.execute((params['input'] as Record<string, unknown>) ?? {});
           return ok({ executed: true, name, output });
-        } catch {
-          return fail('Skill-manager package not available');
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
         }
       },
     ),

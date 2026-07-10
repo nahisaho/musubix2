@@ -34,12 +34,15 @@ export function validateInput(input: unknown): boolean {
     expect(suite.code).toContain("describe('validateInput'");
   });
 
-  it('should extract exported classes and generate describe blocks', () => {
+  it('should extract exported classes and generate a test per public method', () => {
     const gen = new UnitTestGenerator();
-    const source = `export class MyService {\n  run() {}\n}`;
+    const source = `export class MyService {\n  run() {}\n  private helper() {}\n}`;
     const suite = gen.generate(source, 'unit');
-    expect(suite.testCount).toBe(1);
+    // instantiable + run(); private helper() is excluded (v0.5.44).
+    expect(suite.testCount).toBe(2);
     expect(suite.code).toContain("describe('MyService'");
+    expect(suite.code).toContain("it('run() should work'");
+    expect(suite.code).not.toContain('helper()');
   });
 
   it('should generate fallback test for empty source', () => {

@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.44] - 2026-07-10
+
+3 領域を検証・修正: ① MCP サーバー、② 生成品質、③ 細かい分析の正確性。
+
+### Fixed（① MCP サーバー）
+
+- **誤解を招くエラー隠蔽** — MCP ツールの多くが `try { … } catch { return fail('Core package not available') }` で**実際のエラーを握りつぶし**、常に「Core package not available」等を返していた（コアは実際には読み込めている）。単一文の catch 55 箇所を、**実エラーメッセージを返す**よう修正。61 ツールの初期化・呼び出しは正常動作を確認（`sdd.design.generate` 等）
+- 意図的なフォールバック（既定値を返す 6 箇所）はそのまま維持
+
+### Improved（② 生成品質）
+
+- **`test:gen` のメソッド網羅** — クラスに対し `should be instantiable` のみだったのを、**公開メソッドごとにテストを生成**（`constructor`・`private`/`protected` は除外）。例: `UserService` → `createUser()` / `getUser()` のテストを生成
+
+### Fixed（③ 細かい分析）
+
+- **EARS の If-then 分類** — `IF <条件>, THEN … SHALL …` は EARS の**「unwanted（望ましくない挙動／エラー処理）」パターン**だが `complex` に誤分類されていたのを修正（真の複合は `WHEN…WHILE…` 等の組み合わせのみ）
+- **`trace impact` の実データ連携** — 常に空のリンクで解析していたため影響 0 件だったのを、`--specs`/`--src` から実際のトレースリンク（要件↔ソース）を構築して解析。`trace impact REQ-AUT-001` が参照元ソースファイルを列挙
+
+### Validation
+
+- MCP: 不正入力で実エラー（`reqs.map is not a function`）を返す
+- `test:gen`: 公開メソッドごとにテスト生成、private は除外
+- EARS: `If…then…shall` → `unwanted`（confidence 1）
+- `trace impact`: 要件を参照する 2 ソースファイルを検出
+
+### Tests
+
+- core: EARS unwanted 分類、test:gen メソッド網羅の期待値を更新・追加
+- mcp-server: 実エラーを surface する検証
+- musubi: `trace impact` の実リンク解析を検証
+
 ## [0.5.43] - 2026-07-10
 
 SDD パイプラインの下流連携（続き）。`codegen` が設計成果物・要件ファイルを受け取れず、ファイルパスを渡すと**不正なクラス名**を生成していた問題を修正。

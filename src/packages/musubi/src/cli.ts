@@ -647,16 +647,26 @@ export async function handleTrace(
     case 'impact': {
       const targetId = args[0];
       if (!targetId) {
-        console.error('❌ Usage: musubix trace impact <target-id>');
+        console.error('❌ Usage: musubix trace impact <target-id> [--specs <file>] [--src <dir>]');
         return ExitCode.GENERAL_ERROR;
       }
+      // Build real traceability links (requirement ↔ source file) so impact
+      // analysis reflects the actual codebase, not an empty graph.
+      const { specsFile, srcDir } = resolveTraceInputs(flags);
+      const data = buildCodeTraceData(specsFile, srcDir);
       const analyzer = createImpactAnalyzer();
-      const result = analyzer.analyze(targetId, []);
+      const result = analyzer.analyze(
+        targetId,
+        data.links.map((l) => ({ source: l.source, target: l.target })),
+      );
       console.log(`Impact analysis for ${targetId}:`);
       console.log(`  Level: ${result.level}`);
-      console.log(`  Affected: ${result.affectedIds.length} items`);
+      console.log(`  Affected: ${result.affectedIds.length} item(s)`);
       for (const id of result.affectedIds) {
         console.log(`    - ${id}`);
+      }
+      if (result.affectedIds.length === 0) {
+        console.log(`  ℹ No trace links for '${targetId}' in ${specsFile} / ${srcDir}.`);
       }
       return ExitCode.SUCCESS;
     }

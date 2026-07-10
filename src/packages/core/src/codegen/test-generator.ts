@@ -30,26 +30,35 @@ export class UnitTestGenerator {
     const classes = this.extractNames(sourceCode, EXPORT_CLASS_RE);
 
     const describeBlocks: string[] = [];
+    let testCount = 0;
 
     for (const cls of classes) {
-      describeBlocks.push(
-        `describe('${cls}', () => {\n  it('should be instantiable', () => {\n    // TODO: implement\n    expect(true).toBe(true);\n  });\n});`,
-      );
+      const methods = this.extractMethods(sourceCode, cls);
+      const its: string[] = [
+        `  it('should be instantiable', () => {\n    // TODO: implement\n    expect(true).toBe(true);\n  });`,
+      ];
+      for (const m of methods) {
+        its.push(
+          `  it('${m}() should work', () => {\n    // TODO: implement ${cls}.${m}\n    expect(true).toBe(true);\n  });`,
+        );
+      }
+      testCount += its.length;
+      describeBlocks.push(`describe('${cls}', () => {\n${its.join('\n')}\n});`);
     }
 
     for (const fn of functions) {
       describeBlocks.push(
         `describe('${fn}', () => {\n  it('should work correctly', () => {\n    // TODO: implement\n    expect(true).toBe(true);\n  });\n});`,
       );
+      testCount += 1;
     }
 
     if (describeBlocks.length === 0) {
       describeBlocks.push(
         "describe('module', () => {\n  it('should be defined', () => {\n    expect(true).toBe(true);\n  });\n});",
       );
+      testCount = 1;
     }
-
-    const testCount = classes.length + functions.length || 1;
 
     const code = ["import { describe, it, expect } from 'vitest';", '', ...describeBlocks, ''].join(
       '\n',
@@ -93,6 +102,44 @@ export class UnitTestGenerator {
       names.push(match[1]);
     }
     return names;
+  }
+
+  /**
+   * Extract public method names of a class from source, so each gets its own
+   * test. Skips the constructor, private/protected members and control-flow
+   * keywords; getters/setters are included.
+   */
+  private extractMethods(code: string, className: string): string[] {
+    const start = code.search(new RegExp(`\\bclass\\s+${className}\\b`));
+    if (start < 0) return [];
+    const open = code.indexOf('{', start);
+    if (open < 0) return [];
+    // Balance braces to isolate the class body.
+    let depth = 0;
+    let end = open;
+    for (let i = open; i < code.length; i++) {
+      if (code[i] === '{') depth++;
+      else if (code[i] === '}') {
+        depth--;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+    const body = code.slice(open + 1, end);
+    const methodRe =
+      /(?:^|\n)[ \t]*((?:public\s+|static\s+|async\s+|get\s+|set\s+)*)([a-zA-Z_$][\w$]*)\s*\([^)]*\)\s*(?::\s*[^{;]+)?\{/g;
+    const KEYWORDS = new Set(['if', 'for', 'while', 'switch', 'catch', 'return', 'constructor']);
+    const seen = new Set<string>();
+    const methods: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = methodRe.exec(body)) !== null) {
+      const prefix = m[1];
+      const name = m[2];
+      if (/\b(private|protected)\b/.test(prefix)) continue; // only public
+      if (KEYWORDS.has(name) || seen.has(name)) continue;
+      seen.add(name);
+      methods.push(name);
+    }
+    return methods;
   }
 }
 

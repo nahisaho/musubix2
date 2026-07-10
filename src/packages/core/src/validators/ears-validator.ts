@@ -31,6 +31,14 @@ const PATTERN_RULES: PatternRule[] = [
     bonus: 0.25,
   },
   {
+    // EARS unwanted-behaviour pattern: "IF <condition>, THEN the system SHALL …"
+    // (error handling / undesired events) — classified as unwanted, not complex.
+    pattern: 'unwanted',
+    regex: /\bIF\b.*\bTHEN\b.*\bSHALL\b/i,
+    baseConfidence: 0.6,
+    bonus: 0.25,
+  },
+  {
     pattern: 'unwanted',
     regex: /\bSHALL\s+NOT\b/i,
     baseConfidence: 0.6,
@@ -41,12 +49,6 @@ const PATTERN_RULES: PatternRule[] = [
     regex: /\bWHERE\b.*\b(THE\s+.+\s+)?SHALL\b/i,
     baseConfidence: 0.6,
     bonus: 0.2,
-  },
-  {
-    pattern: 'complex',
-    regex: /\bIF\b.*\bTHEN\b.*\bSHALL\b/i,
-    baseConfidence: 0.55,
-    bonus: 0.15,
   },
   {
     pattern: 'ubiquitous',

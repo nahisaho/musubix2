@@ -217,6 +217,16 @@ describe('v0.5.8 MCP tool wiring', () => {
     expect((r.data as { pattern: string }).pattern).toBe('event-driven');
   });
 
+  // v0.5.44 — tool failures surface the real error, not a generic message.
+  it('surfaces the real error instead of "Core package not available"', async () => {
+    const r = await findTool('sdd-core', 'sdd.design.generate').handler({
+      requirements: 'a string, not an array', // wrong shape → triggers an error
+    });
+    expect(r.success).toBe(false);
+    expect(r.error ?? '').not.toContain('Core package not available');
+    expect(r.error ?? '').toMatch(/map is not a function/);
+  });
+
   it('sdd.requirements.list parses a Markdown document', async () => {
     const r = await findTool('sdd-core', 'sdd.requirements.list').handler({
       markdown: '## REQ-AUT-001: Login\n**要件**:\nTHE system SHALL work.\n',

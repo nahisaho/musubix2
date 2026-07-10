@@ -39,9 +39,11 @@ describe('REQ-REQ-001: EARSValidator', () => {
       expect(result.confidence).toBeGreaterThan(0.60);
     });
 
-    it('should classify COMPLEX pattern', () => {
+    it('should classify IF…THEN…SHALL as the unwanted-behaviour pattern', () => {
+      // In EARS, "IF <condition>, THEN the system SHALL …" is the unwanted
+      // behaviour (error-handling) pattern — not complex (v0.5.44).
       const result = validator.analyze('IF the retry count exceeds 3, THEN THE system SHALL circuit break.');
-      expect(result.pattern).toBe('complex');
+      expect(result.pattern).toBe('unwanted');
       expect(result.confidence).toBeGreaterThan(0.50);
     });
 

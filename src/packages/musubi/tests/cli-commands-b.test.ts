@@ -76,6 +76,29 @@ describe('CLI Commands B — Traceability', () => {
     expect(code).toBe(ExitCode.GENERAL_ERROR);
   });
 
+  // v0.5.44 — impact uses real trace links from specs/src.
+  it('trace impact lists the source files that reference a requirement', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_impact');
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(join(dir, 'reqs.md'), '## REQ-AUT-001: Auth\n**要件**: shall authenticate.\n');
+    writeFileSync(join(dir, 'src', 'a.ts'), '// Implements REQ-AUT-001\nexport const a = 1;\n');
+    writeFileSync(join(dir, 'src', 'b.ts'), '// REQ-AUT-001\nexport const b = 2;\n');
+    try {
+      logSpy.mockClear();
+      const code = await handleTrace('impact', ['REQ-AUT-001'], {
+        specs: join(dir, 'reqs.md'),
+        src: join(dir, 'src'),
+      });
+      expect(code).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('Affected: 2');
+      expect(out).toContain('a.ts');
+      expect(out).toContain('b.ts');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('trace default shows help', async () => {
     const code = await handleTrace(undefined, []);
     expect(code).toBe(ExitCode.SUCCESS);
