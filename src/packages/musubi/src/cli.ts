@@ -2748,6 +2748,8 @@ interface CodegenTarget {
   requirementIds: string[];
   /** Design patterns (from the section) to scaffold into the generated class. */
   patterns: string[];
+  /** State names inferred from WHILE clauses (for a State-pattern enum). */
+  states: string[];
 }
 
 function extractCodegenTargets(content: string): CodegenTarget[] {
@@ -2761,7 +2763,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
           title?: string;
           requirementIds?: string[];
           patterns?: string[];
-          components?: Array<{ name?: string; methods?: CodegenMethod[]; requirementIds?: string[] }>;
+          components?: Array<{ name?: string; methods?: CodegenMethod[]; requirementIds?: string[]; states?: string[] }>;
         }>;
       };
       // Prefer the design document's components — they carry method signatures
@@ -2777,6 +2779,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
           methods: c.methods ?? [],
           requirementIds: c.requirementIds ?? [],
           patterns,
+          states: c.states ?? [],
         }));
       }
       const els = (data.elements ?? []).filter((e) => e.type === 'component' || e.type === 'container');
@@ -2788,6 +2791,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
           // A C4 component whose id is a requirement id carries its own trace.
           requirementIds: /^REQ-[A-Z]{2,6}-\d{3}$/.test(e.id ?? '') ? [e.id as string] : [],
           patterns: [],
+          states: [],
         }));
       }
       if (data.sections?.length) {
@@ -2797,6 +2801,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
           methods: [],
           requirementIds: s.requirementIds ?? [],
           patterns: s.patterns ?? [],
+          states: [],
         }));
       }
     } catch {
@@ -2816,6 +2821,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
       methods: [deriveMethodSignature(req.text, req.title)],
       requirementIds: [req.id],
       patterns: [],
+      states: [],
     });
   }
   return targets;
@@ -2846,6 +2852,7 @@ export async function handleCodegen(
           name: t.name,
           methods: t.methods.length > 0 ? t.methods : undefined,
           patterns: t.patterns.length > 0 ? t.patterns : undefined,
+          states: t.states.length > 0 ? t.states : undefined,
         });
         // Emit a traceability comment (Article V) so `trace matrix` can link the
         // generated code back to the requirement(s) it implements.

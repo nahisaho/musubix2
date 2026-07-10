@@ -1,6 +1,6 @@
 {
   "name": "musubix2",
-  "version": "0.5.57",
+  "version": "0.5.58",
   "description": "MUSUBIX2 — Specification Driven Development System",
   "type": "module",
   "main": "./dist/index.js",

@@ -19,6 +19,8 @@ export interface DesignComponent {
   methods: Array<{ name: string; params: string; returnType: string }>;
   /** Requirement IDs this component realises. */
   requirementIds: string[];
+  /** State names inferred from WHILE clauses (for a state-machine component). */
+  states: string[];
 }
 
 export interface DesignSection {
@@ -317,6 +319,7 @@ export class DesignGenerator {
         responsibility: r.title || `Handle ${r.id}`,
         methods: [sig],
         requirementIds: [r.id],
+        states: this.deriveStates(reqs),
       }];
     }
     // Multiple requirements in the same domain cohere into one service with a
@@ -335,7 +338,28 @@ export class DesignGenerator {
       responsibility: `${domain} domain — ${reqs.length} operations`,
       methods,
       requirementIds: reqs.map((r) => r.id),
+      states: this.deriveStates(reqs),
     }];
+  }
+
+  /**
+   * Infer state-machine states from the WHILE clauses of state-driven
+   * requirements. "WHILE the pipeline is running" → "Running"; a clause with no
+   * "is" uses its last word ("WHILE draining" → "Draining").
+   */
+  private deriveStates(reqs: ParsedRequirementInput[]): string[] {
+    const states = new Set<string>();
+    for (const req of reqs) {
+      for (const m of req.text.matchAll(/\bWHILE\b\s+([^,.。\n]+)/gi)) {
+        const clause = m[1].trim();
+        const isMatch = /\bis\s+([A-Za-z]+)/i.exec(clause);
+        const word = isMatch ? isMatch[1] : clause.split(/\s+/).filter(Boolean).pop();
+        if (word && !OPERATION_STOPWORDS.has(word.toLowerCase())) {
+          states.add(word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+        }
+      }
+    }
+    return [...states];
   }
 
   private deriveDataEntities(reqs: ParsedRequirementInput[]): string[] {

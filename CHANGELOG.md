@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.58] - 2026-07-10
+
+0.5.57 の State パターン雛形を強化。プレースホルダ（Idle/Active/Done）ではなく、要件の WHILE 節から実際の状態名を推論するようにした。
+
+### Improved
+
+- **State enum を WHILE 節から推論** — state-driven 要件の `WHILE <主語> is <状態>` から状態名を抽出し、状態機械の enum を生成。初期状態 `Idle` を先頭に付与:
+  - 例（ストリーム処理）: 「WHILE the pipeline is running」→ `{ Idle, Running }`、「WHILE the pipeline is draining」→ `{ Idle, Draining }`、「WHILE the pipeline is paused」→ `{ Idle, Paused }`
+  - `is` の無い節は末尾語を採用（「WHILE draining」→ `Draining`）、複数 WHILE 要件の状態は 1 enum に統合
+  - 推論できない場合は従来のプレースホルダ（Idle/Active/Done）にフォールバック
+  - 生成コードは `tsc --strict` を通過
+- `DesignComponent.states` / `CodeGenOptions.states` を追加し、design → codegen へ推論状態を伝播
+
+### Tests
+
+- core: WHILE からの状態推論（`is` あり／なし）、推論状態からの enum 生成、プレースホルダ フォールバック
+- 全 **1903 テスト**緑 / lint 0 errors / branch coverage 81.7% / clean `tsc -b`
+
 ## [0.5.57] - 2026-07-10
 
 design で検出した設計パターンを codegen の雛形に反映。生成コードが「空クラス＋メソッドスタブ」から、パターンに応じた構造を持つ骨格になった。

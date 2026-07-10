@@ -26,6 +26,8 @@ export interface CodeGenOptions {
   implements?: string;
   /** Design patterns (Observer, State, Feature Toggle, …) to scaffold into the class. */
   patterns?: string[];
+  /** State names (from WHILE clauses) for a State-pattern enum. */
+  states?: string[];
 }
 
 export interface GeneratedCode {
@@ -99,18 +101,22 @@ export class CodeGenerator {
     const fields: string[] = [];
     const extraMethods: string[] = [];
 
-    // State pattern → a placeholder state enum and a current-state field.
+    // State pattern → a state enum and a current-state field. The states are
+    // inferred from the requirements' WHILE clauses when available (with an
+    // initial Idle state); otherwise a placeholder is emitted.
     if (hasState) {
       const enumName = `${options.name}State`;
+      const inferred = [...new Set((options.states ?? []).filter((s) => s && s !== 'Idle'))];
+      const stateNames = inferred.length > 0 ? ['Idle', ...inferred] : ['Idle', 'Active', 'Done'];
       preamble.push(
         `export enum ${enumName} {`,
-        "  Idle = 'idle',",
-        "  Active = 'active',",
-        "  Done = 'done',",
+        ...stateNames.map((s) => `  ${s} = '${s.toLowerCase()}',`),
         '}',
         '',
       );
-      fields.push(`  // TODO: refine the states for ${options.name}`);
+      if (inferred.length === 0) {
+        fields.push(`  // TODO: refine the states for ${options.name}`);
+      }
       fields.push(`  private state: ${enumName} = ${enumName}.Idle;`);
     }
 

@@ -61,7 +61,7 @@ describe('REQ-COD-001: CodeGenerator — 12 template types', () => {
       expect(r.code).toContain('private emit(event: unknown): void');
     });
 
-    it('scaffolds a State enum and state field', () => {
+    it('scaffolds a placeholder State enum when no states are inferred', () => {
       const r = gen.generate({
         templateType: 'class',
         name: 'HeaterService',
@@ -69,7 +69,24 @@ describe('REQ-COD-001: CodeGenerator — 12 template types', () => {
         patterns: ['State'],
       });
       expect(r.code).toContain('export enum HeaterServiceState');
+      expect(r.code).toContain("Active = 'active'"); // placeholder
       expect(r.code).toContain('private state: HeaterServiceState = HeaterServiceState.Idle');
+    });
+
+    it('builds the State enum from inferred states (with an initial Idle)', () => {
+      const r = gen.generate({
+        templateType: 'class',
+        name: 'PipelineService',
+        methods: [{ name: 'ingest', params: '', returnType: 'void' }],
+        patterns: ['State'],
+        states: ['Running', 'Draining', 'Paused'],
+      });
+      expect(r.code).toContain('export enum PipelineServiceState');
+      expect(r.code).toContain("Idle = 'idle'");
+      expect(r.code).toContain("Running = 'running'");
+      expect(r.code).toContain("Draining = 'draining'");
+      expect(r.code).toContain("Paused = 'paused'");
+      expect(r.code).not.toContain("Done = 'done'"); // placeholder not used
     });
 
     it('composes multiple patterns in one class', () => {

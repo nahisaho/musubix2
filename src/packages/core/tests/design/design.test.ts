@@ -106,6 +106,24 @@ describe('DesignGenerator — enriched sections (v0.5.45)', () => {
     ]);
     expect(doc.sections[0].components[0].name).toBe('PayService');
   });
+
+  // v0.5.58 — states are inferred from WHILE clauses for a state-machine service.
+  it('infers state names from WHILE clauses', () => {
+    const gen = new DesignGenerator();
+    const doc = gen.generate([
+      { id: 'REQ-PIPE-001', title: 'Ingest', text: 'WHILE the pipeline is running, THE system SHALL ingest events.', pattern: 'state-driven' },
+      { id: 'REQ-PIPE-002', title: 'Drain', text: 'WHILE the pipeline is draining, THE system SHALL flush events.', pattern: 'state-driven' },
+    ]);
+    expect(doc.sections[0].components[0].states).toEqual(['Running', 'Draining']);
+  });
+
+  it('uses the last word when a WHILE clause has no "is"', () => {
+    const gen = new DesignGenerator();
+    const doc = gen.generate([
+      { id: 'REQ-JOB-001', title: 'Drain', text: 'WHILE draining, THE system SHALL flush.', pattern: 'state-driven' },
+    ]);
+    expect(doc.sections[0].components[0].states).toEqual(['Draining']);
+  });
 });
 
 describe('DES-DES-001: DesignGenerator', () => {
