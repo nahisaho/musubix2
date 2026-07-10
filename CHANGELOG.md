@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.49] - 2026-07-10
+
+SDD パイプライン全体（init → requirements → design → codegen → test:gen → trace → verify → security）を新規プロジェクトで通し実行するエンドツーエンド ドッグフーディングを実施。パッケージ間連携（connective tissue）の重大な欠陥 2 件を発見・修正。
+
+### Fixed
+
+- **4 文字以上のドメインコードを持つ要件 ID が全パイプラインで無視されていた** — 要件 ID 正規表現が `REQ-[A-Z]{3}-\d{3}`（ちょうど 3 文字）にハードコードされており、`REQ-AUTH-001`・`REQ-ADMIN-001` 等が**パーサ・トレース・C4 導出・codegen 抽出のすべてで暗黙にドロップ**されていた。`[A-Z]{2,6}` に拡張（parser / cli / mcp-server の 7 箇所）
+- **design → codegen → trace の連携が切れていた** — codegen が生成コードに要件 ID を出力しないため、`trace matrix` が常に「referenced in code: 0 (0%)」になっていた。生成される各クラスに `// Implements: REQ-XXX-001` の**トレーサビリティ コメント**（憲法 Article V）を付与するよう修正。design JSON の `components[].requirementIds` / 要件 Markdown の ID から導出。結果、パイプライン一気通貫で trace 100%
+- **`requirements analyze` の confidence が未丸め表示**（`0.9500000000000001`）だったのを `toFixed(2)` に
+
+### Validation（E2E）
+
+- 5 要件（TSK×3 / AUTH / SEC）の新規プロジェクトで全 8 ステップが正常完了
+- requirements: 5/5 解析（AUTH 含む）、design: 3 セクション・5 コンポーネント（戻り値型付き）、codegen: 5 クラス（trace コメント付き）、test:gen: 15 describe/it、**trace: 100% coverage**、verify: 5 要件を SMT 化し整合性 OK、security: 0 findings
+
+### Tests
+
+- core: 2〜6 文字ドメインコードの ID パース
+- musubi: codegen が design/要件双方で `// Implements: REQ-…` を出力すること
+- 全 **1822 テスト**緑 / lint 0 errors / branch coverage 80.3% / clean `tsc -b`
+
 ## [0.5.48] - 2026-07-10
 
 これまで CLI から使えなかった 3 パッケージを **CLI サブコマンドとして公開**（憲法 Article II: CLI Interface Mandate に適合）。ユーザーが直接利用できるようになった。

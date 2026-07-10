@@ -542,7 +542,7 @@ export async function handleInit(
 // ── Trace handler ──────────────────────────────────────────────────────────
 
 /** Matches a MUSUBIX requirement id such as REQ-AUT-001. */
-const REQ_ID_RE = /REQ-[A-Z]{3}-\d{3}/g;
+const REQ_ID_RE = /REQ-[A-Z]{2,6}-\d{3}/g;
 
 interface CodeTraceData {
   requirementIds: string[];
@@ -561,7 +561,7 @@ export function buildCodeTraceData(specsFile: string, srcDir: string): CodeTrace
   if (existsSync(specsFile)) {
     const content = readFileSync(specsFile, 'utf-8');
     for (const line of content.split('\n')) {
-      const m = line.match(/^#{1,4}\s+(REQ-[A-Z]{3}-\d{3})\b/);
+      const m = line.match(/^#{1,4}\s+(REQ-[A-Z]{2,6}-\d{3})\b/);
       if (m) {reqIds.push(m[1]);}
     }
     if (reqIds.length === 0) {
@@ -2317,7 +2317,7 @@ export async function handleReqValidate(filePath: string): Promise<ExitCodeValue
     for (const req of requirements) {
       const analysis = validator.analyze(req.text);
       const validation = validator.validate(req.text);
-      console.log(`${req.id}: pattern=${analysis.pattern}, confidence=${analysis.confidence}`);
+      console.log(`${req.id}: pattern=${analysis.pattern}, confidence=${analysis.confidence.toFixed(2)}`);
       if (!validation.valid) {
         hasIssues = true;
         for (const issue of validation.issues) {
@@ -2331,7 +2331,7 @@ export async function handleReqValidate(filePath: string): Promise<ExitCodeValue
       // Diagnose the common cause: REQ- tokens present but not in the required
       // heading form. Silent failure here is a frequent first-run pitfall.
       if (/REQ-/i.test(content)) {
-        const headingLike = /^#{1,4}\s+REQ-[A-Z]{3}-\d{3}:/m.test(content);
+        const headingLike = /^#{1,4}\s+REQ-[A-Z]{2,6}-\d{3}:/m.test(content);
         console.error(
           '⚠ Found "REQ-" text but no parseable requirements. ' +
             'Requirements must be Markdown headings shaped like:',
@@ -2555,7 +2555,7 @@ function deriveC4FromRequirements(content: string): {
   elements: Array<Record<string, unknown>>;
   relationships: Array<Record<string, unknown>>;
 } {
-  const reqRe = /^#{1,4}\s+(REQ-([A-Z]{3})-\d{3}):\s*(.*)$/gm;
+  const reqRe = /^#{1,4}\s+(REQ-([A-Z]{2,6})-\d{3}):\s*(.*)$/gm;
   const reqs: Array<{ id: string; domain: string; title: string }> = [];
   let m: RegExpExecArray | null;
   while ((m = reqRe.exec(content)) !== null) {
@@ -2597,7 +2597,7 @@ export async function handleDesignC4(
     };
     if (content.trimStart().startsWith('{')) {
       data = JSON.parse(content); // explicit C4 model JSON
-    } else if (/^#{1,4}\s+REQ-[A-Z]{3}-\d{3}/m.test(content)) {
+    } else if (/^#{1,4}\s+REQ-[A-Z]{2,6}-\d{3}/m.test(content)) {
       data = deriveC4FromRequirements(content); // Markdown requirements → C4 model
     } else {
       console.error(
@@ -2675,6 +2675,8 @@ interface CodegenTarget {
   name: string;
   type: string;
   methods: CodegenMethod[];
+  /** Requirement IDs this target realises, emitted as a traceability comment. */
+  requirementIds: string[];
 }
 
 function extractCodegenTargets(content: string): CodegenTarget[] {
@@ -2682,11 +2684,12 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
   if (trimmed.startsWith('{')) {
     try {
       const data = JSON.parse(content) as {
-        elements?: Array<{ id?: string; name?: string; type?: string }>;
+        elements?: Array<{ id?: string; name?: string; type?: string; description?: string }>;
         sections?: Array<{
           id?: string;
           title?: string;
-          components?: Array<{ name?: string; methods?: CodegenMethod[] }>;
+          requirementIds?: string[];
+          components?: Array<{ name?: string; methods?: CodegenMethod[]; requirementIds?: string[] }>;
         }>;
       };
       // Prefer the design document's components — they carry method signatures
@@ -2697,14 +2700,26 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
           name: toPascalCase(c.name ?? 'Component'),
           type: 'class',
           methods: c.methods ?? [],
+          requirementIds: c.requirementIds ?? [],
         }));
       }
       const els = (data.elements ?? []).filter((e) => e.type === 'component' || e.type === 'container');
       if (els.length > 0) {
-        return els.map((e) => ({ name: toPascalCase(e.name ?? e.id ?? 'Component'), type: 'class', methods: [] }));
+        return els.map((e) => ({
+          name: toPascalCase(e.name ?? e.id ?? 'Component'),
+          type: 'class',
+          methods: [],
+          // A C4 component whose id is a requirement id carries its own trace.
+          requirementIds: /^REQ-[A-Z]{2,6}-\d{3}$/.test(e.id ?? '') ? [e.id as string] : [],
+        }));
       }
       if (data.sections?.length) {
-        return data.sections.map((s) => ({ name: toPascalCase(s.title ?? s.id ?? 'Section'), type: 'class', methods: [] }));
+        return data.sections.map((s) => ({
+          name: toPascalCase(s.title ?? s.id ?? 'Section'),
+          type: 'class',
+          methods: [],
+          requirementIds: s.requirementIds ?? [],
+        }));
       }
     } catch {
       /* fall through */
@@ -2721,6 +2736,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
       name: toPascalCase(req.title || req.id),
       type: 'class',
       methods: [deriveMethodSignature(req.text, req.title)],
+      requirementIds: [req.id],
     });
   }
   return targets;
@@ -2751,7 +2767,12 @@ export async function handleCodegen(
           name: t.name,
           methods: t.methods.length > 0 ? t.methods : undefined,
         });
-        blocks.push(result.code);
+        // Emit a traceability comment (Article V) so `trace matrix` can link the
+        // generated code back to the requirement(s) it implements.
+        const trace = t.requirementIds.length > 0
+          ? `// Implements: ${t.requirementIds.join(', ')}\n`
+          : '';
+        blocks.push(trace + result.code);
       }
       const code = blocks.join('\n\n');
       if (outPath) {

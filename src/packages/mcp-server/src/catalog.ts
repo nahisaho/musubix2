@@ -215,7 +215,7 @@ function sddCoreTools(): CatalogEntry[] {
         try {
           const reqIds = [...new Set((params['requirementIds'] as string[]) ?? [])];
           const sources = (params['sources'] as Array<{ file?: string; code?: string }>) ?? [];
-          const refRe = /REQ-[A-Z]{3}-\d{3}/g;
+          const refRe = /REQ-[A-Z]{2,6}-\d{3}/g;
           const covered = new Set<string>();
           for (const s of sources) {
             for (const m of (s.code ?? '').matchAll(refRe)) {

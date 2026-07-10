@@ -281,6 +281,32 @@ describe('handleCodegen', () => {
     expect(await handleTestGen(out)).toBe(ExitCode.SUCCESS);
   });
 
+  // v0.5.49 — generated code carries a traceability comment so `trace` can link
+  // it back to the requirement (design→codegen→trace chain).
+  it('emits an "Implements: REQ-…" traceability comment', async () => {
+    const reqs = join(FIXTURE_DIR, 'codegen-trace-reqs.md');
+    const design = join(FIXTURE_DIR, 'codegen-trace-design.json');
+    const out = join(FIXTURE_DIR, 'codegen-trace.ts');
+    writeFileSync(reqs, '## REQ-AUTH-001: Authenticate\n**要件**: THE system SHALL validate credentials.\n');
+    await handleDesignGenerate(reqs, design);
+    expect(await handleCodegen(design, 'class', out)).toBe(ExitCode.SUCCESS);
+    const written = readFileSync(out, 'utf-8');
+    expect(written).toContain('// Implements: REQ-AUTH-001');
+  });
+
+  it('emits a traceability comment when generating from requirements directly', async () => {
+    const reqs = join(FIXTURE_DIR, 'codegen-trace-md.md');
+    writeFileSync(reqs, '## REQ-TSK-001: Create Task\n**要件**: THE system SHALL create a task.\n');
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleCodegen(reqs)).toBe(ExitCode.SUCCESS);
+      expect(logs.join('\n')).toContain('// Implements: REQ-TSK-001');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   // v0.5.45 — codegen prefers a design document's components (which carry methods).
   it('generates classes with methods from a design artifact', async () => {
     const reqs = join(FIXTURE_DIR, 'codegen-design-reqs.md');

@@ -78,6 +78,20 @@ describe('REQ-REQ-002: MarkdownEARSParser', () => {
     expect(reqs[0].text).toContain('npm workspaces');
   });
 
+  // v0.5.49 — dogfooding: domain codes are not always 3 letters (AUTH, ADMIN…).
+  it('accepts requirement ids with 2–6 letter domain codes', () => {
+    const md = [
+      '## REQ-AUTH-001: Authenticate',
+      '**要件**: THE system SHALL validate credentials.',
+      '## REQ-DB-001: Persist',
+      '**要件**: THE system SHALL store records.',
+      '## REQ-ADMIN-001: Admin',
+      '**要件**: THE system SHALL manage users.',
+    ].join('\n');
+    const reqs = parser.parse(md);
+    expect(reqs.map((r) => r.id)).toEqual(['REQ-AUTH-001', 'REQ-DB-001', 'REQ-ADMIN-001']);
+  });
+
   // v0.5.39 — dogfooding: tolerate common authoring styles.
   it('should parse a heading without a title', () => {
     const md = '## REQ-AUT-001:\n**要件**:\nThe system shall authenticate users.\n';

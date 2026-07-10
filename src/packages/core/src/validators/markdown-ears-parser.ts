@@ -12,7 +12,7 @@ import type { ParsedRequirement, EARSPattern, ValidationIssue } from '../types/e
 import { EARSValidator } from './ears-validator.js';
 
 // Title is optional: `## REQ-XXX-000:` (no title) still parses.
-const REQ_HEADING_REGEX = /^#{1,4}\s+(REQ-[A-Z]{3}-\d{3}):\s*(.*)$/;
+const REQ_HEADING_REGEX = /^#{1,4}\s+(REQ-[A-Z]{2,6}-\d{3}):\s*(.*)$/;
 const FIELD_REGEX = {
   type: /^\*\*種別\*\*:\s*(.+)$/m,
   priority: /^\*\*優先度\*\*:\s*(P[012])$/m,
