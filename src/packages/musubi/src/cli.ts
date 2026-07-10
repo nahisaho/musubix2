@@ -2746,6 +2746,8 @@ interface CodegenTarget {
   methods: CodegenMethod[];
   /** Requirement IDs this target realises, emitted as a traceability comment. */
   requirementIds: string[];
+  /** Design patterns (from the section) to scaffold into the generated class. */
+  patterns: string[];
 }
 
 function extractCodegenTargets(content: string): CodegenTarget[] {
@@ -2758,18 +2760,23 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
           id?: string;
           title?: string;
           requirementIds?: string[];
+          patterns?: string[];
           components?: Array<{ name?: string; methods?: CodegenMethod[]; requirementIds?: string[] }>;
         }>;
       };
       // Prefer the design document's components — they carry method signatures
-      // derived from the requirements, so the skeleton isn't just empty classes.
-      const comps = (data.sections ?? []).flatMap((s) => s.components ?? []);
+      // derived from the requirements, plus the section's detected design
+      // patterns, so the skeleton reflects the intended structure.
+      const comps = (data.sections ?? []).flatMap((s) =>
+        (s.components ?? []).map((c) => ({ c, patterns: s.patterns ?? [] })),
+      );
       if (comps.length > 0) {
-        return comps.map((c) => ({
+        return comps.map(({ c, patterns }) => ({
           name: toPascalCase(c.name ?? 'Component'),
           type: 'class',
           methods: c.methods ?? [],
           requirementIds: c.requirementIds ?? [],
+          patterns,
         }));
       }
       const els = (data.elements ?? []).filter((e) => e.type === 'component' || e.type === 'container');
@@ -2780,6 +2787,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
           methods: [],
           // A C4 component whose id is a requirement id carries its own trace.
           requirementIds: /^REQ-[A-Z]{2,6}-\d{3}$/.test(e.id ?? '') ? [e.id as string] : [],
+          patterns: [],
         }));
       }
       if (data.sections?.length) {
@@ -2788,6 +2796,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
           type: 'class',
           methods: [],
           requirementIds: s.requirementIds ?? [],
+          patterns: s.patterns ?? [],
         }));
       }
     } catch {
@@ -2806,6 +2815,7 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
       type: 'class',
       methods: [deriveMethodSignature(req.text, req.title)],
       requirementIds: [req.id],
+      patterns: [],
     });
   }
   return targets;
@@ -2835,6 +2845,7 @@ export async function handleCodegen(
           templateType: t.type as Parameters<typeof generator.generate>[0]['templateType'],
           name: t.name,
           methods: t.methods.length > 0 ? t.methods : undefined,
+          patterns: t.patterns.length > 0 ? t.patterns : undefined,
         });
         // Emit a traceability comment (Article V) so `trace matrix` can link the
         // generated code back to the requirement(s) it implements.

@@ -24,6 +24,8 @@ export interface CodeGenOptions {
   description?: string;
   methods?: Array<{ name: string; params: string; returnType: string }>;
   implements?: string;
+  /** Design patterns (Observer, State, Feature Toggle, …) to scaffold into the class. */
+  patterns?: string[];
 }
 
 export interface GeneratedCode {
@@ -88,27 +90,70 @@ export class CodeGenerator {
   private renderClass(options: CodeGenOptions): string {
     const desc = options.description ? `\n * ${options.description}` : '';
     const impl = options.implements ? ` implements ${options.implements}` : '';
+    const patterns = new Set(options.patterns ?? []);
+    const hasToggle = patterns.has('Feature Toggle');
+    const hasState = patterns.has('State');
+    const hasObserver = patterns.has('Observer');
+
+    const preamble: string[] = []; // declarations emitted before the class (e.g. state enum)
+    const fields: string[] = [];
+    const extraMethods: string[] = [];
+
+    // State pattern → a placeholder state enum and a current-state field.
+    if (hasState) {
+      const enumName = `${options.name}State`;
+      preamble.push(
+        `export enum ${enumName} {`,
+        "  Idle = 'idle',",
+        "  Active = 'active',",
+        "  Done = 'done',",
+        '}',
+        '',
+      );
+      fields.push(`  // TODO: refine the states for ${options.name}`);
+      fields.push(`  private state: ${enumName} = ${enumName}.Idle;`);
+    }
+
+    // Observer pattern → listener registry and an emit helper.
+    if (hasObserver) {
+      fields.push('  private readonly listeners: Array<(event: unknown) => void> = [];');
+      extraMethods.push(
+        '  on(handler: (event: unknown) => void): void {\n    this.listeners.push(handler);\n  }',
+        '  private emit(event: unknown): void {\n    for (const listener of this.listeners) {\n      listener(event);\n    }\n  }',
+      );
+    }
+
+    // Feature Toggle pattern → an `enabled` flag guarding each operation.
+    const ctor = hasToggle
+      ? '  constructor(private readonly enabled: boolean = false) {}'
+      : '  constructor() {\n    // TODO: implement\n  }';
+
     const methods = (options.methods ?? [])
-      .map(
-        (m) =>
-          `  ${m.name}(${m.params}): ${m.returnType} {\n    throw new Error('Not implemented');\n  }`,
-      )
-      .join('\n\n');
+      .map((m) => {
+        const guard = hasToggle ? this.toggleGuard(m.returnType) : '';
+        return `  ${m.name}(${m.params}): ${m.returnType} {\n${guard}    throw new Error('Not implemented');\n  }`;
+      });
+
+    const body = [ctor, ...fields, ...extraMethods, ...methods].join('\n\n');
 
     return [
+      ...preamble,
       '/**',
       ` * ${options.name}${desc}`,
       ' */',
       `export class ${options.name}${impl} {`,
-      '  constructor() {',
-      '    // TODO: implement',
-      '  }',
-      methods ? '' : '',
-      methods,
+      body,
       '}',
-    ]
-      .filter((line, i) => !(line === '' && i === 7 && !methods))
-      .join('\n');
+    ].join('\n');
+  }
+
+  /** A Feature Toggle early-return guard, typed to the method's return value. */
+  private toggleGuard(returnType: string): string {
+    const rt = returnType.trim();
+    if (rt === 'void' || rt === '') {return '    if (!this.enabled) { return; }\n';}
+    if (rt === 'boolean') {return '    if (!this.enabled) { return false; }\n';}
+    if (rt.endsWith('[]')) {return '    if (!this.enabled) { return []; }\n';}
+    return '    // feature toggle: no-op when this.enabled is false\n';
   }
 
   private renderInterface(options: CodeGenOptions): string {

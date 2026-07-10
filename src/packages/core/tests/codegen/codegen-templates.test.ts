@@ -26,6 +26,75 @@ describe('REQ-COD-001: CodeGenerator — 12 template types', () => {
     }
   });
 
+  // v0.5.57 — detected design patterns scaffold structure into a class.
+  describe('pattern-aware class scaffolding', () => {
+    it('scaffolds a Feature Toggle guard and enabled flag', () => {
+      const r = gen.generate({
+        templateType: 'class',
+        name: 'EcoModeService',
+        methods: [{ name: 'lowerTarget', params: '', returnType: 'void' }],
+        patterns: ['Feature Toggle'],
+      });
+      expect(r.code).toContain('constructor(private readonly enabled: boolean = false)');
+      expect(r.code).toContain('if (!this.enabled) { return; }');
+    });
+
+    it('returns a typed default from a toggle-guarded non-void method', () => {
+      const r = gen.generate({
+        templateType: 'class',
+        name: 'GateService',
+        methods: [{ name: 'isAllowed', params: '', returnType: 'boolean' }],
+        patterns: ['Feature Toggle'],
+      });
+      expect(r.code).toContain('if (!this.enabled) { return false; }');
+    });
+
+    it('scaffolds an Observer listener registry', () => {
+      const r = gen.generate({
+        templateType: 'class',
+        name: 'SetpointService',
+        methods: [{ name: 'adjust', params: '', returnType: 'void' }],
+        patterns: ['Observer'],
+      });
+      expect(r.code).toContain('private readonly listeners: Array<(event: unknown) => void> = []');
+      expect(r.code).toContain('on(handler: (event: unknown) => void): void');
+      expect(r.code).toContain('private emit(event: unknown): void');
+    });
+
+    it('scaffolds a State enum and state field', () => {
+      const r = gen.generate({
+        templateType: 'class',
+        name: 'HeaterService',
+        methods: [{ name: 'activate', params: '', returnType: 'void' }],
+        patterns: ['State'],
+      });
+      expect(r.code).toContain('export enum HeaterServiceState');
+      expect(r.code).toContain('private state: HeaterServiceState = HeaterServiceState.Idle');
+    });
+
+    it('composes multiple patterns in one class', () => {
+      const r = gen.generate({
+        templateType: 'class',
+        name: 'NightService',
+        methods: [{ name: 'apply', params: '', returnType: 'void' }],
+        patterns: ['Observer', 'State'],
+      });
+      expect(r.code).toContain('export enum NightServiceState');
+      expect(r.code).toContain('private readonly listeners');
+    });
+
+    it('is unchanged when no patterns are supplied', () => {
+      const r = gen.generate({
+        templateType: 'class',
+        name: 'PlainService',
+        methods: [{ name: 'run', params: '', returnType: 'void' }],
+      });
+      expect(r.code).toContain('constructor() {');
+      expect(r.code).not.toContain('this.enabled');
+      expect(r.code).not.toContain('export enum');
+    });
+  });
+
   it('should generate enum code', () => {
     const result = gen.generate({
       templateType: 'enum',

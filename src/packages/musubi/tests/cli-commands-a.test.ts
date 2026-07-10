@@ -307,6 +307,19 @@ describe('handleCodegen', () => {
     }
   });
 
+  // v0.5.57 — a design section's detected pattern scaffolds the generated class.
+  it('scaffolds a Feature Toggle from a WHERE design section', async () => {
+    const reqs = join(FIXTURE_DIR, 'codegen-pat-reqs.md');
+    const design = join(FIXTURE_DIR, 'codegen-pat-design.json');
+    const out = join(FIXTURE_DIR, 'codegen-pat.ts');
+    writeFileSync(reqs, '## REQ-ECO-001: Eco Mode\n**要件**: WHERE eco mode is enabled, THE system SHALL lower the target.\n');
+    await handleDesignGenerate(reqs, design);
+    expect(await handleCodegen(design, 'class', out)).toBe(ExitCode.SUCCESS);
+    const code = readFileSync(out, 'utf-8');
+    expect(code).toContain('private readonly enabled: boolean = false');
+    expect(code).toContain('if (!this.enabled)');
+  });
+
   // v0.5.45 — codegen prefers a design document's components (which carry methods).
   it('generates classes with methods from a design artifact', async () => {
     const reqs = join(FIXTURE_DIR, 'codegen-design-reqs.md');

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.57] - 2026-07-10
+
+design で検出した設計パターンを codegen の雛形に反映。生成コードが「空クラス＋メソッドスタブ」から、パターンに応じた構造を持つ骨格になった。
+
+### Improved
+
+- **検出パターンを codegen のクラス骨格に反映** — design セクションの `patterns` を codegen に受け渡し、クラス生成時に構造を scaffold:
+  - **Observer**（WHEN/event-driven）→ リスナー登録簿 `listeners` と `on(handler)` / `emit(event)` メソッド
+  - **State**（WHILE/state-driven）→ プレースホルダの状態 enum（`XState { Idle/Active/Done }`）と `private state` フィールド
+  - **Feature Toggle**（WHERE/optional）→ `constructor(private readonly enabled = false)` と各メソッド先頭のフラグ ガード（戻り型に応じ `return;` / `return false;` / `return [];`）
+  - 複数パターンは合成される（例: complex 由来の Observer+State を 1 クラスに）。パターン無指定時は従来どおり（後方互換）
+  - 生成コードは `tsc --strict` を通過することを確認
+- `CodeGenOptions` に `patterns?: string[]` を追加、CLI は design JSON のセクション patterns を各コンポーネント target へ伝播
+
+### Tests
+
+- core: Feature Toggle ガード（void/boolean）、Observer レジストリ、State enum、パターン合成、無指定時の後方互換
+- musubi: WHERE design セクション → 生成クラスに Feature Toggle scaffolding
+- 全 **1900 テスト**緑 / lint 0 errors / branch coverage 81.7% / clean `tsc -b`
+
 ## [0.5.56] - 2026-07-10
 
 RBAC/権限ドメイン（禁止・ロール条件が多い）で E2E ドッグフーディングを実施。新しい要件構造（`WHERE <条件>, SHALL NOT <動作>` の複合、ハイフン語 "re-authentication"、多数の prohibition）を通したが**ハードなバグは検出されず**、直近の修正（0.5.49〜0.5.55）でパイプラインが堅牢化したことを確認。その不変条件を統合テストとして固定化。
