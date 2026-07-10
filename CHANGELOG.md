@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.53] - 2026-07-10
+
+状態機械中心のドメイン（ストリーム処理パイプライン: 取込/ドレイン/一時停止/チェックポイント/冪等化）で E2E ドッグフーディング。WHILE 状態遷移が多い要件構造で、SMT 変換の意味論バグを発見・修正。
+
+### Fixed
+
+- **`SHALL NOT` が state-driven/event-driven/optional/complex パターンで無視され、意味が反転していた** — 従来 `unwanted` パターンでしか否定を扱っておらず、「WHILE paused, THE system SHALL NOT accept new events」（一時停止中は受け付けない）が `(=> paused accept_new_events)`（=受け付ける）と**逆の意味**に変換されていた。要件文に `SHALL NOT` があれば**パターンに関わらず動作を否定**するよう修正 → `(=> the_pipeline_is_paused (not accept_new_events))`
+  - 設計側（`deriveMethodSignature`）は既に `reject…(): boolean` と否定を捉えていたため、formal-verify のみの不整合だった
+
+### Validation（E2E — ストリーム 8 要件）
+
+- analyze 8/8 分類（state-driven ×3・complex・optional・unwanted 含む）、verify 全 SMT が意味的に正しい（WHILE+SHALL NOT の否定、IF-THEN の含意、complex の (and …)）、trace 100%（INGEST×2 が凝集し `trace impact` で結合表示）、security 0、test:gen 22
+
+### Tests
+
+- formal-verify: state-driven + SHALL NOT が動作を否定すること
+- 全 **1829 テスト**緑 / lint 0 errors / branch coverage 80.2% / clean `tsc -b`
+
 ## [0.5.52] - 2026-07-10
 
 相互依存の高いドメイン（決済基盤: 認証・課金・返金・台帳・冪等性）で SDD パイプラインを再ドッグフーディング。パイプラインは 8 要件で正常動作（0.5.51 の IF-THEN 修正も冪等性要件で検証）した一方、**設計の凝集度**に改善余地を発見。

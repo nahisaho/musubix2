@@ -152,16 +152,22 @@ export class EarsToSmtConverter {
     }
 
     const variables = extractVariables(requirement.text);
+    // A "SHALL NOT" anywhere in the requirement negates the action, regardless
+    // of pattern (e.g. "WHILE paused, THE system SHALL NOT accept events" →
+    // while paused the action must NOT happen). Without this, the negation was
+    // silently dropped for every pattern except plain unwanted.
+    const negated = /\bSHALL\s+NOT\b/i.test(requirement.text);
+    const actionExpr = negated ? `(not ${actionVar})` : actionVar;
     let assertions: string[];
 
     switch (requirement.pattern) {
       case 'ubiquitous':
-        assertions = [`(assert (=> true ${actionVar}))`];
+        assertions = [`(assert (=> true ${actionExpr}))`];
         break;
 
       case 'event-driven': {
         const triggerVar = requirement.trigger ? sanitizeName(requirement.trigger) : 'trigger';
-        assertions = [`(assert (=> ${triggerVar} ${actionVar}))`];
+        assertions = [`(assert (=> ${triggerVar} ${actionExpr}))`];
         if (!requirement.trigger) {
           warnings.push('No trigger specified; using default "trigger"');
         }
@@ -170,7 +176,7 @@ export class EarsToSmtConverter {
 
       case 'state-driven': {
         const condVar = requirement.condition ? sanitizeName(requirement.condition) : 'condition';
-        assertions = [`(assert (=> ${condVar} ${actionVar}))`];
+        assertions = [`(assert (=> ${condVar} ${actionExpr}))`];
         if (!requirement.condition) {
           warnings.push('No condition specified; using default "condition"');
         }
@@ -179,13 +185,14 @@ export class EarsToSmtConverter {
 
       case 'unwanted':
         if (requirement.condition) {
-          // "IF <condition> THEN THE system SHALL <action>" — a guarded response
-          // (error handling / mitigation): the action must happen when the
-          // condition holds, so it is an implication, not a negation.
-          assertions = [`(assert (=> ${sanitizeName(requirement.condition)} ${actionVar}))`];
+          // "IF <condition> THEN THE system SHALL [NOT] <action>" — a guarded
+          // response: the (possibly negated) action applies when the condition
+          // holds, so it is an implication.
+          assertions = [`(assert (=> ${sanitizeName(requirement.condition)} ${actionExpr}))`];
         } else {
-          // "THE system SHALL NOT <action>" — a prohibition.
-          assertions = [`(assert (not ${actionVar}))`];
+          // "THE system SHALL NOT <action>" — a prohibition (actionExpr already
+          // carries the negation).
+          assertions = [`(assert ${actionExpr})`];
         }
         break;
 
@@ -193,7 +200,7 @@ export class EarsToSmtConverter {
         const featureVar = requirement.trigger
           ? sanitizeName(requirement.trigger)
           : 'feature_enabled';
-        assertions = [`(assert (=> ${featureVar} ${actionVar}))`];
+        assertions = [`(assert (=> ${featureVar} ${actionExpr}))`];
         if (!requirement.trigger) {
           warnings.push('No feature trigger specified; using default "feature_enabled"');
         }
@@ -203,7 +210,7 @@ export class EarsToSmtConverter {
       case 'complex': {
         const condVar = requirement.condition ? sanitizeName(requirement.condition) : 'condition';
         const triggerVar = requirement.trigger ? sanitizeName(requirement.trigger) : 'trigger';
-        assertions = [`(assert (=> (and ${condVar} ${triggerVar}) ${actionVar}))`];
+        assertions = [`(assert (=> (and ${condVar} ${triggerVar}) ${actionExpr}))`];
         if (!requirement.condition) {
           warnings.push('No condition specified; using default "condition"');
         }

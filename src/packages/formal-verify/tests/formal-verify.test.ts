@@ -120,6 +120,23 @@ describe('DES-FV-001: EarsToSmtConverter', () => {
     expect(result.formula!.assertions[0]).not.toContain('(not');
   });
 
+  // v0.5.53 — a SHALL NOT inside a state-driven (or any non-unwanted) pattern
+  // must negate the action, not assert it: "WHILE paused SHALL NOT accept" means
+  // the action must NOT happen while paused.
+  it('negates the action of a state-driven SHALL NOT requirement', () => {
+    const stateNot: ParsedRequirement = {
+      id: 'REQ-PAUSE-001',
+      title: 'Reject while paused',
+      text: 'While the pipeline is paused, the system shall not accept new events',
+      pattern: 'state-driven',
+      condition: 'the pipeline is paused',
+      action: 'accept new events',
+    };
+    const result = converter.convert(stateNot);
+    expect(result.success).toBe(true);
+    expect(result.formula!.assertions[0]).toContain('(=> the_pipeline_is_paused (not accept_new_events))');
+  });
+
   it('should convert complex requirement with combined condition and trigger', () => {
     const result = converter.convert(complexReq);
     expect(result.success).toBe(true);
