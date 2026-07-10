@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.65] - 2026-07-11
+
+dogfooding 実験で見つけた 4 件の不具合を修正。
+
+### Fixed
+
+- **`req validate` / `requirements analyze` がマーカー無し要件を誤判定** — 見出し直下に EARS 文を直接書いた要件（`**要件**:` マーカー無し）は本文が空として扱われ、全要件が「ubiquitous / confidence 0.30 / Missing SHALL」と誤報告されていた。マーカーが無い場合は本文の散文行（フィールドマーカー・見出し・チェックリストを除く）を要件文とみなすフォールバックを追加
+- **`design:c4 --level` が無視されていた** — `container`/`component` を指定しても常に `C4Context` ヘッダを出力していた。レベルに応じて `C4Container` / `C4Component` を出力するよう修正
+- **`design:c4` が未宣言要素への関係を出力** — 関係フィルタが「どちらか一方の端点がレベルに含まれる」条件（`||`）で、そのレベルに宣言されていない要素への `Rel(...)` を生成していた。両端点が宣言済みの場合のみ出力（`&&`）するよう修正。あわせて Mermaid で無効なハイフン付き ID（`REQ-ORD-001`）を有効なエイリアス（`REQ_ORD_001`）にエスケープ
+- **`test:gen` が非ソースファイルを無言で受理** — 明示指定した単一ファイルは拡張子フィルタを素通りし、Markdown 要件を渡すと無意味なスタブを出力していた。`collectFiles` が単一ファイルにもフィルタを適用するよう修正し、`test:gen` / `design:verify` に Markdown を渡した際は次に取るべきコマンドを案内
+
 ## [0.5.64] - 2026-07-11
 
 実装実験で見つけた 3 件の改善を実施。

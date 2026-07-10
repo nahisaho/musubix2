@@ -218,6 +218,14 @@ describe('handleDesignVerify', () => {
     const code = await handleDesignVerify(join(FIXTURE_DIR, 'nope.json'));
     expect(code).toBe(ExitCode.GENERAL_ERROR);
   });
+
+  it('guides the user (VALIDATION_ERROR) when given Markdown instead of design JSON', async () => {
+    const md = join(FIXTURE_DIR, 'reqs.md');
+    writeFileSync(md, '# Reqs\n\n## REQ-AUT-001: Login\nTHE system SHALL authenticate users.\n');
+    const code = await handleDesignVerify(md);
+    expect(code).toBe(ExitCode.VALIDATION_ERROR);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('is not a design JSON artifact'));
+  });
 });
 
 // ── handleCodegen ──────────────────────────────────────────────────────────
@@ -406,6 +414,17 @@ describe('handleTestGen', () => {
   it('returns GENERAL_ERROR for missing file', async () => {
     const code = await handleTestGen(join(FIXTURE_DIR, 'nope.ts'));
     expect(code).toBe(ExitCode.GENERAL_ERROR);
+  });
+
+  // A Markdown requirements file is not source: the extension filter now applies
+  // to explicitly-named files, so it is rejected with guidance rather than
+  // silently producing a meaningless stub.
+  it('rejects a Markdown file (not source) with guidance', async () => {
+    const md = join(FIXTURE_DIR, 'reqs-for-test-gen.md');
+    writeFileSync(md, '## REQ-AUT-001: Login\nTHE system SHALL authenticate users.\n');
+    const code = await handleTestGen(md);
+    expect(code).toBe(ExitCode.GENERAL_ERROR);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('reads source code'));
   });
 
   // ISSUE-15: a directory argument must not crash with EISDIR.

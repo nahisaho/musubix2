@@ -94,7 +94,11 @@ export class MarkdownEARSParser {
     const traceMatch = block.match(FIELD_REGEX.traceability);
     const pkgMatch = block.match(FIELD_REGEX.package);
 
-    const reqText = reqMatch ? reqMatch[1].trim() : '';
+    // Prefer an explicit `**要件**:` marker, but fall back to the block's prose
+    // when the EARS statement is written directly under the heading — a very
+    // common shape. Without this, req.text is empty and validation misreports
+    // every requirement as "ubiquitous / Missing SHALL".
+    const reqText = reqMatch ? reqMatch[1].trim() : this.fallbackRequirementText(block);
 
     // Classify with EARS validator
     let pattern: EARSPattern | undefined;
@@ -126,6 +130,24 @@ export class MarkdownEARSParser {
       package: pkgMatch ? pkgMatch[1] : undefined,
       line: partial.line,
     };
+  }
+
+  /**
+   * When no `**要件**:` marker is present, treat the block's prose lines as the
+   * requirement statement. Field markers (`**…**:`), headings, and checklist
+   * bullets are excluded so only the EARS sentence(s) survive.
+   */
+  private fallbackRequirementText(block: string): string {
+    const prose: string[] = [];
+    for (const raw of block.split('\n')) {
+      const line = raw.trim();
+      if (!line) {continue;}
+      if (line.startsWith('**')) {continue;} // field marker (種別/優先度/要件/…)
+      if (line.startsWith('#')) {continue;} // stray heading
+      if (/^[-*]\s/.test(line)) {continue;} // list / acceptance-criteria bullet
+      prose.push(line);
+    }
+    return prose.join(' ').trim();
   }
 
   private normalizePattern(raw: string): EARSPattern {

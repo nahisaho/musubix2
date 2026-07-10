@@ -110,6 +110,27 @@ describe('REQ-REQ-002: MarkdownEARSParser', () => {
     expect(reqs[0].pattern).toBe('event-driven');
   });
 
+  it('should parse a bare EARS statement under the heading (no **要件** marker)', () => {
+    const md =
+      '## REQ-NTF-003: Queue while offline\n' +
+      'WHILE the user is offline, THE system SHALL queue notifications.\n';
+    const reqs = parser.parse(md);
+    expect(reqs).toHaveLength(1);
+    expect(reqs[0].text).toContain('SHALL queue notifications');
+    expect(reqs[0].pattern).toBe('state-driven');
+    expect(reqs[0].confidence).toBeGreaterThan(0.5);
+  });
+
+  it('fallback text excludes field markers and checklist bullets', () => {
+    const md =
+      '## REQ-NTF-004: Retry\n' +
+      'IF the delivery fails, THEN THE system SHALL retry up to 3 times.\n' +
+      '**受入基準**:\n- [ ] retries 3 times\n';
+    const reqs = parser.parse(md);
+    expect(reqs[0].text).toBe('IF the delivery fails, THEN THE system SHALL retry up to 3 times.');
+    expect(reqs[0].pattern).toBe('unwanted');
+  });
+
   it('should extract EARS pattern from type field', () => {
     const reqs = parser.parse(SAMPLE_MARKDOWN);
     expect(reqs[0].pattern).toBe('ubiquitous');

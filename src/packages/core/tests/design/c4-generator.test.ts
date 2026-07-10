@@ -69,6 +69,38 @@ describe('DES-DES-002: C4ModelGenerator', () => {
     expect(mermaid).toContain('Rel(user, sys');
   });
 
+  it('should emit a level-specific Mermaid header', () => {
+    const gen = makeGenerator();
+    expect(gen.toMermaid(gen.generateDiagram('context', 't')).split('\n')[0]).toBe('C4Context');
+    expect(gen.toMermaid(gen.generateDiagram('container', 't')).split('\n')[0]).toBe('C4Container');
+    expect(gen.toMermaid(gen.generateDiagram('component', 't')).split('\n')[0]).toBe('C4Component');
+    expect(gen.toMermaid(gen.generateDiagram('code', 't')).split('\n')[0]).toBe('C4Component');
+  });
+
+  it('should not reference elements undeclared at the level (both endpoints kept)', () => {
+    const gen = makeGenerator();
+    // Container level excludes the `svc` component; the api->svc rel must drop.
+    const diagram = gen.generateDiagram('container', 'Container');
+    const ids = new Set(diagram.elements.map((e) => e.id));
+    for (const rel of diagram.relationships) {
+      expect(ids.has(rel.from)).toBe(true);
+      expect(ids.has(rel.to)).toBe(true);
+    }
+    expect(diagram.relationships.some((r) => r.to === 'svc')).toBe(false);
+  });
+
+  it('should escape non-identifier ids into valid Mermaid aliases', () => {
+    const gen = new C4ModelGenerator();
+    gen.addElement({ id: 'ORD', name: 'ORD', type: 'container', description: 'svc' });
+    gen.addElement({ id: 'REQ-ORD-001', name: 'Place Order', type: 'component', description: 'REQ-ORD-001' });
+    gen.addRelationship({ from: 'ORD', to: 'REQ-ORD-001', description: 'implements' });
+    const mermaid = gen.toMermaid(gen.generateDiagram('component', 'Components'));
+    expect(mermaid).toContain('Component(REQ_ORD_001,');
+    expect(mermaid).toContain('Rel(ORD, REQ_ORD_001,');
+    expect(mermaid).not.toMatch(/\(REQ-ORD-001,/); // no hyphenated alias
+    expect(mermaid).toContain('"REQ-ORD-001"'); // readable label preserved
+  });
+
   it('should generate valid PlantUML output', () => {
     const gen = makeGenerator();
     const diagram = gen.generateDiagram('context', 'System Context');

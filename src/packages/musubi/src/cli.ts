@@ -951,7 +951,13 @@ const WALK_IGNORE = new Set(['node_modules', '.git', 'dist', 'coverage', '.next'
  */
 export function collectFiles(target: string, extFilter?: (ext: string) => boolean): string[] {
   const stat = statSync(target);
-  if (stat.isFile()) {return [target];}
+  if (stat.isFile()) {
+    // Honor the extension filter for explicitly-named files too — otherwise a
+    // non-source file (e.g. a Markdown requirements doc) slips past into
+    // generators that treat it as code and emit meaningless output.
+    if (extFilter && !extFilter(target.split('.').pop() ?? '')) {return [];}
+    return [target];
+  }
   const out: string[] = [];
   const walk = (dir: string): void => {
     // A directory can disappear mid-scan (e.g. a temp dir removed by another
@@ -2710,6 +2716,18 @@ export async function handleDesignC4(
 export async function handleDesignVerify(filePath: string): Promise<ExitCodeValue> {
   try {
     const content = readFileSync(filePath, 'utf-8');
+    // design:verify consumes the JSON artifact from `design generate --out`.
+    // A Markdown requirements file is the most common wrong input — detect it
+    // and guide the user instead of surfacing a raw JSON.parse error.
+    if (!/^\s*[[{]/.test(content)) {
+      console.error(
+        `❌ ${filePath} is not a design JSON artifact.\n` +
+          '   design:verify reads the JSON produced by:\n' +
+          `     musubix design generate ${filePath} --out design.json\n` +
+          '   then: musubix design:verify design.json',
+      );
+      return ExitCode.VALIDATION_ERROR;
+    }
     const design = JSON.parse(content) as Parameters<
       ReturnType<typeof createSOLIDValidator>['validate']
     >[0];
@@ -2945,7 +2963,11 @@ export async function handleTestGen(filePath: string): Promise<ExitCodeValue> {
     // Accept a single file or a directory (skeletons generated per file).
     const files = collectFiles(filePath, (ext) => ext in EXT_TO_LANG);
     if (files.length === 0) {
-      console.error(`❌ No source files found under: ${filePath}`);
+      console.error(
+        `❌ No source files found under: ${filePath}\n` +
+          `   test:gen reads source code (${Object.keys(EXT_TO_LANG).join(', ')}), not requirements.\n` +
+          '   Generate code first:  musubix codegen <reqs.md> --out impl.ts  →  musubix test:gen impl.ts',
+      );
       return ExitCode.GENERAL_ERROR;
     }
     const single = files.length === 1;
