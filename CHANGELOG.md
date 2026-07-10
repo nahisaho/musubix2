@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.54] - 2026-07-10
+
+MCP catalog（61 ツール）の網羅テストを追加し、重量級パッケージのツールも含めて全ハンドラの動作を検証。
+
+### Tests
+
+- **全 61 MCP ツール ハンドラの網羅スモークテスト** — 各ツールを「全パラメータ指定」と「空引数」の 2 通りで呼び出し、well-formed な `ToolResult`（成功 or graceful failure）を返し例外を投げないこと、失敗時に旧来の誤メッセージ "Core package not available" を出さないことを検証。使い捨て cwd で実行し、cwd 相対ストアへの書き込みが他スイートを汚染しないよう隔離
+  - 空引数呼び出しにより各ハンドラの `?? default` フォールバックの**両側**（指定時／省略時）を網羅 → `catalog.ts` の branch coverage 48% → **70%**
+  - 重量級パッケージ（neural-search/synthesis/formal-verify/deep-research 等）はコードが除外対象の `index.ts` に集約されているため、ツール呼び出しでカバレッジ分母を増やさず、グローバル branch は 80.2% → **81.6%** に上昇（ゲート調整不要）
+- 全 **1890 テスト**緑 / lint 0 errors / branch coverage 81.6% / clean `tsc -b`
+
 ## [0.5.53] - 2026-07-10
 
 状態機械中心のドメイン（ストリーム処理パイプライン: 取込/ドレイン/一時停止/チェックポイント/冪等化）で E2E ドッグフーディング。WHILE 状態遷移が多い要件構造で、SMT 変換の意味論バグを発見・修正。

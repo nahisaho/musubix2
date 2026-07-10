@@ -502,3 +502,62 @@ describe('sdd-core tools apply defaults when optional params are omitted', () =>
   });
 });
 
+
+// ---------------------------------------------------------------------------
+// v0.5.54 — every tool handler must run and return a well-formed ToolResult
+// (success or graceful failure), never throw, and never surface the old generic
+// "Core package not available" string. Runs in a throwaway cwd so tools that
+// persist to cwd-relative stores can't pollute other suites. Most heavy
+// packages live in an excluded index.ts, so this adds little coverage mass.
+// ---------------------------------------------------------------------------
+
+function smokeArgs(params: Array<{ name: string; type: string; default?: unknown }>): Record<string, unknown> {
+  const args: Record<string, unknown> = {};
+  for (const p of params) {
+    if (p.default !== undefined) { args[p.name] = p.default; continue; }
+    switch (p.type) {
+      case 'string':
+        args[p.name] = /code|source/i.test(p.name)
+          ? 'export function sample(a) { return a; }'
+          : /markdown|content|document|text|spec/i.test(p.name)
+            ? '## REQ-XXX-001: Sample\n**要件**: THE system SHALL work.'
+            : 'sample';
+        break;
+      case 'number': args[p.name] = 1; break;
+      case 'boolean': args[p.name] = false; break;
+      case 'array': args[p.name] = []; break;
+      default: args[p.name] = {};
+    }
+  }
+  return args;
+}
+
+describe('every tool handler returns a well-formed ToolResult', () => {
+  const origCwd = process.cwd();
+  let tmp: string;
+  beforeAll(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'musubix-tools-'));
+    process.chdir(tmp);
+  });
+  afterAll(() => {
+    process.chdir(origCwd);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  for (const cat of getToolCategories()) {
+    for (const t of cat.tools) {
+      it(`${t.definition.name} runs without throwing`, async () => {
+        // Call with fully-populated args and again with empty args, so both the
+        // "param provided" and the "param omitted → default" branches of each
+        // handler's `?? default` fallbacks are exercised.
+        for (const args of [smokeArgs(t.definition.parameters), {}]) {
+          const result = await t.handler(args);
+          expect(typeof result.success).toBe('boolean');
+          if (!result.success) {
+            expect(result.error ?? '').not.toContain('Core package not available');
+          }
+        }
+      });
+    }
+  }
+});
