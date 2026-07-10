@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.52] - 2026-07-10
+
+相互依存の高いドメイン（決済基盤: 認証・課金・返金・台帳・冪等性）で SDD パイプラインを再ドッグフーディング。パイプラインは 8 要件で正常動作（0.5.51 の IF-THEN 修正も冪等性要件で検証）した一方、**設計の凝集度**に改善余地を発見。
+
+### Improved
+
+- **同一ドメインの複数要件を 1 つの凝集サービスに集約** — 従来は要件ごとに単一メソッドのサービスを生成していたため、`REQ-PAY-001/002/003` が `ChargeCardService`/`RefundPaymentService`/`CaptureAuthorizationService` の 3 クラスに分裂し、関連要件が**実装コードを共有せず `trace impact` で結合が見えなかった**。ドメイン（ID プレフィックス）に複数要件がある場合は **1 サービス＋要件ごとのメソッド**に集約するよう変更:
+  - 例: PAY×3 → `PayService.chargePaymentMethod/refundOriginalCharge/captureAuthorizedPayment`、LEDGER×2 → `LedgerService.recordLedgerEntry/lockLedger`
+  - 単一要件のドメインは従来どおり説明的なタイトル由来名を維持（例: `VerifyTokenService`）
+  - 全大文字のドメインコードを Title case に正規化（`PAY`→`Pay`, `LEDGER`→`Ledger`）
+  - 結果: 生成クラス数 8→5、`trace impact REQ-PAY-001` が `PayService` と結合要件 `REQ-PAY-002`/`REQ-PAY-003` を正しく報告
+
+- **メソッド名の末尾 filler をさらに拡充** — `within`/`during`/`upon` と数量詞 `six`〜`ten` を追加（例: `captureAuthorizedPaymentWithin`→`captureAuthorizedPayment`）
+
+### Validation（E2E — 決済 8 要件）
+
+- analyze 8/8 分類（6 文字ドメイン `LEDGER` 含む）、verify 全 SMT 正常（冪等性の IF-THEN が含意、PAN の SHALL NOT が否定）、trace 100%、security 0、test:gen 24
+
+### Tests
+
+- core: 複数要件ドメインの凝集サービス、単一要件の説明的命名、全大文字ドメインの正規化
+- 全 **1828 テスト**緑 / lint 0 errors / branch coverage 80.3% / clean `tsc -b`
+
 ## [0.5.51] - 2026-07-10
 
 別ドメイン（IoT/制御系サーモスタット）で SDD パイプライン全体を再ドッグフーディング。未検証だった EARS パターン（state-driven `WHILE`、complex、optional `WHERE`、IF-THEN）を含む 7 要件を通し、パターン固有のバグ 2 件を発見・修正。

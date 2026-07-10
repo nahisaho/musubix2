@@ -62,7 +62,8 @@ describe('deriveMethodSignature (v0.5.46)', () => {
 });
 
 describe('DesignGenerator — enriched sections (v0.5.45)', () => {
-  it('derives responsibilities, components with methods, and data entities', () => {
+  // v0.5.52 — multiple requirements in one domain cohere into a single service.
+  it('derives a cohesive domain service with a method per requirement', () => {
     const gen = new DesignGenerator();
     const doc = gen.generate([
       { id: 'REQ-USR-001', title: 'User Registration', text: 'WHEN a visitor signs up, THE system SHALL create a user account.', pattern: 'event-driven' },
@@ -70,22 +71,40 @@ describe('DesignGenerator — enriched sections (v0.5.45)', () => {
     ]);
     const section = doc.sections[0];
     expect(section.responsibilities).toHaveLength(2);
-    expect(section.components.map((c) => c.name)).toContain('UserRegistrationService');
-    const reg = section.components.find((c) => c.name === 'UserRegistrationService')!;
-    expect(reg.methods[0].name).toBe('createUserAccount');
-    expect(reg.requirementIds).toEqual(['REQ-USR-001']);
+    // Two USR requirements → one UsrService owning both operations.
+    expect(section.components).toHaveLength(1);
+    const svc = section.components[0];
+    expect(svc.name).toBe('UsrService');
+    expect(svc.methods.map((m) => m.name)).toEqual(['createUserAccount', 'issueSessionToken']);
+    expect(svc.requirementIds).toEqual(['REQ-USR-001', 'REQ-USR-002']);
     expect(section.dataEntities).toContain('User');
-    // The description now enumerates responsibilities and components.
     expect(section.description).toContain('Components:');
     expect(section.description).toContain('createUserAccount()');
   });
 
-  it('does not double-suffix a component whose title already ends in Service', () => {
+  it('keeps a descriptive title-based name for a single-requirement domain', () => {
+    const gen = new DesignGenerator();
+    const doc = gen.generate([
+      { id: 'REQ-REG-001', title: 'User Registration', text: 'THE system SHALL create a user account.', pattern: 'ubiquitous' },
+    ]);
+    expect(doc.sections[0].components[0].name).toBe('UserRegistrationService');
+  });
+
+  it('does not double-suffix a single component whose title already ends in Service', () => {
     const gen = new DesignGenerator();
     const doc = gen.generate([
       { id: 'REQ-PAY-001', title: 'Payment Service', text: 'THE system SHALL charge a card.', pattern: 'ubiquitous' },
     ]);
     expect(doc.sections[0].components[0].name).toBe('PaymentService');
+  });
+
+  it('normalises an all-caps domain code to Title case', () => {
+    const gen = new DesignGenerator();
+    const doc = gen.generate([
+      { id: 'REQ-PAY-001', title: 'Charge', text: 'THE system SHALL charge a card.', pattern: 'ubiquitous' },
+      { id: 'REQ-PAY-002', title: 'Refund', text: 'THE system SHALL refund a payment.', pattern: 'ubiquitous' },
+    ]);
+    expect(doc.sections[0].components[0].name).toBe('PayService');
   });
 });
 

@@ -61,9 +61,10 @@ const LIST_VERBS = new Set(['list', 'query', 'search', 'collect', 'enumerate']);
  * mid-phrase but trimmed from the tail after the word cap.
  */
 const TRAILING_FILLER = new Set([
-  'every', 'by', 'before', 'after', 'with', 'of', 'to', 'in', 'on', 'for', 'from',
-  'into', 'than', 'as', 'at', 'per', 'via', 'using', 'about', 'over', 'under',
-  'one', 'two', 'three', 'four', 'five',
+  'every', 'by', 'before', 'after', 'with', 'within', 'of', 'to', 'in', 'on', 'for',
+  'from', 'into', 'than', 'as', 'at', 'per', 'via', 'using', 'about', 'over', 'under',
+  'during', 'upon', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
+  'nine', 'ten',
 ]);
 
 function operationParts(text: string, fallbackTitle: string): { negated: boolean; words: string[] } {
@@ -190,7 +191,7 @@ export class DesignGenerator {
     const groups = this.groupRequirements(requirements);
 
     const sections: DesignSection[] = groups.map((group, idx) => {
-      const components = this.deriveComponents(group.requirements);
+      const components = this.deriveComponents(group.requirements, group.domain);
       return {
         id: `${docId}-SEC-${String(idx + 1).padStart(3, '0')}`,
         title: group.title,
@@ -257,7 +258,7 @@ export class DesignGenerator {
 
   private groupRequirements(
     reqs: ParsedRequirementInput[],
-  ): Array<{ title: string; requirements: ParsedRequirementInput[] }> {
+  ): Array<{ title: string; domain: string; requirements: ParsedRequirementInput[] }> {
     // Group by requirement ID prefix (e.g., REQ-AUTH, REQ-DATA)
     const groups = new Map<string, ParsedRequirementInput[]>();
     for (const req of reqs) {
@@ -269,6 +270,7 @@ export class DesignGenerator {
 
     return Array.from(groups.entries()).map(([prefix, requirements]) => ({
       title: `${prefix} Design Section`,
+      domain: prefix.replace(/^REQ-/, ''),
       requirements,
     }));
   }
@@ -303,17 +305,37 @@ export class DesignGenerator {
     });
   }
 
-  private deriveComponents(reqs: ParsedRequirementInput[]): DesignComponent[] {
-    return reqs.map((r) => {
+  private deriveComponents(reqs: ParsedRequirementInput[], domain: string): DesignComponent[] {
+    // A single-requirement domain keeps a descriptive, title-based service name.
+    if (reqs.length === 1) {
+      const r = reqs[0];
       const sig = deriveMethodSignature(r.text, r.title);
-      const compName = this.pascal(r.title || sig.name) + (/(service|manager|controller|repository)$/i.test(r.title) ? '' : 'Service');
-      return {
+      const compName = this.pascal(r.title || sig.name) +
+        (/(service|manager|controller|repository)$/i.test(r.title) ? '' : 'Service');
+      return [{
         name: compName,
         responsibility: r.title || `Handle ${r.id}`,
         methods: [sig],
         requirementIds: [r.id],
-      };
+      }];
+    }
+    // Multiple requirements in the same domain cohere into one service with a
+    // method per requirement, so related operations share a component (and are
+    // correctly reported as coupled by impact analysis).
+    const seen = new Map<string, number>();
+    const methods = reqs.map((r) => {
+      const sig = deriveMethodSignature(r.text, r.title);
+      const count = seen.get(sig.name) ?? 0;
+      seen.set(sig.name, count + 1);
+      return count === 0 ? sig : { ...sig, name: `${sig.name}${count + 1}` };
     });
+    return [{
+      // Normalise an all-caps domain code (PAY, LEDGER) to Title case.
+      name: `${this.pascal(domain.toLowerCase())}Service`,
+      responsibility: `${domain} domain — ${reqs.length} operations`,
+      methods,
+      requirementIds: reqs.map((r) => r.id),
+    }];
   }
 
   private deriveDataEntities(reqs: ParsedRequirementInput[]): string[] {
