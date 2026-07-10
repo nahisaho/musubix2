@@ -377,14 +377,20 @@ export class DesignGenerator {
   private suggestPatterns(reqs: ParsedRequirementInput[]): string[] {
     const patterns = new Set<string>();
     for (const req of reqs) {
-      if (req.text.includes('WHEN')) {
+      // Word-boundary matches so an EARS keyword isn't detected inside another
+      // word (e.g. "verify" must not trigger the IF → Strategy rule).
+      if (/\bWHEN\b/.test(req.text)) {
         patterns.add('Observer');
       }
-      if (req.text.includes('WHILE')) {
+      if (/\bWHILE\b/.test(req.text)) {
         patterns.add('State');
       }
-      if (req.text.includes('IF')) {
+      if (/\bIF\b/.test(req.text)) {
         patterns.add('Strategy');
+      }
+      // Optional (WHERE <feature> is enabled …) → a feature-flag pattern.
+      if (req.pattern === 'optional' || /\bWHERE\b/.test(req.text)) {
+        patterns.add('Feature Toggle');
       }
       if (req.pattern === 'complex') {
         patterns.add('Chain of Responsibility');

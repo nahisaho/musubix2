@@ -191,6 +191,26 @@ describe('DES-DES-001: DesignGenerator', () => {
     expect(doc.sections[0].patterns).toContain('Simple Implementation');
   });
 
+  // v0.5.55 — optional (WHERE …) maps to a feature-flag pattern.
+  it('should suggest Feature Toggle for an optional (WHERE) requirement', () => {
+    const generator = new DesignGenerator();
+    const doc = generator.generate([
+      { id: 'REQ-001', title: 'Eco Mode', text: 'WHERE eco mode is enabled, THE system SHALL lower the target.', pattern: 'optional' },
+    ]);
+    expect(doc.sections[0].patterns).toContain('Feature Toggle');
+    expect(doc.sections[0].patterns).not.toContain('Simple Implementation');
+  });
+
+  // v0.5.55 — a keyword must not be detected inside another word.
+  it('does not mistake "verify" for the IF keyword', () => {
+    const generator = new DesignGenerator();
+    const doc = generator.generate([
+      { id: 'REQ-001', title: 'Verify Signature', text: 'THE system SHALL verify the signature.', pattern: 'ubiquitous' },
+    ]);
+    expect(doc.sections[0].patterns).not.toContain('Strategy');
+    expect(doc.sections[0].patterns).toContain('Simple Implementation');
+  });
+
   it('should increment document counter', () => {
     const generator = new DesignGenerator();
     const reqs: ParsedRequirementInput[] = [

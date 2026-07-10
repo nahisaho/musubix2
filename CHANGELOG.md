@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.55] - 2026-07-10
+
+複数の E2E ドッグフーディングで確認されていた唯一の未対応（optional/WHERE の設計パターン欠落）を修正。
+
+### Fixed
+
+- **optional（WHERE）要件が設計パターンにマップされず Simple Implementation にフォールバックしていた** — `WHERE <機能> is enabled, THE system SHALL …` を **Feature Toggle** パターンにマップ（`req.pattern === 'optional'` または `\bWHERE\b`）。これで 6 つの EARS パターン全てが設計パターンを持つ（WHEN→Observer, WHILE→State, IF→Strategy, WHERE→Feature Toggle, complex→Chain of Responsibility, ubiquitous→Simple Implementation）
+- **キーワード検出の部分一致バグを修正** — `req.text.includes('IF')` が単語内の "IF" にも一致していた（例: 「**verify** the signature」が誤って Strategy パターンを付与）。単語境界（`\bIF\b` 等）に変更し WHEN/WHILE/IF/WHERE すべてで誤検出を防止
+
+### Tests
+
+- core: WHERE → Feature Toggle、`verify` が IF と誤認されないこと
+- 全 **1892 テスト**緑 / lint 0 errors / branch coverage 81.6% / clean `tsc -b`
+
 ## [0.5.54] - 2026-07-10
 
 MCP catalog（61 ツール）の網羅テストを追加し、重量級パッケージのツールも含めて全ハンドラの動作を検証。
