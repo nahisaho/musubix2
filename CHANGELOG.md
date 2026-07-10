@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.67] - 2026-07-11
+
+dogfooding 実装テストで、CodeGraph のフラグメント照合がディレクトリ接頭辞に誤反応する不具合を発見・修正。
+
+### Fixed
+
+- **`cg path` / `cg impact` / `cg cycles` の短いフラグメントがディレクトリ名に誤反応** — フラグメントをフルパスに対して部分一致（`filePath.includes(frag)`）していたため、`src/` 配下のすべてのファイルがフラグメント `c` に一致していた（`sr`c`/` の `c`）。その結果 `cg path b c` が本来の `b→c`（1 hop）ではなく、ターゲット `c` を始点ファイル `src/b.ts` に解決して 0 hop の退化パスを返していた。ファイル名（basename）を優先して照合し、basename に一致が無い場合のみフルパス（`services/` などのディレクトリ指定）へフォールバックするよう修正（`matchFilesByFragment` を追加、`impact`/`path`/`cycles` で共有）
+
 ## [0.5.66] - 2026-07-11
 
 dogfooding 実装テストで、taint dataflow アナライザが JavaScript/TypeScript を実質的に解析できていない不具合を発見・修正。

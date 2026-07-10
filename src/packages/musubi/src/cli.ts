@@ -1177,6 +1177,17 @@ function buildResolutionMaps(
   return { defFiles, filesByBasename };
 }
 
+/**
+ * Match a user fragment against indexed file paths. Prefers file-name
+ * (basename) matches so a short fragment like `c` selects `src/c.ts` and not
+ * every file under `sr`c`/`. Falls back to full-path matching (for directory
+ * queries like `services/`) only when no basename matches.
+ */
+function matchFilesByFragment(files: string[], fragment: string): string[] {
+  const byBase = files.filter((f) => (f.split(/[\\/]/).pop() ?? f).includes(fragment));
+  return byBase.length > 0 ? byBase : files.filter((f) => f.includes(fragment));
+}
+
 function resolveImportToFiles(
   moduleName: string,
   defFilesByName: Map<string, Set<string>>,
@@ -1721,7 +1732,7 @@ export async function handleCodegraph(
           dependents.set(defFile, set);
         }
       }
-      const seeds = [...new Set(nodes.map((n) => n.filePath))].filter((f) => f.includes(filter));
+      const seeds = matchFilesByFragment([...new Set(nodes.map((n) => n.filePath))], filter);
       if (seeds.length === 0) {
         console.log(`No indexed file matches '${filter}'.`);
         return ExitCode.SUCCESS;
@@ -1815,8 +1826,9 @@ export async function handleCodegraph(
         adj.set(r.from, set);
       }
       const allFiles = [...new Set(nodes.map((n) => n.filePath))];
-      const froms = allFiles.filter((f) => f.includes(fromFrag));
-      const isTarget = (f: string) => f.includes(toFrag);
+      const froms = matchFilesByFragment(allFiles, fromFrag);
+      const targetSet = new Set(matchFilesByFragment(allFiles, toFrag));
+      const isTarget = (f: string) => targetSet.has(f);
       if (froms.length === 0) {
         console.log(`No indexed file matches '${fromFrag}'.`);
         return ExitCode.SUCCESS;
@@ -1898,7 +1910,7 @@ export async function handleCodegraph(
         return ExitCode.SUCCESS;
       }
       let cycles = findDependencyCycles(nodes, edges);
-      if (filter) {cycles = cycles.filter((c) => c.some((f) => f.includes(filter!)));}
+      if (filter) {cycles = cycles.filter((c) => matchFilesByFragment(c, filter).length > 0);}
       if (args.includes('--json')) {
         console.log(JSON.stringify({
           count: cycles.length,

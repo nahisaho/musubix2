@@ -49,6 +49,12 @@ persisted graph exactly.
 | `cg diff <baseline> [current]` | Compare two graph snapshots |
 | `cg languages` | List supported languages |
 
+> **フラグメント照合**: `deps` / `impact` / `path` / `cycles` の `<fragment>` は
+> まずファイル名（basename）に対して照合されます。`cg path b c` は `src/c.ts` を
+> 選び、`sr`c`/` というディレクトリ接頭辞に釣られて `src/b.ts` を選ぶことはありません。
+> basename に一致が無い場合のみ、フルパス（`services/` などのディレクトリ指定）に
+> フォールバックします。
+
 Run `npx musubix cg <subcommand> --help` for per-command usage.
 
 ### `cg impact <fragment> [--direct] [--depth N] [--json]`

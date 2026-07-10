@@ -623,6 +623,39 @@ describe('CLI Commands B — Codegraph', () => {
     }
   });
 
+  // v0.5.67: a short fragment must match the file NAME, not the directory. Files
+  // under `src/` must not all match fragment `c` via the `sr`c`/` prefix.
+  it('cg path/impact match by basename, not the directory prefix', async () => {
+    const root = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_frag');
+    const dir = join(root, 'src');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'c.ts'), 'export function cFn(x: number): number { return x; }\n');
+    writeFileSync(join(dir, 'b.ts'), "import { cFn } from './c.js';\nexport function bFn(x: number): number { return cFn(x); }\n");
+    writeFileSync(join(dir, 'a.ts'), "import { bFn } from './b.js';\nexport function aFn(x: number): number { return bFn(x); }\n");
+    const prevCwd = process.cwd();
+    process.chdir(root);
+    try {
+      expect(await handleCodegraph('index', ['.'])).toBe(ExitCode.SUCCESS);
+
+      // `b` → `c`: target fragment `c` must resolve to src/c.ts, not src/b.ts
+      // (whose path contains the `c` of `sr`c`/`). Was a spurious 0-hop path.
+      logSpy.mockClear();
+      expect(await handleCodegraph('path', ['b', 'c', '--json'])).toBe(ExitCode.SUCCESS);
+      const j = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+      expect(j.hops).toBe(1);
+      expect(j.path[j.path.length - 1]).toContain('c.ts');
+
+      // `cg impact c` selects only c.ts, not every file under src/.
+      logSpy.mockClear();
+      expect(await handleCodegraph('impact', ['c'])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('1 file(s) matching');
+    } finally {
+      process.chdir(prevCwd);
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   // v0.5.31: Python class method call resolution.
   it('cg impact resolves Python method calls across files', async () => {
     const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_cg_py');
