@@ -2680,11 +2680,36 @@ export async function handleSkills(
         console.error('❌ Usage: musubix skills create <name>');
         return ExitCode.GENERAL_ERROR;
       }
-      console.log(`✅ Scaffolded skill: ${name}`);
-      console.log(`  ${name}/`);
-      console.log(`  ├── skill.json`);
-      console.log(`  ├── index.ts`);
-      console.log(`  └── tests/`);
+      // Actually write the scaffold to disk (previously only printed a tree).
+      const dir = name;
+      if (existsSync(dir)) {
+        console.error(`❌ '${dir}' already exists.`);
+        return ExitCode.GENERAL_ERROR;
+      }
+      mkdirSync(joinPath(dir, 'tests'), { recursive: true });
+      const skillJson = {
+        name,
+        description: `TODO: describe the ${name} skill`,
+        action: 'run',
+        version: '0.1.0',
+      };
+      writeFileSync(joinPath(dir, 'skill.json'), JSON.stringify(skillJson, null, 2) + '\n', 'utf-8');
+      writeFileSync(
+        joinPath(dir, 'index.ts'),
+        `export const ${toIdentifier(name)} = {\n` +
+          `  name: ${JSON.stringify(name)},\n` +
+          `  run(): void {\n    // TODO: implement\n  },\n};\n`,
+        'utf-8',
+      );
+      writeFileSync(
+        joinPath(dir, 'tests', 'index.test.ts'),
+        `import { describe, it, expect } from 'vitest';\n\n` +
+          `describe(${JSON.stringify(name)}, () => {\n` +
+          `  it('is a placeholder', () => {\n    expect(true).toBe(true);\n  });\n});\n`,
+        'utf-8',
+      );
+      console.log(`✅ Scaffolded skill at ${dir}/`);
+      console.log(`  ${dir}/skill.json, ${dir}/index.ts, ${dir}/tests/index.test.ts`);
       return ExitCode.SUCCESS;
     }
     default:
@@ -2692,6 +2717,7 @@ export async function handleSkills(
       return ExitCode.SUCCESS;
   }
 }
+
 
 // ── Knowledge handler ──────────────────────────────────────────────────────
 
@@ -2844,10 +2870,16 @@ export async function handleDecision(
     case 'create': {
       const title = args[0];
       if (!title) {
-        console.error('❌ Usage: musubix decision create <title>');
+        console.error('❌ Usage: musubix decision create <title> [--context …] [--decision …] [--consequences …]');
         return ExitCode.GENERAL_ERROR;
       }
-      const adr = await manager.create({ title, context: '', decision: '', consequences: '' });
+      // Populate the ADR body from flags (previously always empty).
+      const adr = await manager.create({
+        title,
+        context: (flags['context'] as string | undefined) ?? '',
+        decision: (flags['decision'] as string | undefined) ?? '',
+        consequences: (flags['consequences'] as string | undefined) ?? '',
+      });
       console.log(`✅ Created ADR: ${adr.id} — ${adr.title}`);
       return ExitCode.SUCCESS;
     }
@@ -2926,6 +2958,35 @@ export async function handleDecision(
 
 // ── Deep Research handler ──────────────────────────────────────────────────
 
+/**
+ * Pull entities from the local knowledge graph that match a topic and adapt them
+ * into research sources, so `deep-research` can reason over project knowledge.
+ */
+async function knowledgeSourcesForTopic(
+  topic: string,
+  basePath = '.knowledge',
+): Promise<Array<{ title: string; type: 'documentation'; relevance: number; content: string }>> {
+  try {
+    const { createKnowledgeStore } = await import('@musubix2/knowledge');
+    const store = createKnowledgeStore(basePath);
+    if ('load' in store && typeof (store as { load?: unknown }).load === 'function') {
+      await (store as unknown as { load: () => Promise<void> }).load();
+    }
+    const byText = await store.query({ text: topic });
+    const bySearch = await store.search(topic);
+    const merged = new Map<string, (typeof byText)[number]>();
+    for (const e of [...byText, ...bySearch]) merged.set(e.id, e);
+    return [...merged.values()].map((e) => ({
+      title: e.name ?? e.id,
+      type: 'documentation' as const,
+      relevance: 0.85,
+      content: `${e.name ?? e.id} (${e.type}): ${e.description ?? ''}`.trim(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function handleDeepResearch(
   sub: string | undefined,
   args: string[],
@@ -2940,10 +3001,11 @@ export async function handleDeepResearch(
         console.error('❌ Usage: musubix deep-research query <question>');
         return ExitCode.GENERAL_ERROR;
       }
-      const result = engine.research({ topic: question, depth: 'medium' }, []);
+      const sources = await knowledgeSourcesForTopic(question);
+      const result = engine.research({ topic: question, depth: 'medium' }, sources);
       console.log(`Question: ${question}`);
       console.log(`Confidence: ${result.confidence}`);
-      console.log(`Sources: ${result.sources.length}`);
+      console.log(`Sources: ${result.sources.length}${sources.length ? ` (from knowledge graph)` : ''}`);
       console.log(`Answer: ${result.summary}`);
       return ExitCode.SUCCESS;
     }
@@ -2953,9 +3015,10 @@ export async function handleDeepResearch(
         console.error('❌ Usage: musubix deep-research iterative <question>');
         return ExitCode.GENERAL_ERROR;
       }
+      const sources = await knowledgeSourcesForTopic(question);
       const result = engine.researchIterative(
         { topic: question, depth: 'medium' },
-        () => [],
+        () => sources,
       );
       console.log(`Iterative research: ${question}`);
       console.log(`Confidence: ${result.confidence}`);
@@ -2968,10 +3031,14 @@ export async function handleDeepResearch(
         console.error('❌ Usage: musubix deep-research evidence <topic>');
         return ExitCode.GENERAL_ERROR;
       }
+      // Seed the engine's accumulator from the knowledge graph, then build the
+      // evidence chain (generateEvidenceChain reads prior research results).
+      const sources = await knowledgeSourcesForTopic(topic);
+      engine.research({ topic, depth: 'medium' }, sources);
       const evidence = engine.generateEvidenceChain(topic);
       console.log(`Evidence for "${topic}": ${evidence.length} items`);
       for (const e of evidence) {
-        console.log(`  - ${JSON.stringify(e)}`);
+        console.log(`  - ${e.claim} (confidence ${e.confidence.toFixed(2)}, ${e.sources.length} source(s))`);
       }
       return ExitCode.SUCCESS;
     }

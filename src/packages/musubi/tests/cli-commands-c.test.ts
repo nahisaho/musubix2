@@ -64,10 +64,20 @@ describe('CLI Commands C — Skills', () => {
     expect(code).toBe(ExitCode.SUCCESS);
   });
 
-  it('skills create returns SUCCESS with name', async () => {
-    const code = await handleSkills('create', ['my-skill']);
-    expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('my-skill'));
+  it('skills create scaffolds real files', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'musubix2-skill-'));
+    const prev = process.cwd();
+    process.chdir(dir);
+    try {
+      const code = await handleSkills('create', ['my-skill']);
+      expect(code).toBe(ExitCode.SUCCESS);
+      expect(existsSync(join(dir, 'my-skill', 'skill.json'))).toBe(true);
+      expect(existsSync(join(dir, 'my-skill', 'index.ts'))).toBe(true);
+      expect(existsSync(join(dir, 'my-skill', 'tests', 'index.test.ts'))).toBe(true);
+    } finally {
+      process.chdir(prev);
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('skills create returns GENERAL_ERROR without name', async () => {
@@ -157,6 +167,22 @@ describe('CLI Commands C — Decision', () => {
     expect(code).toBe(ExitCode.GENERAL_ERROR);
   });
 
+  // v0.5.41 — dogfooding: create must populate context/decision from flags.
+  it('decision create stores context/decision from flags', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'musubix2-adr-'));
+    try {
+      const flags = { path: dir, context: 'Need ACID', decision: 'Use PostgreSQL' };
+      expect(await handleDecision('create', ['Use PostgreSQL'], flags)).toBe(ExitCode.SUCCESS);
+      logSpy.mockClear();
+      await handleDecision('get', ['ADR-001'], { path: dir });
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('Need ACID');
+      expect(out).toContain('Use PostgreSQL');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('decision get returns GENERAL_ERROR without id', async () => {
     const code = await handleDecision('get', [], {});
     expect(code).toBe(ExitCode.GENERAL_ERROR);
@@ -189,6 +215,27 @@ describe('CLI Commands C — Deep Research', () => {
     const code = await handleDeepResearch('query', ['What is SDD?']);
     expect(code).toBe(ExitCode.SUCCESS);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Confidence'));
+  });
+
+  // v0.5.41 — dogfooding: query/evidence pull sources from the knowledge graph.
+  it('deep-research query uses knowledge-graph entities as sources', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'musubix2-dr-'));
+    const prev = process.cwd();
+    process.chdir(dir);
+    try {
+      await handleKnowledge(
+        'put',
+        ['microservices', 'concept', 'Microservices add operational complexity'],
+        {},
+      );
+      logSpy.mockClear();
+      expect(await handleDeepResearch('query', ['microservices'])).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('from knowledge graph');
+    } finally {
+      process.chdir(prev);
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('deep-research query returns GENERAL_ERROR without question', async () => {

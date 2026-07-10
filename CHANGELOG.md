@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.41] - 2026-07-10
+
+`decisions` / `deep-research` / `skills` を dogfooding し、3 つのスタブ／未配線を実装。
+
+### Fixed（decisions）
+
+- **`decision create` が context/decision を無視** — 常に空の ADR を作成していた（`context: '', decision: '', consequences: ''` をハードコード）。`--context` / `--decision` / `--consequences` フラグから本文を設定するよう修正
+
+### Fixed（deep-research）
+
+- **ナレッジグラフ非連携** — `deep-research query|iterative|evidence` が常に空のソース配列で実行され、常に「Sources: 0」だった。**ローカルのナレッジグラフ（`.knowledge`）からトピックに一致するエンティティを取得し、`ResearchSource` に変換して供給**するよう修正。`evidence` は先に `research()` でアキュムレータを満たしてから証拠チェーンを生成
+
+### Fixed（skills）
+
+- **`skills create` がツリーを表示するだけのスタブ** — ファイルを何も書いていなかった。実際に `<name>/skill.json`・`<name>/index.ts`・`<name>/tests/index.test.ts` をディスクに生成するよう修正（既存ディレクトリはエラー）。生成される `skill.json` は `skills validate` を通過
+
+### Validation
+
+- `decision create … --context … --decision …` → `get` が本文を表示
+- `deep-research query microservices`（ナレッジに該当エンティティあり）→ Confidence 0.87 / Sources 1（from knowledge graph）、`evidence` が 2 件
+- `skills create my-skill` → 実ファイルを生成し `skills validate` に合格
+
+### Notes（正常動作を確認したもの）
+
+- `ontology add/list/stats`、`synthesis dsl`、`policy list/validate`、`decision accept/deprecate/search/index` は正常動作
+
+### Tests
+
+- musubi: decisions のフラグ入力、deep-research のナレッジ連携、skills の実ファイル生成を検証（52 → 55）
+
 ## [0.5.40] - 2026-07-10
 
 `trace` / `decisions` / `design:c4` / `deep-research` を dogfooding し、`design:c4` の不親切なクラッシュと `trace validate` のスタブ挙動を修正。
