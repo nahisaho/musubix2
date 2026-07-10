@@ -188,6 +188,14 @@ describe('DES-COD-003: TaintAnalyzer', () => {
     expect(analyzer.analyze('el.innerHTML = userInput;', 'ui.js').length).toBeGreaterThan(0);
   });
 
+  // v0.5.71 — building HTML by splicing a string literal with `+` is dynamic.
+  it('flags innerHTML built by string concatenation', () => {
+    expect(analyzer.analyze('el.innerHTML = "<b>" + name + "</b>";', 'ui.js')
+      .some((f) => f.type === 'xss')).toBe(true);
+    // still no false positive on a purely static literal
+    expect(analyzer.analyze('el.innerHTML = "<b>static</b>";', 'ui.js')).toHaveLength(0);
+  });
+
   // v0.5.36 — recall: command injection, deserialization, weak crypto.
   it('detects command-injection sinks', () => {
     expect(analyzer.analyze('os.system("rm -rf " + x)', 'a.py').length).toBeGreaterThan(0);
@@ -299,6 +307,30 @@ describe('TaintDataflowAnalyzer', () => {
   it('matches capitalized SQL sinks (Go Exec / QueryRow)', () => {
     expect(df.analyze('q := "DELETE " + id\ndb.Execute(q)', 'h.go').length).toBeGreaterThan(0);
     expect(df.analyze('q := "SELECT " + id\ndb.QueryRow(q)', 'h.go').length).toBeGreaterThan(0);
+  });
+
+  // v0.5.71 — C-style `Type name = value` declarations (Java/C#) must be parsed
+  // so taint propagates through the declared variable.
+  it('tracks taint through C-style declarations (Java/C#)', () => {
+    expect(df.analyze('String q = "SELECT " + id;\nstmt.executeQuery(q);', 'A.java').length).toBeGreaterThan(0);
+    expect(df.analyze('string q = "SELECT " + id;\ncmd.ExecuteReader(q);', 'A.cs').length).toBeGreaterThan(0);
+    expect(df.analyze('final Map<K,V> m = build("x" + tainted);\nq.executeQuery(m);', 'A.java').length).toBeGreaterThan(0);
+    // A parameterized query with a static declaration stays clean.
+    expect(df.analyze('String q = "SELECT ?";\nstmt.executeQuery(q, id);', 'A.java')).toHaveLength(0);
+  });
+
+  // v0.5.71 — Rust: format!() macro is dynamic, and a `&q` reference argument
+  // resolves to `q`. Kotlin/Swift use val/var/let which the prefix parses.
+  it('tracks taint through Rust format!() into query(&q)', () => {
+    const code = 'let q = format!("SELECT * FROM u WHERE id = {}", id);\nclient.query(&q);\n';
+    expect(df.analyze(code, 'a.rs').length).toBeGreaterThan(0);
+    // Parameterized (static string) stays clean.
+    expect(df.analyze('let q = "SELECT ?";\nclient.query(&q, &[&id]);', 'a.rs')).toHaveLength(0);
+  });
+
+  it('tracks taint through Kotlin val declaration', () => {
+    const code = 'val q = "SELECT * FROM u WHERE id = " + id\nstmt.executeQuery(q)\n';
+    expect(df.analyze(code, 'A.kt').length).toBeGreaterThan(0);
   });
 });
 

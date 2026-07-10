@@ -97,4 +97,20 @@ describe('DES-TRC-002: MatrixGenerator', () => {
     expect(report.completeness).toBe(100);
     expect(report.cells).toHaveLength(0);
   });
+
+  // v0.5.71 — sources with no targets is 0% coverage, not 100% (a prior
+  // `totalPairs === 0 ? 100` fallback reported full completeness for uncovered
+  // requirements).
+  it('reports 0% completeness when requirements have no targets', () => {
+    const gen = new MatrixGenerator();
+    const report = gen.generate(['REQ-ZZ-001'], [], []);
+    expect(report.completeness).toBe(0);
+  });
+
+  it('completeness = fraction of source requirements that are linked', () => {
+    const gen = new MatrixGenerator();
+    // 2 of 3 requirements linked → 67%.
+    const report = gen.generate(sources, targets, links);
+    expect(report.completeness).toBe(67);
+  });
 });

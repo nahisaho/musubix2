@@ -414,8 +414,10 @@ export class TaintAnalyzer {
     },
     {
       // Flag dynamic assignments only — `innerHTML = "static"` / `= ''` (clearing
-      // or a constant) is not an XSS sink; a variable/expression RHS is.
-      regex: /\.innerHTML\s*=\s*[^\s'"=]/g,
+      // or a constant) is not an XSS sink. A variable/expression RHS is, and so
+      // is a string literal spliced with `+` (`innerHTML = "<b>" + name`), which
+      // builds HTML from a (possibly tainted) value.
+      regex: /\.innerHTML\s*=\s*(?:[^\s'"=]|['"][^'"]*['"]\s*\+)/g,
       severity: 'high',
       type: 'xss',
       description: 'Direct innerHTML assignment — potential XSS vulnerability',
@@ -623,7 +625,7 @@ export class TaintDataflowAnalyzer {
     {
       // Case-insensitive + `\w*` so Go/Java/C# forms match too: db.Query(q),
       // QueryRow/QueryContext, stmt.executeQuery(q), executeUpdate(q).
-      re: /\b(?:execute\w*|query\w*|raw|prepare)\s*\(\s*(\$?\w+)\s*[,)]/gi,
+      re: /\b(?:execute\w*|query\w*|raw|prepare)\s*\(\s*(&?\$?\w+)\s*[,)]/gi,
       severity: 'high', type: 'injection', cweId: 'CWE-89',
       label: 'SQL injection — a dynamically-built string flows into a query',
       suggestion: 'Use parameterized queries; never pass a formatted/concatenated string to the DB.',
@@ -670,6 +672,7 @@ export class TaintDataflowAnalyzer {
     if (TaintDataflowAnalyzer.SANITIZERS.test(rhs)) {return false;}
     return (
       /\.\s*format\s*\(/.test(rhs) || // "…".format(x)
+      /\b(?:format|write|writeln|panic|println|eprintln)!\s*\(/.test(rhs) || // Rust format!(…) macros
       /\bf['"]/.test(rhs) || // f-string
       /['"]\s*%\s*[\w([]/.test(rhs) || // "…" % x
       /['"]\s*\+\s*[$\w]|[$\w.\])]\s*\+\s*['"]/.test(rhs) || // string + var / var + string
@@ -687,7 +690,13 @@ export class TaintDataflowAnalyzer {
     // annotation — without this, taint never propagates through TS variables.
     // Accepts JS/TS declarations (`const`/`let`/`var`), an optional `: T` type
     // annotation, and Go's `:=` short declaration (the `:?` before `=`).
-    const assignRe = /^\s*(?:(?:const|let|var)\s+)?(\$?[A-Za-z_]\w*)\s*(?::[^=]+)?:?=(?!=)\s*(.+)$/;
+    // Captures `name` from an assignment / declaration. The optional
+    // `(?:[\w.<>\[\],]+\s+)*?` prefix consumes leading type / modifier tokens so
+    // C-style declarations parse too: `String q = …` (Java), `string q = …`
+    // (C#), `final Map<K,V> m = …`, alongside JS `const`/`let`/`var`, an
+    // optional `: T` TS annotation, and Go's `:=`. Non-greedy so the *last*
+    // identifier before `=` is the variable, not the type.
+    const assignRe = /^\s*(?:[\w.<>[\],]+\s+)*?(\$?[A-Za-z_]\w*)\s*(?::[^=]+)?:?=(?!=)\s*(.+)$/;
 
     // Collect tainted variables (name → 1-based definition line), propagating
     // taint through assignments to a fixpoint (bounded).
@@ -726,7 +735,7 @@ export class TaintDataflowAnalyzer {
         const re = new RegExp(sink.re.source, sink.re.flags.includes('g') ? sink.re.flags : sink.re.flags + 'g');
         let m: RegExpExecArray | null;
         while ((m = re.exec(line)) !== null) {
-          const arg = m[1];
+          const arg = m[1].replace(/^&/, ''); // Rust: `query(&q)` references `q`
           const def = tainted.get(arg);
           if (def === undefined || def >= i + 1) {continue;} // must be defined earlier
           const key = `${i}:${arg}`;

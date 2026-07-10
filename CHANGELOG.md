@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.71] - 2026-07-11
+
+dogfooding 実装テスト 50 本を実施し、5 件の不具合を発見・修正。
+
+### Fixed
+
+- **Java / C# / Kotlin / Swift の SQL インジェクションが検出されなかった** — taint 解析の代入検出が `Type name = value` 形式の C 系宣言を認識していなかった（変数名の前に型が来るため型を変数名と誤認）。型・修飾子トークンの前置を許容する正規表現に変更し、`String q = "…"+id`（Java）、`string q = …`（C#）、`val q = …`（Kotlin）などを解析できるようにした（パラメータ化クエリは誤検出しない）
+- **JS/TS の innerHTML への文字列連結による XSS を見逃していた** — `el.innerHTML = "<b>" + name` は文字列リテラルで始まるため「静的」と判定され検出されなかった。文字列リテラル＋`+` 連結を動的とみなすよう XSS パターンを拡張（純粋な静的リテラルは従来どおり無視）
+- **`trace matrix` が未被覆でも「Completeness: 100%」と表示** — 完全性をソース×ターゲットのペア密度で計算し、ターゲットが 0 件だと `totalPairs===0` で 100% にフォールバックしていた。要件（ソース）のうちリンクを持つ割合で計算するよう変更（未被覆要件は 0%）
+- **重複する要件 ID が警告されなかった** — 同一 REQ-ID が複数回出現してもトレーサビリティ上問題なく通過していた。`req validate` で重複 ID を検出し警告・非ゼロ終了するよう追加
+- **Rust の SQL インジェクションが検出されなかった** — `format!()` マクロを動的文字列とみなしていなかった点と、`query(&q)` の参照引数 `&q` をシンクが捕捉できなかった点を修正
+
+これらにより taint 解析が Python/PHP/JS/TS に加え Go/Java/C#/Kotlin/Swift/Rust をカバー。
+
 ## [0.5.70] - 2026-07-11
 
 dogfooding 実装テスト 10 本を実施し、3 件の不具合を発見・修正。

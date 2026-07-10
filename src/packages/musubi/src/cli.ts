@@ -2468,6 +2468,16 @@ export async function handleReqValidate(filePath: string): Promise<ExitCodeValue
       }
     }
 
+    // Duplicate requirement IDs break traceability (a REQ-ID must be unique).
+    const idCounts = new Map<string, number>();
+    for (const req of requirements) {idCounts.set(req.id, (idCounts.get(req.id) ?? 0) + 1);}
+    for (const [id, n] of idCounts) {
+      if (n > 1) {
+        hasIssues = true;
+        console.log(`  ⚠ Duplicate requirement ID "${id}" appears ${n}× — IDs must be unique.`);
+      }
+    }
+
     if (requirements.length === 0) {
       console.log('No requirements found in file');
       // Diagnose the common cause: REQ- tokens present but not in the required

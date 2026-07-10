@@ -62,6 +62,24 @@ describe('handleReqValidate', () => {
     expect(console.log).toHaveBeenCalledWith('No requirements found in file');
   });
 
+  // v0.5.71 — duplicate requirement IDs break traceability and must be flagged.
+  it('flags duplicate requirement IDs (VALIDATION_ERROR)', async () => {
+    const file = join(FIXTURE_DIR, 'dupe.md');
+    writeFileSync(
+      file,
+      '## REQ-DUP-001: A\nTHE system SHALL a.\n## REQ-DUP-001: B\nTHE system SHALL b.\n',
+    );
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      const code = await handleReqValidate(file);
+      expect(code).toBe(ExitCode.VALIDATION_ERROR);
+      expect(logs.join('\n')).toContain('Duplicate requirement ID "REQ-DUP-001"');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   // v0.5.64 — the diagnostic hint reflects the real rule (2–6 letter domain).
   it('diagnoses a malformed id with the correct 2–6 letter hint', async () => {
     const file = join(FIXTURE_DIR, 'malformed.md');

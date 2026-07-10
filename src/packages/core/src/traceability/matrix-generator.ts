@@ -74,9 +74,13 @@ export class MatrixGenerator {
       }
     }
 
-    const totalPairs = sourceIds.length * targetIds.length;
-    const linkedCount = cells.filter((c) => c.linked).length;
-    const completeness = totalPairs === 0 ? 100 : Math.round((linkedCount / totalPairs) * 100);
+    // Completeness = fraction of source requirements that trace to at least one
+    // target. (A sparse source×target grid is expected — most pairs are
+    // unlinked — so pair density is not a meaningful coverage measure, and it
+    // wrongly reported 100% when there were sources but zero targets.)
+    const coveredSources = sourceIds.filter((s) => linkedSources.has(s)).length;
+    const completeness =
+      sourceIds.length === 0 ? 100 : Math.round((coveredSources / sourceIds.length) * 100);
 
     return { cells, gaps, completeness };
   }
