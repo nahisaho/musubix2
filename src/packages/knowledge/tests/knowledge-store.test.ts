@@ -42,6 +42,19 @@ describe('REQ-KNW-001: FileKnowledgeStore', () => {
     expect(await store.getEntity('missing')).toBeUndefined();
   });
 
+  // v0.5.39 — dogfooding: search/query must not crash on entities that lack a
+  // name or tags (e.g. minimal entities created via the CLI).
+  it('search and query tolerate entities without name/tags', async () => {
+    await store.putEntity({ id: 'user', type: 'requirement', properties: {} } as unknown as Entity);
+    await expect(store.search('user')).resolves.toBeDefined();
+    const byText = await store.query({ text: 'user' });
+    expect(Array.isArray(byText)).toBe(true);
+    // A named entity is still found by search.
+    await store.putEntity(createEntity('order'));
+    const found = await store.search('order');
+    expect(found.some((e) => e.id === 'order')).toBe(true);
+  });
+
   it('should delete entities and their relations', async () => {
     await store.putEntity(createEntity('e1'));
     await store.putEntity(createEntity('e2'));

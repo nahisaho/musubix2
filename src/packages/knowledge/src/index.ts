@@ -191,7 +191,7 @@ export class FileKnowledgeStore implements KnowledgeStore {
       const lower = filter.text.toLowerCase();
       results = results.filter(
         (e) =>
-          e.name.toLowerCase().includes(lower) ||
+          (e.name ?? '').toLowerCase().includes(lower) ||
           (e.description?.toLowerCase().includes(lower) ?? false),
       );
     }
@@ -220,7 +220,8 @@ export class FileKnowledgeStore implements KnowledgeStore {
     let results = Object.values(this.graph.entities).filter((e) => {
       for (const field of fields) {
         if (field === 'name') {
-          const val = caseSensitive ? e.name : e.name.toLowerCase();
+          const name = e.name ?? '';
+          const val = caseSensitive ? name : name.toLowerCase();
           if (val.includes(searchText)) {
             return true;
           }
@@ -232,7 +233,7 @@ export class FileKnowledgeStore implements KnowledgeStore {
           }
         }
         if (field === 'tags') {
-          for (const tag of e.tags) {
+          for (const tag of e.tags ?? []) {
             const val = caseSensitive ? tag : tag.toLowerCase();
             if (val.includes(searchText)) {
               return true;

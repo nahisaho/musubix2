@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.39] - 2026-07-10
+
+`requirements`（EARS 検証）と `knowledge`（グラフ）を dogfooding し、パーサーの厳格さと未処理クラッシュを修正。
+
+### Fixed（requirements / EARS パーサー）
+
+- **タイトルなし見出しの取りこぼし** — `## REQ-AUT-001:`（タイトル無し）が見出し正規表現の `(.+)` に一致せず、**ファイル内の全要件が黙って消える**問題を修正（`(.*)` に変更してタイトルを任意化）
+- **インライン要件テキストの非対応** — `**要件**: THE … SHALL …`（同一行にテキスト）が「次行にテキスト」を要求する正規表現に一致せず解析されなかった問題を修正（同一行・次行の両方に対応）
+- 修正後、タイトル無し＋インライン形式の文書でも 8 要件すべてが正しく解析・分類（良い EARS は高信頼度、曖昧なものは「SHALL 欠如／低信頼度」を検出）
+
+### Fixed（knowledge）
+
+- **`search` のクラッシュ** — `name`/`tags` を持たないエンティティ（CLI で最小構成で作成したもの）に対し `e.name.toLowerCase()` が「Cannot read properties of undefined」で落ちる問題を修正（null 安全化。`query` の text フィルタも同様に修正）
+- **CLI `knowledge put` が不完全なエンティティを保存** — `name`/`tags` を付けずに保存していたため `search`/`query` が機能しなかった。`name`（既定は id）と `tags: []` を付与し、任意の `[name]` 引数を追加
+- **CLI `knowledge query`** — 従来は型の完全一致のみ。名前・説明の部分一致とエンティティ id 一致も対象にし、`query user` が「user」エンティティを見つけられるように
+
+### Tests
+
+- core: タイトル無し見出し・インライン要件テキストの解析を検証
+- knowledge: `name`/`tags` 欠如エンティティでの `search`/`query` 非クラッシュを検証
+
 ## [0.5.38] - 2026-07-10
 
 `security` の taint データフロー解析に**サニタイザ認識**を追加。エスケープ／キャスト済みの値を汚染源から除外し、誤検知を削減。

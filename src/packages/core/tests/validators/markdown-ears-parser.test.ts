@@ -78,6 +78,24 @@ describe('REQ-REQ-002: MarkdownEARSParser', () => {
     expect(reqs[0].text).toContain('npm workspaces');
   });
 
+  // v0.5.39 — dogfooding: tolerate common authoring styles.
+  it('should parse a heading without a title', () => {
+    const md = '## REQ-AUT-001:\n**要件**:\nThe system shall authenticate users.\n';
+    const reqs = parser.parse(md);
+    expect(reqs).toHaveLength(1);
+    expect(reqs[0].id).toBe('REQ-AUT-001');
+    expect(reqs[0].title).toBe('');
+    expect(reqs[0].text).toContain('authenticate');
+  });
+
+  it('should parse inline requirement text (**要件**: … on one line)', () => {
+    const md = '## REQ-AUT-002: Login\n**要件**: When a user logs in, the system shall create a session.\n';
+    const reqs = parser.parse(md);
+    expect(reqs).toHaveLength(1);
+    expect(reqs[0].text).toContain('create a session');
+    expect(reqs[0].pattern).toBe('event-driven');
+  });
+
   it('should extract EARS pattern from type field', () => {
     const reqs = parser.parse(SAMPLE_MARKDOWN);
     expect(reqs[0].pattern).toBe('ubiquitous');

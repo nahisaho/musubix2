@@ -11,11 +11,14 @@
 import type { ParsedRequirement, EARSPattern, ValidationIssue } from '../types/ears.js';
 import { EARSValidator } from './ears-validator.js';
 
-const REQ_HEADING_REGEX = /^#{1,4}\s+(REQ-[A-Z]{3}-\d{3}):\s*(.+)$/;
+// Title is optional: `## REQ-XXX-000:` (no title) still parses.
+const REQ_HEADING_REGEX = /^#{1,4}\s+(REQ-[A-Z]{3}-\d{3}):\s*(.*)$/;
 const FIELD_REGEX = {
   type: /^\*\*種別\*\*:\s*(.+)$/m,
   priority: /^\*\*優先度\*\*:\s*(P[012])$/m,
-  requirement: /^\*\*要件\*\*:\s*\n([\s\S]+?)(?=\n\*\*|$)/m,
+  // Requirement text may be inline (`**要件**: THE … SHALL …`) or on the
+  // following line(s).
+  requirement: /^\*\*要件\*\*:[ \t]*\n?([\s\S]+?)(?=\n\*\*|$)/m,
   acceptanceCriteria: /^\*\*受入基準\*\*:\s*\n((?:[-*]\s+\[[ x]\].+\n?)+)/m,
   traceability: /^\*\*トレーサビリティ\*\*:\s*(.+)$/m,
   package: /^\*\*パッケージ\*\*:\s*`(.+)`$/m,

@@ -2654,11 +2654,20 @@ export async function handleKnowledge(
     case 'put': {
       const id = args[0];
       const type = args[1];
+      const name = args[2];
       if (!id || !type) {
-        console.error('❌ Usage: musubix knowledge put <id> <type>');
+        console.error('❌ Usage: musubix knowledge put <id> <type> [name]');
         return ExitCode.GENERAL_ERROR;
       }
-      await store.putEntity({ id, type: type as EntityType, properties: {} } as any);
+      // Store a well-formed entity (name defaults to id, tags default to []),
+      // so full-text `search` and `query` work without crashing.
+      await store.putEntity({
+        id,
+        name: name ?? id,
+        type: type as EntityType,
+        properties: {},
+        tags: [],
+      } as any);
       await store.save();
       console.log(`✅ Stored entity: ${id} (${type})`);
       return ExitCode.SUCCESS;
@@ -2693,7 +2702,16 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge query <filter>');
         return ExitCode.GENERAL_ERROR;
       }
-      const results = await store.query({ type: filter as EntityType });
+      // Match on exact type OR a text substring of name/description, and also
+      // on the entity id — so `query user` finds an entity named/ided "user".
+      const byType = await store.query({ type: filter as EntityType });
+      const byText = await store.query({ text: filter });
+      const merged = new Map<string, (typeof byType)[number]>();
+      for (const e of [...byType, ...byText]) merged.set(e.id, e);
+      for (const e of await store.query({})) {
+        if (e.id.toLowerCase().includes(filter.toLowerCase())) merged.set(e.id, e);
+      }
+      const results = [...merged.values()];
       console.log(`Results: ${results.length} entities`);
       for (const e of results) {
         console.log(`  ${e.id} (${e.type})`);
