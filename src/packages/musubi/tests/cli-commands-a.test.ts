@@ -475,6 +475,15 @@ describe('Group A dispatcher integration', () => {
     const code = await dispatcher.run(['codegen', 'MyClass', '--type', 'class']);
     expect(code).toBe(ExitCode.SUCCESS);
   });
+
+  // v0.5.69 — codegen emits TypeScript only; an unsupported --lang must be
+  // rejected rather than silently emitting TS.
+  it('rejects codegen --lang for a non-TypeScript language', async () => {
+    const dispatcher = createCLIDispatcher();
+    expect(await dispatcher.run(['codegen', 'MyClass', '--lang', 'python'])).toBe(ExitCode.VALIDATION_ERROR);
+    // typescript (and no flag) still work.
+    expect(await dispatcher.run(['codegen', 'MyClass', '--lang', 'typescript'])).toBe(ExitCode.SUCCESS);
+  });
 });
 
 // ── v0.5.1 fixes: verb tolerance, exit-code propagation, parser diagnostic ──

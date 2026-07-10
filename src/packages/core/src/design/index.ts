@@ -421,13 +421,18 @@ export class DesignGenerator {
   private suggestInterfaces(reqs: ParsedRequirementInput[]): string[] {
     const interfaces: string[] = [];
     for (const req of reqs) {
-      // Extract potential interface names from requirement titles
-      const words = req.title.split(/\s+/).filter((w) => w.length > 3);
+      // Extract potential interface names from requirement titles. Strip
+      // non-alphanumerics per word so titles like "In-progress tracking" yield
+      // a valid TS identifier (IInprogressTracking), not "IIn-progressTracking".
+      const words = req.title
+        .split(/[\s_\-,、]+/)
+        .map((w) => w.replace(/[^A-Za-z0-9]/g, ''))
+        .filter((w) => w.length > 3);
       if (words.length > 0) {
         const name = words
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
           .join('');
-        interfaces.push(`I${name}`);
+        if (name) {interfaces.push(`I${name}`);}
       }
     }
     return [...new Set(interfaces)];

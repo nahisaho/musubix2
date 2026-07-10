@@ -4195,6 +4195,17 @@ export function getDefaultCommands(): CLICommand[] {
           console.error('❌ Usage: musubix codegen [generate] <name> [--type class|interface|function|...] [--out <file>]');
           return ExitCode.VALIDATION_ERROR;
         }
+        // codegen emits TypeScript only. A `--lang python` was silently ignored
+        // (TS came out anyway) — reject it explicitly so output is never a
+        // surprise language.
+        const lang = (args['lang'] as string | undefined) ?? (args['language'] as string | undefined);
+        if (typeof lang === 'string' && !/^(ts|typescript)$/i.test(lang)) {
+          console.error(
+            `❌ codegen currently emits TypeScript only (requested: ${lang}).\n` +
+              '   Omit --lang, or pass --lang typescript.',
+          );
+          return ExitCode.VALIDATION_ERROR;
+        }
         const type = (args['type'] as string | undefined) ?? 'class';
         return await handleCodegen(name, type, args['out'] as string | undefined);
       },

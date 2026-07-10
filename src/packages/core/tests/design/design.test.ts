@@ -189,6 +189,20 @@ describe('DES-DES-001: DesignGenerator', () => {
     expect(doc.sections[0].interfaces[0]).toMatch(/^I/);
   });
 
+  // v0.5.69 — interface names must be valid TS identifiers even when the title
+  // contains punctuation ("In-progress tracking" → not "IIn-progressTracking").
+  it('produces valid identifier interface names from punctuated titles', () => {
+    const generator = new DesignGenerator();
+    const reqs: ParsedRequirementInput[] = [
+      { id: 'REQ-RIDE-002', title: 'In-progress tracking', text: 'WHILE a trip is in progress, THE system SHALL update.', pattern: 'state-driven' },
+    ];
+    const doc = generator.generate(reqs);
+    for (const iface of doc.sections[0].interfaces) {
+      expect(iface).toMatch(/^I[A-Za-z0-9]*$/); // no hyphens or other punctuation
+    }
+    expect(doc.sections[0].interfaces).toContain('IProgressTracking');
+  });
+
   it('should suggest Observer pattern for WHEN keyword', () => {
     const generator = new DesignGenerator();
     const reqs: ParsedRequirementInput[] = [

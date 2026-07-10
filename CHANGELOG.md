@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.69] - 2026-07-11
+
+dogfooding 実装テスト（複数ドメインの大きめ要件セット）で 2 件を発見・修正。
+
+### Fixed
+
+- **設計の interface 名が無効な TS 識別子になることがある** — `suggestInterfaces` がタイトルを空白のみで分割し、句読点を除去していなかったため、「In-progress tracking」というタイトルから `IIn-progressTracking`（ハイフン入り＝無効な識別子）が生成され、design.json の `interfaces` に保存されていた。`pascal` と同様に単語ごとに非英数字を除去するよう修正（→ `IProgressTracking`）。現状 codegen はこの名前を直接使わないため生成コードは壊れていなかったが、設計成果物のデータ品質として修正
+- **`codegen --lang python` が無言で TypeScript を出力** — codegen は TypeScript 専用だが、`--lang` フラグは解釈されず無視され、要求と異なる言語（TS）が出力されていた。TypeScript 以外が指定された場合は明示的にエラーとするよう修正（`--lang typescript` と未指定は従来どおり動作）
+
 ## [0.5.68] - 2026-07-11
 
 dogfooding 実装テストで、知識グラフのリレーションが CLI/MCP 経由で壊れて保存される不具合を発見・修正。
