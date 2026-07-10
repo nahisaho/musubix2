@@ -40,6 +40,11 @@ function fail(error: string): ToolResult {
   return { success: false, error };
 }
 
+/** Extract a human-readable message from a caught value (single branch, kept DRY). */
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 // ---------------------------------------------------------------------------
 // SDD Core tools (from @musubix2/core)
 // ---------------------------------------------------------------------------
@@ -70,7 +75,7 @@ function sddCoreTools(): CatalogEntry[] {
             issues: validation.issues,
           });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -92,7 +97,7 @@ function sddCoreTools(): CatalogEntry[] {
           });
           return ok({ results, allValid: results.every((r) => r.valid) });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -107,7 +112,7 @@ function sddCoreTools(): CatalogEntry[] {
           const parsed = new MarkdownEARSParser().parse((params['markdown'] as string) ?? '');
           return ok(parsed.map((r) => ({ id: r.id, title: r.title, pattern: r.pattern, text: r.text })));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -128,7 +133,7 @@ function sddCoreTools(): CatalogEntry[] {
           }));
           return ok(createDesignGenerator().generate(mapped));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -150,7 +155,7 @@ function sddCoreTools(): CatalogEntry[] {
           const design = createDesignGenerator().generate(mapped);
           return ok(createSOLIDValidator().validate(design));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -173,7 +178,7 @@ function sddCoreTools(): CatalogEntry[] {
           });
           return ok(code);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -194,7 +199,7 @@ function sddCoreTools(): CatalogEntry[] {
           );
           return ok(suite);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -227,7 +232,7 @@ function sddCoreTools(): CatalogEntry[] {
             complete: gaps.length === 0 && reqIds.length > 0,
           });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -244,7 +249,7 @@ function sddCoreTools(): CatalogEntry[] {
           const result = interviewer.analyzeInput(params['input'] as string);
           return ok(result);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -273,7 +278,7 @@ function sddCoreTools(): CatalogEntry[] {
           );
           return ok(result);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -288,7 +293,7 @@ function sddCoreTools(): CatalogEntry[] {
           const interviewer = core.createRequirementsInterviewer();
           return ok(interviewer.getState());
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -305,7 +310,7 @@ function sddCoreTools(): CatalogEntry[] {
           const doc = generator.generate(context as never);
           return ok(doc);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -334,7 +339,7 @@ function knowledgeTools(): CatalogEntry[] {
           const entity = await store.getEntity(params['id'] as string);
           return entity ? ok(entity) : fail('Entity not found');
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -361,7 +366,7 @@ function knowledgeTools(): CatalogEntry[] {
           await store.save();
           return ok({ id: params['id'], type: params['type'], saved: true });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -382,7 +387,7 @@ function knowledgeTools(): CatalogEntry[] {
           if (deleted) {await store.save();}
           return ok({ id: params['id'], deleted });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -409,7 +414,7 @@ function knowledgeTools(): CatalogEntry[] {
           await store.save();
           return ok({ from: params['from'], to: params['to'], type: params['type'], added: true });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -430,7 +435,7 @@ function knowledgeTools(): CatalogEntry[] {
           const results = await store.search(params['query'] as string, { limit: (params['limit'] as number) ?? 10 });
           return ok(results);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -451,7 +456,7 @@ function knowledgeTools(): CatalogEntry[] {
           const result = await store.traverse(params['startId'] as string, { depth: (params['depth'] as number) ?? 2 });
           return ok(result);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -468,7 +473,7 @@ function knowledgeTools(): CatalogEntry[] {
           const stats = store.getStats();
           return ok(stats);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -586,7 +591,7 @@ function ontologyTools(): CatalogEntry[] {
           await saveTripleStore(store, file);
           return ok({ added: true, total: store.size() });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -610,7 +615,7 @@ function ontologyTools(): CatalogEntry[] {
           });
           return ok({ results, count: results.length });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -627,7 +632,7 @@ function ontologyTools(): CatalogEntry[] {
           await saveTripleStore(store, file);
           return ok(result);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -642,7 +647,7 @@ function ontologyTools(): CatalogEntry[] {
           const { store } = await loadTripleStore((params['basePath'] as string) ?? '.');
           return ok(createConsistencyValidator().validate(store));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -666,7 +671,7 @@ function ontologyTools(): CatalogEntry[] {
           });
           return ok({ bindings, count: bindings.length });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -696,7 +701,7 @@ function codeAnalysisTools(): CatalogEntry[] {
           );
           return ok({ nodes, count: nodes.length });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -728,7 +733,7 @@ function codeAnalysisTools(): CatalogEntry[] {
           const stats = engine.getStats();
           return ok({ nodeCount: stats.nodeCount, edgeCount: stats.edgeCount, languages: [...stats.languages] });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -763,7 +768,7 @@ function codeAnalysisTools(): CatalogEntry[] {
           const results = new GraphRAGSearch(engine).globalSearch((params['query'] as string) ?? '');
           return ok({ query: params['query'], results });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -784,7 +789,7 @@ function codeAnalysisTools(): CatalogEntry[] {
           );
           return ok(dfg);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -821,7 +826,7 @@ function securityTools(): CatalogEntry[] {
           const result = createSecurityScanner().scan(sourceOf(params), (params['filePath'] as string) ?? 'inline');
           return ok({ findings: result.findings, severity: severityOf(result.findings) });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -839,7 +844,7 @@ function securityTools(): CatalogEntry[] {
           const secrets = createSecretDetector().scan(sourceOf(params), (params['filePath'] as string) ?? 'inline');
           return ok({ secrets, count: secrets.length });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -857,7 +862,7 @@ function securityTools(): CatalogEntry[] {
           const tainted = new TaintAnalyzer().analyze(sourceOf(params), (params['filePath'] as string) ?? 'inline');
           return ok({ tainted, count: tainted.length });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -875,7 +880,7 @@ function securityTools(): CatalogEntry[] {
           const result = createComplianceChecker().check(sourceOf(params), (params['filePath'] as string) ?? 'inline', []);
           return ok(result);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -906,7 +911,7 @@ function researchTools(): CatalogEntry[] {
           );
           return ok(result);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -929,7 +934,7 @@ function researchTools(): CatalogEntry[] {
           );
           return ok(result);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -951,7 +956,7 @@ function researchTools(): CatalogEntry[] {
           acc.accumulate(result);
           return ok({ evidence: acc.query(topic), summary: result.summary, confidence: result.confidence });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1012,7 +1017,7 @@ function neuralTools(): CatalogEntry[] {
           const hits = engine.search(await embedder.embed((params['query'] as string) ?? ''), (params['topK'] as number) ?? 10);
           return ok({ query: params['query'], hits });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1032,7 +1037,7 @@ function neuralTools(): CatalogEntry[] {
           const vector = await model.embed(text);
           return ok({ vector, dimensions: Array.isArray(vector) ? vector.length : (vector as { values?: number[] }).values?.length ?? 0 });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1047,7 +1052,7 @@ function neuralTools(): CatalogEntry[] {
           const items = ((params['items'] as unknown[]) ?? []).map(String);
           return ok(createWakePhase().process(items));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1062,7 +1067,7 @@ function neuralTools(): CatalogEntry[] {
           const patterns = ((params['patterns'] as unknown[]) ?? []).map(String);
           return ok(createSleepPhase().consolidate(patterns));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1078,7 +1083,7 @@ function neuralTools(): CatalogEntry[] {
           const patterns = createLibraryLearner().learn(snippets);
           return ok({ patterns, count: patterns.length });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1123,7 +1128,7 @@ function synthesisTools(): CatalogEntry[] {
           const result = builder.execute((params['input'] as string) ?? '');
           return ok({ input: params['input'], ops, result });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1142,7 +1147,7 @@ function synthesisTools(): CatalogEntry[] {
           const rule = createSynthesisEngine().synthesize(examples);
           return ok({ rule, synthesized: rule !== null });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1165,7 +1170,7 @@ function synthesisTools(): CatalogEntry[] {
           for (const n of (params['negative'] as string[]) ?? []) {mgr.addNegative(name, n);}
           return ok({ name, hypotheses: mgr.getConsistentHypotheses(name), spaces: mgr.getSpaces().size });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1215,7 +1220,7 @@ function formalVerifyTools(): CatalogEntry[] {
           const { createEarsToSmtConverter } = await import('@musubix2/formal-verify');
           return ok(createEarsToSmtConverter().convert(await buildSpecFromParams(params) as never));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1229,7 +1234,7 @@ function formalVerifyTools(): CatalogEntry[] {
           const { createZ3Adapter } = await import('@musubix2/formal-verify');
           return ok(await createZ3Adapter().solve((params['formula'] as string) ?? ''));
         } catch (err) {
-          return fail(`Z3 solve failed: ${err instanceof Error ? err.message : String(err)}`);
+          return fail(`Z3 solve failed: ${errMsg(err)}`);
         }
       },
     ),
@@ -1247,7 +1252,7 @@ function formalVerifyTools(): CatalogEntry[] {
           const { createEarsToLeanConverter } = await import('@musubix2/lean');
           return ok(createEarsToLeanConverter().convert(await buildSpecFromParams(params) as never));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1261,7 +1266,7 @@ function formalVerifyTools(): CatalogEntry[] {
           const { createLeanProofRunner } = await import('@musubix2/lean');
           return ok(await createLeanProofRunner().runProof((params['proof'] as string) ?? ''));
         } catch (err) {
-          return fail(`Lean proof run failed: ${err instanceof Error ? err.message : String(err)}`);
+          return fail(`Lean proof run failed: ${errMsg(err)}`);
         }
       },
     ),
@@ -1278,7 +1283,7 @@ function formalVerifyTools(): CatalogEntry[] {
           const { createHybridVerifier } = await import('@musubix2/lean');
           return ok(await createHybridVerifier().verify(await buildSpecFromParams(params) as never));
         } catch (err) {
-          return fail(`Hybrid verification failed: ${err instanceof Error ? err.message : String(err)}`);
+          return fail(`Hybrid verification failed: ${errMsg(err)}`);
         }
       },
     ),
@@ -1325,7 +1330,7 @@ function workflowTools(): CatalogEntry[] {
             approvals: PHASE_ORDER.map((p) => ({ phase: p, approved: tracker.isApproved(p) })),
           });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1345,7 +1350,7 @@ function workflowTools(): CatalogEntry[] {
           if (result.success) {await saveTracker(tracker, file);}
           return ok(result);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1365,7 +1370,7 @@ function workflowTools(): CatalogEntry[] {
           const canTransition = await createPhaseController(tracker).canTransition(target);
           return ok({ targetPhase: target, canTransition });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1385,7 +1390,7 @@ function workflowTools(): CatalogEntry[] {
           await saveTracker(tracker, file);
           return ok({ phase, approved: true });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1421,7 +1426,7 @@ function decisionsTools(): CatalogEntry[] {
           });
           return ok(adr);
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1437,7 +1442,7 @@ function decisionsTools(): CatalogEntry[] {
           await mgr.load();
           return ok(await mgr.list());
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1456,7 +1461,7 @@ function decisionsTools(): CatalogEntry[] {
           await mgr.load();
           return ok(await mgr.search(params['query'] as string));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1498,7 +1503,7 @@ function skillsTools(): CatalogEntry[] {
           const mgr = await getSkillManager();
           return ok(mgr.getAvailableSkills().map((s) => ({ id: s.id, name: s.metadata.name, status: s.status })));
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1526,7 +1531,7 @@ function skillsTools(): CatalogEntry[] {
           );
           return ok({ id: skill.id, name, registered: true });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),
@@ -1547,7 +1552,7 @@ function skillsTools(): CatalogEntry[] {
           const output = await match.execute((params['input'] as Record<string, unknown>) ?? {});
           return ok({ executed: true, name, output });
         } catch (err) {
-          return fail(err instanceof Error ? err.message : String(err));
+          return fail(errMsg(err));
         }
       },
     ),

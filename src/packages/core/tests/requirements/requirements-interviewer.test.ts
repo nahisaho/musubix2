@@ -308,6 +308,73 @@ describe('RequirementsDocGenerator — document generation', () => {
     expect(doc.markdown).toContain('Webアプリケーション');
     expect(doc.markdown).toContain('Developer');
   });
+
+  it('should cover all NFR categories, stakeholders and acceptance criteria', () => {
+    const generator = new RequirementsDocGenerator();
+    const doc = generator.generate({
+      projectName: 'FullNFR',
+      scalability: '10k concurrent users',
+      availability: '99.9% uptime',
+      stakeholders: ['PO', 'QA'],
+      acceptanceCriteria: ['All P0 features shipped'],
+    });
+    expect(doc.markdown).toContain('スケーラビリティ');
+    expect(doc.markdown).toContain('可用性');
+    expect(doc.markdown).toContain('## 3. ステークホルダー');
+    expect(doc.markdown).toContain('- PO');
+    expect(doc.markdown).toContain('## 9. 受入基準');
+    expect(doc.markdown).toContain('All P0 features shipped');
+  });
+
+  it('should honour an explicit earsPattern per feature (all EARS forms)', () => {
+    const generator = new RequirementsDocGenerator();
+    const doc = generator.generate({
+      projectName: 'Patterns',
+      features: [
+        { name: 'A', description: 'do a', earsPattern: 'ubiquitous' },
+        { name: 'B', description: 'do b', earsPattern: 'event-driven' },
+        { name: 'C', description: 'do c', earsPattern: 'state-driven' },
+        { name: 'D', description: 'do d', earsPattern: 'unwanted' },
+        { name: 'E', description: 'do e', earsPattern: 'optional' },
+        { name: 'F', description: 'do f', earsPattern: 'complex' },
+        { name: 'G', description: '' }, // empty description → action falls back to name
+      ],
+    });
+    const texts = doc.requirements.map((r) => r.earsText);
+    expect(texts.some((t) => t.startsWith('The system SHALL provide'))).toBe(true);
+    expect(texts.some((t) => t.startsWith('WHEN B is triggered'))).toBe(true);
+    expect(texts.some((t) => t.startsWith('WHILE the relevant state holds'))).toBe(true);
+    expect(texts.some((t) => t.includes('SHALL NOT allow'))).toBe(true);
+    expect(texts.some((t) => t.startsWith('WHERE E is enabled'))).toBe(true);
+    expect(texts.some((t) => t.startsWith('WHILE the condition holds, WHEN F'))).toBe(true);
+    // Feature G has no description, so the EARS action reuses the feature name.
+    expect(texts.some((t) => t.includes('provide G'))).toBe(true);
+  });
+
+  it('should infer EARS pattern from feature text when unset', () => {
+    const generator = new RequirementsDocGenerator();
+    const doc = generator.generate({
+      projectName: 'Inferred',
+      features: [
+        { name: 'イベント通知', description: 'when a trigger fires' },
+        { name: '状態管理', description: 'while in a given state' },
+        { name: 'エラー処理', description: 'must not fail silently' },
+        { name: 'オプション設定', description: 'optional if enabled' },
+      ],
+    });
+    const patterns = doc.requirements.map((r) => r.pattern);
+    expect(patterns).toContain('event-driven');
+    expect(patterns).toContain('state-driven');
+    expect(patterns).toContain('unwanted');
+    expect(patterns).toContain('optional');
+  });
+
+  it('should fall back to "Untitled" when projectName is absent', () => {
+    const generator = new RequirementsDocGenerator();
+    const doc = generator.generate({});
+    expect(doc.title).toContain('Untitled');
+    expect(doc.markdown).toContain('# Untitled — 要件仕様書');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

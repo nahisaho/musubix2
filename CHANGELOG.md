@@ -38,7 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chore（CI 復旧）
 
-- **Lint 失敗で CI が長期 red だった問題を修正** — `curly`/`no-unreachable`/`no-useless-escape` 違反 298 件を解消（大半は `eslint --fix` による波括弧補完、加えて `tasks` の到達不能 `break` 除去、Google API キー正規表現の不要エスケープ修正）。挙動変更なし・全 1763 テスト緑を確認
+長期 red だった CI を green に復旧（lint がマスクしていた後続段の失敗も含め順に解消）。
+
+- **Lint** — `curly`/`no-unreachable`/`no-useless-escape` 違反 298 件を解消（大半は `eslint --fix` による波括弧補完、加えて `tasks` の到達不能 `break` 除去、Google API キー正規表現の不要エスケープ修正）
+- **cli.ts のソース破損** — 複合キー区切りに使われていたリテラル NUL バイト 4 個を `\t` に置換（`file` がバイナリ判定・grep が binary 扱いになる原因を除去。挙動は不変）
+- **`trace` のクラッシュ耐性** — `collectFiles` のディレクトリ走査と `buildCodeTraceData` のファイル読み取りを、走査中に消えるファイル/ディレクトリ（並行クリーンアップ等）で例外を投げず**スキップ**するよう堅牢化。これにより並行テスト実行時の flaky 失敗（`trace validate`/`impact` が既定 `.` を走査中に ENOENT）を解消
+- **カバレッジ 80% ゲート** — MCP `errMsg` ヘルパー抽出（55 個の重複三項演算子を 1 分岐に集約）と、requirements/trace/test:gen の分岐テスト追加で branch coverage を 79.2% → 80.1% に回復
+- 挙動変更なし・全 1771 テスト緑・`tsc -b`/`typecheck`/`lint`（0 errors）/coverage（80.1%）を確認
 
 ## [0.5.43] - 2026-07-10
 

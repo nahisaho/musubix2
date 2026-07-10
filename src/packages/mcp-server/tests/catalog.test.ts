@@ -446,3 +446,4 @@ describe('v0.5.11 MCP tool wiring', () => {
     expect(r.success).toBe(false);
   });
 });
+

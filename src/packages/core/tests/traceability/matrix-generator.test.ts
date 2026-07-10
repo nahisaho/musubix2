@@ -76,4 +76,25 @@ describe('DES-TRC-002: MatrixGenerator', () => {
     // REQ-001/DES-001 is verified → '2'
     expect(lines[1]).toContain('2');
   });
+
+  it('should report an unlinked target as an incoming gap and infer types', () => {
+    const gen = new MatrixGenerator();
+    // TST-900 has no incoming link → gap; ids cover design/test type inference.
+    const report = gen.generate(['REQ-001', 'DES-500'], ['DES-500', 'TST-900'], [
+      { source: 'REQ-001', target: 'DES-500', verified: true },
+    ]);
+    const gapIds = report.gaps.map((g) => g.id);
+    expect(gapIds).toContain('TST-900');
+    const tstGap = report.gaps.find((g) => g.id === 'TST-900');
+    expect(tstGap!.type).toBe('test');
+    const desGap = report.gaps.find((g) => g.id === 'DES-500' && g.reason.includes('outgoing'));
+    expect(desGap!.type).toBe('design');
+  });
+
+  it('should report 100% completeness for an empty matrix', () => {
+    const gen = new MatrixGenerator();
+    const report = gen.generate([], [], []);
+    expect(report.completeness).toBe(100);
+    expect(report.cells).toHaveLength(0);
+  });
 });

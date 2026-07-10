@@ -370,7 +370,7 @@ import {
   type WorkflowPhase,
   PHASE_ORDER,
 } from '@musubix2/workflow-engine';
-import { readFileSync, existsSync, statSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync, writeFileSync, mkdirSync, type Dirent } from 'node:fs';
 import { join as joinPath, dirname as dirnamePath } from 'node:path';
 
 /**
@@ -565,7 +565,14 @@ export function buildCodeTraceData(specsFile: string, srcDir: string): CodeTrace
   const links: CodeTraceData['links'] = [];
   if (existsSync(srcDir)) {
     for (const file of collectFiles(srcDir, (ext) => ext in EXT_TO_LANG)) {
-      const code = readFileSync(file, 'utf-8');
+      // The file may vanish between listing and reading (concurrent cleanup);
+      // skip unreadable files instead of aborting the whole trace.
+      let code: string;
+      try {
+        code = readFileSync(file, 'utf-8');
+      } catch {
+        continue;
+      }
       const refs = new Set<string>();
       for (const m of code.matchAll(REQ_ID_RE)) {
         if (reqSet.has(m[0])) {refs.add(m[0]);}
@@ -866,7 +873,15 @@ export function collectFiles(target: string, extFilter?: (ext: string) => boolea
   if (stat.isFile()) {return [target];}
   const out: string[] = [];
   const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    // A directory can disappear mid-scan (e.g. a temp dir removed by another
+    // process); skip it rather than crashing the whole command.
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
       if (entry.name.startsWith('.') && entry.name !== '.') {continue;}
       if (WALK_IGNORE.has(entry.name)) {continue;}
       const full = joinPath(dir, entry.name);
@@ -1407,7 +1422,7 @@ export async function handleCodegraph(
           new Map(savedNodes.map((n) => [n.id, n])).values(),
         );
         const uniqueEdges = Array.from(
-          new Map(savedEdges.map((e) => [`${e.from} ${e.to} ${e.kind}`, e])).values(),
+          new Map(savedEdges.map((e) => [`${e.from}	${e.to}	${e.kind}`, e])).values(),
         );
         saveCodeGraph(uniqueNodes, uniqueEdges);
         console.log(
@@ -1995,7 +2010,7 @@ export async function handleCodegraph(
         for (const to of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
           if (to === e.from) {continue;}
           if (filter && !e.from.includes(filter) && !to.includes(filter)) {continue;}
-          fileEdges.set(`${e.from} ${to} ${e.kind}`, { from: e.from, to, kind: e.kind });
+          fileEdges.set(`${e.from}	${to}	${e.kind}`, { from: e.from, to, kind: e.kind });
         }
       }
       const rels = [...fileEdges.values()];
