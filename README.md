@@ -175,7 +175,8 @@ npx musubix design:c4 <file>    # C4 diagram generation (--level context|contain
 npx musubix design:verify <file># Design verification (SOLID)
 npx musubix tasks               # Task breakdown management (validate|list|stats)
 npx musubix codegen generate <name|file>  # Code gen from a name, design.json or requirements.md
-                                #   (--type class|..., --out <file>; emits // Implements: REQ- comments)
+                                #   (--type class|..., --out <file>; emits // Implements: REQ- comments,
+                                #    scaffolds detected patterns: Observer/State/Feature Toggle)
 npx musubix test:gen <file|dir> # Test generation (accepts a file or a directory)
 npx musubix trace matrix        # Requirement → code coverage matrix (--specs <file> --src <dir>)
 npx musubix trace impact <REQ-ID>         # Symbol-level impact: implementing code + coupled requirements
