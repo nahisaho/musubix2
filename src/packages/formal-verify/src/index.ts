@@ -178,7 +178,15 @@ export class EarsToSmtConverter {
       }
 
       case 'unwanted':
-        assertions = [`(assert (not ${actionVar}))`];
+        if (requirement.condition) {
+          // "IF <condition> THEN THE system SHALL <action>" — a guarded response
+          // (error handling / mitigation): the action must happen when the
+          // condition holds, so it is an implication, not a negation.
+          assertions = [`(assert (=> ${sanitizeName(requirement.condition)} ${actionVar}))`];
+        } else {
+          // "THE system SHALL NOT <action>" — a prohibition.
+          assertions = [`(assert (not ${actionVar}))`];
+        }
         break;
 
       case 'optional': {

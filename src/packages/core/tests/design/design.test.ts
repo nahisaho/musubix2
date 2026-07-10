@@ -26,6 +26,15 @@ describe('deriveOperation', () => {
   it('falls back to execute when nothing usable is present', () => {
     expect(deriveOperation('the system shall the a of')).toBe('execute');
   });
+
+  // v0.5.51 — trim trailing prepositions/quantifiers left by the word cap.
+  it('trims a trailing preposition from the operation name', () => {
+    expect(deriveOperation('THE system SHALL read the current temperature every second.')).toBe('readCurrentTemperature');
+  });
+
+  it('trims a trailing quantifier from the operation name', () => {
+    expect(deriveOperation('THE system SHALL lower the target by two degrees.')).toBe('lowerTarget');
+  });
 });
 
 describe('deriveMethodSignature (v0.5.46)', () => {

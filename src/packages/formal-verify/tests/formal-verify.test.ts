@@ -100,6 +100,26 @@ describe('DES-FV-001: EarsToSmtConverter', () => {
     expect(result.formula!.assertions[0]).toContain('lose_data');
   });
 
+  // v0.5.51 — an "IF <condition> THEN THE system SHALL <action>" requirement is
+  // a guarded mitigation, not a prohibition: the action must happen when the
+  // condition holds, so it converts to an implication rather than a negation.
+  it('converts a guarded unwanted (IF…THEN…SHALL) to an implication', () => {
+    const guarded: ParsedRequirement = {
+      id: 'REQ-SAFE-001',
+      title: 'Overheat protection',
+      text: 'If the temperature exceeds the safety limit, then the system shall shut off the heater',
+      pattern: 'unwanted',
+      condition: 'temperature exceeds the safety limit',
+      action: 'shut off the heater',
+    };
+    const result = converter.convert(guarded);
+    expect(result.success).toBe(true);
+    expect(result.formula!.assertions[0]).toContain('(assert (=>');
+    expect(result.formula!.assertions[0]).toContain('temperature_exceeds_the_safety_limit');
+    expect(result.formula!.assertions[0]).toContain('shut_off_the_heater');
+    expect(result.formula!.assertions[0]).not.toContain('(not');
+  });
+
   it('should convert complex requirement with combined condition and trigger', () => {
     const result = converter.convert(complexReq);
     expect(result.success).toBe(true);

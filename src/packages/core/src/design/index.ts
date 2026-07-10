@@ -55,6 +55,17 @@ const VALUE_VERBS = new Set([
 /** Verbs whose operations return a collection. */
 const LIST_VERBS = new Set(['list', 'query', 'search', 'collect', 'enumerate']);
 
+/**
+ * Prepositions / quantifiers that read awkwardly as the *last* word of an
+ * operation name (e.g. "readTemperatureEvery", "lowerTargetBy"). They are kept
+ * mid-phrase but trimmed from the tail after the word cap.
+ */
+const TRAILING_FILLER = new Set([
+  'every', 'by', 'before', 'after', 'with', 'of', 'to', 'in', 'on', 'for', 'from',
+  'into', 'than', 'as', 'at', 'per', 'via', 'using', 'about', 'over', 'under',
+  'one', 'two', 'three', 'four', 'five',
+]);
+
 function operationParts(text: string, fallbackTitle: string): { negated: boolean; words: string[] } {
   const shall = /\bSHALL\s+(NOT\s+)?([^.。\n]+)/i.exec(text);
   const negated = Boolean(shall?.[1]);
@@ -64,6 +75,11 @@ function operationParts(text: string, fallbackTitle: string): { negated: boolean
     .map((w) => w.replace(/[^A-Za-z0-9]/g, ''))
     .filter((w) => w.length > 0 && !OPERATION_STOPWORDS.has(w.toLowerCase()))
     .slice(0, 4);
+  // Trim trailing filler/quantifier words so the name ends on a meaningful token
+  // (keep at least the leading verb).
+  while (words.length > 1 && (TRAILING_FILLER.has(words[words.length - 1].toLowerCase()) || /^\d+$/.test(words[words.length - 1]))) {
+    words.pop();
+  }
   return { negated, words };
 }
 

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.51] - 2026-07-10
+
+別ドメイン（IoT/制御系サーモスタット）で SDD パイプライン全体を再ドッグフーディング。未検証だった EARS パターン（state-driven `WHILE`、complex、optional `WHERE`、IF-THEN）を含む 7 要件を通し、パターン固有のバグ 2 件を発見・修正。
+
+### Fixed
+
+- **IF-THEN 要件の SMT 変換が誤り（意味の反転）** — 「IF `<条件>` THEN THE system SHALL `<動作>`」は「条件成立時に緩和動作を実行する」ガード付き応答だが、formal-verify の `unwanted` パターンが常に `(assert (not <action>))` を出力し、**正の緩和動作を否定**していた（例: 「IF 過熱 THEN SHALL ヒーター停止」→ 誤って「ヒーターを停止しない」）。条件がある場合は `(assert (=> <condition> <action>))`（含意）、純粋な `SHALL NOT` のみ `(not <action>)`（禁止）を出力するよう修正
+- **メソッド名の末尾に前置詞/数量詞が残る** — 4 語上限で切った結果、`readCurrentTemperatureEvery` / `lowerTargetByTwo` のように末尾が前置詞・数量詞で終わる不自然な名前になっていた。末尾の filler 語（every/by/two/before/with… や数値）を除去し `readCurrentTemperature` / `lowerTarget` に（先頭の動詞は保持）
+
+### Validation（E2E — 7 パターン）
+
+- requirements: 7/7 を全 EARS パターンで正しく分類（ubiquitous/state-driven/event-driven/unwanted/optional/complex）
+- design: 7 コンポーネント（末尾クリーンなメソッド名・パターン検出）、codegen: trace コメント付き 7 クラス、verify: **IF-THEN が含意、SHALL NOT が否定**として正しく SMT 化、trace: 100%、security: 0 findings
+
+### Tests
+
+- core: 末尾前置詞/数量詞のトリム
+- formal-verify: ガード付き unwanted（IF-THEN）が含意に変換されること
+- 全 **1826 テスト**緑 / lint 0 errors / branch coverage 80.4% / clean `tsc -b`
+
 ## [0.5.50] - 2026-07-10
 
 0.5.49 の E2E ドッグフーディングで判明した `trace impact` の粒度問題を修正。
