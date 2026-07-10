@@ -12,7 +12,8 @@ import {
   type CLIConfig,
 } from '../src/cli.js';
 import { ExitCode } from '@musubix2/core';
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync, mkdtempSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // ── REQ-ARC-003: parseArgs ─────────────────────────────────────────────────
@@ -372,39 +373,63 @@ describe('REQ-SDD-005: Init CLI', () => {
     expect(parsed.flags['force']).toBe(true);
   });
 
-  it('handleInit returns SUCCESS for valid project', async () => {
-    const code = await handleInit('.', 'test-project');
-    expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('test-project'));
+  it('handleInit writes a project into the target dir and returns SUCCESS', async () => {
+    const out = mkdtempSync(join(tmpdir(), 'musubix-hi-'));
+    try {
+      const code = await handleInit(out, 'test-project');
+      expect(code).toBe(ExitCode.SUCCESS);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('test-project'));
+      // The scaffold is actually created on disk.
+      expect(existsSync(join(out, 'musubix.config.json'))).toBe(true);
+      expect(existsSync(join(out, 'steering/product.ja.md'))).toBe(true);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
   });
 
   it('handleInit returns VALIDATION_ERROR for invalid name', async () => {
-    const code = await handleInit('.', '123-bad-name');
-    expect(code).toBe(ExitCode.VALIDATION_ERROR);
-    expect(errSpy).toHaveBeenCalled();
+    const out = mkdtempSync(join(tmpdir(), 'musubix-hi-'));
+    try {
+      const code = await handleInit(out, '123-bad-name');
+      expect(code).toBe(ExitCode.VALIDATION_ERROR);
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
   });
 
-  it('handleInit uses default project name when none given', async () => {
-    const code = await handleInit();
-    expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('my-project'));
+  it('handleInit uses the default project name when none given', async () => {
+    const out = mkdtempSync(join(tmpdir(), 'musubix-hi-'));
+    try {
+      const code = await handleInit(out);
+      expect(code).toBe(ExitCode.SUCCESS);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('my-project'));
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
   });
 
-  it('handleInit uses default path "."', async () => {
-    const code = await handleInit(undefined, 'my-app');
-    expect(code).toBe(ExitCode.SUCCESS);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('my-app'));
-  });
+  // `init` writes a real scaffold; dispatch it from a throwaway cwd so the repo
+  // is not touched.
+  async function dispatchInitInTmp(flags: Record<string, unknown>): Promise<void> {
+    const origCwd = process.cwd();
+    const tmp = mkdtempSync(join(tmpdir(), 'musubix-disp-init-'));
+    process.chdir(tmp);
+    try {
+      await createCLIDispatcher().dispatch('init', flags);
+    } finally {
+      process.chdir(origCwd);
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
 
   it('init dispatch via CLI dispatcher works with --name', async () => {
-    const dispatcher = createCLIDispatcher();
-    await dispatcher.dispatch('init', { name: 'proj-x' });
+    await dispatchInitInTmp({ name: 'proj-x' });
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('proj-x'));
   });
 
   it('init dispatch via CLI dispatcher uses --force flag', async () => {
-    const dispatcher = createCLIDispatcher();
-    await dispatcher.dispatch('init', { name: 'my-app', force: true });
+    await dispatchInitInTmp({ name: 'my-app', force: true });
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('my-app'));
   });
 

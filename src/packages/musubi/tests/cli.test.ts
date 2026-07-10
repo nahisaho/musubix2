@@ -6,6 +6,9 @@ import {
   type CLICommand,
   type CLIConfig,
 } from '../src/cli.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 describe('CLIDispatcher', () => {
   function makeConfig(overrides?: Partial<CLIConfig>): CLIConfig {
@@ -117,8 +120,18 @@ describe('CLIDispatcher', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const dispatcher = createCLIDispatcher();
-    await dispatcher.dispatch('init');
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Initialized project'));
+    // `init` now writes a real scaffold — run it in a throwaway cwd so it does
+    // not create files in the repository.
+    const origCwd = process.cwd();
+    const tmp = mkdtempSync(join(tmpdir(), 'musubix-cli-init-'));
+    process.chdir(tmp);
+    try {
+      await dispatcher.dispatch('init');
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Initialized project'));
+    } finally {
+      process.chdir(origCwd);
+      rmSync(tmp, { recursive: true, force: true });
+    }
     await dispatcher.dispatch('req');
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: musubix req'));
     logSpy.mockRestore();

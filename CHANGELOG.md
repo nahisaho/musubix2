@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.60] - 2026-07-10
+
+開発ガイド作成中のドッグフーディングで発見した `init` の重大バグを修正。
+
+### Fixed
+
+- **`musubix init <dir> --name <name>`（レガシー モード）がファイルを一切書き込んでいなかった** — `ProjectInitializer.init()` は生成すべきファイル一覧を計算するだけで `writeFileSync` しておらず、「✅ Initialized project」と成功を報告しつつ steering/ ・storage/ ・musubix.config.json を作成していなかった（`--platform` を付けた platform-bootstrap モードは正常だった）。テンプレートに内容を持たせ、**実際にディレクトリとファイルを生成**するよう修正:
+  - `steering/`（product/structure/tech/project.yml/rules/constitution.md）、`storage/specs/{requirements,designs,plans,reviews}`、`storage/tasks/tasks.md`、`musubix.config.json` を生成
+  - **冪等**: 既存ファイルは `--force` なしでは上書きしない（編集済みの内容を保護）
+  - 不正なプロジェクト名では何も書き込まない
+
+### Tests
+
+- core: 実ファイル生成の検証（ディスク上に存在すること）、config 内容、テンプレート差、冪等性（上書き保護）、不正名で未書き込み — すべて一時ディレクトリで実行
+- musubi: init 系テストを一時 cwd／一時ディレクトリ経由に修正しリポジトリ汚染を防止
+- 全 **1906 テスト**緑 / lint 0 errors / branch coverage 81.7% / clean `tsc -b`
+
 ## [0.5.59] - 2026-07-10
 
 design の interface 抽象を codegen に活用。凝集サービスに interface を生成し `implements` するとともに、生成コードが型チェックを通るよう推論エンティティ型のスタブも出力。
