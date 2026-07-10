@@ -210,10 +210,35 @@ export function blankNonCode(code: string, hashComments: boolean): string {
       let j = i + 2; while (j < n && !(code[j] === '*' && code[j + 1] === '/')) {j++;}
       j = Math.min(j + 2, n); blank(i, j); i = j; continue;
     }
-    if (c === '"' || c === "'" || c === '`') {
+    if (c === '"' || c === "'") {
       const q = c; let j = i + 1;
       while (j < n && code[j] !== q) { if (code[j] === '\\') {j++;} j++; }
       blank(i + 1, j); // keep the quotes, blank the interior
+      i = j + 1; continue;
+    }
+    if (c === '`') {
+      // Template literal: blank the literal text but PRESERVE `${…}`
+      // interpolations — they are executable code (and injection sinks/sources
+      // live there), so they must survive for the analyzers to see them.
+      let j = i + 1;
+      let litStart = j;
+      while (j < n && code[j] !== '`') {
+        if (code[j] === '\\') { j += 2; continue; }
+        if (code[j] === '$' && code[j + 1] === '{') {
+          blank(litStart, j);
+          j += 2;
+          let depth = 1;
+          while (j < n && depth > 0) {
+            if (code[j] === '{') {depth++;}
+            else if (code[j] === '}') {depth--;}
+            j++;
+          }
+          litStart = j;
+          continue;
+        }
+        j++;
+      }
+      blank(litStart, Math.min(j, n));
       i = j + 1; continue;
     }
     i++;
@@ -646,6 +671,7 @@ export class TaintDataflowAnalyzer {
       /\bf['"]/.test(rhs) || // f-string
       /['"]\s*%\s*[\w([]/.test(rhs) || // "…" % x
       /['"]\s*\+\s*[$\w]|[$\w.\])]\s*\+\s*['"]/.test(rhs) || // string + var / var + string
+      /`[^`]*\$\{/.test(rhs) || // JS/TS template literal: `… ${x} …`
       /['"]\s*\.\s*\$\w/.test(rhs) // PHP: "…" . $var
     );
   }
@@ -654,8 +680,10 @@ export class TaintDataflowAnalyzer {
     const hashComments = /\.(py|rb|sh|php|pl|yaml|yml|r)$/i.test(filePath);
     const lines = blankNonCode(code, hashComments).split('\n');
     const orig = code.split('\n');
-    // `$var = …` / `var = …` at statement start (not ==, <=, >=, !=).
-    const assignRe = /^\s*(\$?[A-Za-z_]\w*)\s*=(?!=)\s*(.+)$/;
+    // `$var = …` / `var = …` at statement start (not ==, <=, >=, !=). Also
+    // accepts JS/TS declarations (`const`/`let`/`var`) with an optional type
+    // annotation — without this, taint never propagates through TS variables.
+    const assignRe = /^\s*(?:(?:const|let|var)\s+)?(\$?[A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=)\s*(.+)$/;
 
     // Collect tainted variables (name → 1-based definition line), propagating
     // taint through assignments to a fixpoint (bounded).

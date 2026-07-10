@@ -4,7 +4,7 @@
 （Specification Driven Development）ワークフローで開発する手順を、実際のコマンドと
 出力とともに解説します。題材は **URL短縮サービス** です。
 
-> このガイド内のコマンド出力は MUSUBIX2 `v0.5.65` で実際に実行して取得したものです。
+> このガイド内のコマンド出力は MUSUBIX2 `v0.5.66` で実際に実行して取得したものです。
 
 ---
 
@@ -312,7 +312,25 @@ Security scan: src (1 file(s))
 Total findings: 0
 ```
 
-秘密情報・危険パターンを検出します。CI で使う場合は `--fail-on high` などで
+生成された骨格はまだロジックが空なので検出はありません。実装を進める中で
+危険なパターンが混入すると検出されます。例えば次のような TS を書くと:
+
+```typescript
+const sql = `SELECT * FROM users WHERE id = ${userId}`;
+db.execute(sql);
+```
+
+```
+  HIGH (1):
+    - SQL injection — a dynamically-built string flows into a query
+      (variable 'sql' built at line 1)
+```
+
+MUSUBIX2 の taint 解析は**変数をまたいだデータフロー**を追跡します — 動的に
+組み立てた文字列（文字列連結・テンプレートリテラル）が `const`/`let` 変数を
+経由してクエリ・シェル・`eval` などのシンクに到達する経路を検出します。
+パラメータ化クエリ（`db.query(sql, [id])`）や無害なテンプレートリテラルは
+誤検出しません。秘密情報も検出対象です。CI で使う場合は `--fail-on high` などで
 重大度しきい値を超えたら失敗させます。
 
 ---

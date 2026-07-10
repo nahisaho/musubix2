@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.66] - 2026-07-11
+
+dogfooding 実装テストで、taint dataflow アナライザが JavaScript/TypeScript を実質的に解析できていない不具合を発見・修正。
+
+### Fixed
+
+- **taint 解析が JS/TS の変数宣言を追跡できていなかった** — 代入検出の正規表現が `name = value`（Python/PHP 形式）のみに対応し、`const`/`let`/`var` 宣言を認識していなかった。このため TS で「動的に組み立てた文字列を変数に代入 → クエリに渡す」という最頻出の SQL/コマンド/コード インジェクション経路がすべて見逃されていた。宣言キーワード（＋任意の型注釈 `: T`）を認識するよう修正。`constant` のような変数名を誤ってキーワードと解釈しないよう、後続の空白を必須化
+- **テンプレートリテラルが動的文字列として扱われていなかった** — `` `SELECT … ${x}` `` を静的文字列とみなしていた。`${…}` 補間を持つテンプレートリテラルを動的とみなすよう修正
+- **`blankNonCode` がテンプレートリテラルの `${…}` を空白化していた** — 文字列内部を伏せる処理がバッククォート文字列の補間式（実行されるコード）まで消していたため、上記の検出が効かなかった。`${…}`（ネストした波括弧を含む）を保持しつつ、リテラル部分のみ空白化するよう修正
+
+これらにより、`const sql = "… '" + id + "'"; query(sql)` や `` const sql = `… ${id}`; db.execute(sql) `` のような TS のインジェクションが検出されるようになった（パラメータ化クエリ・無害なテンプレートリテラルは誤検出しない）。
+
 ## [0.5.65] - 2026-07-11
 
 dogfooding 実験で見つけた 4 件の不具合を修正。

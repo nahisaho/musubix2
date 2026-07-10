@@ -261,6 +261,34 @@ describe('TaintDataflowAnalyzer', () => {
     // …but the unsanitized sibling is still flagged.
     expect(df.analyze('cmd = "ls " + d\nos.system(cmd)', 'a.py').length).toBeGreaterThan(0);
   });
+
+  // v0.5.66 — taint must propagate through JS/TS `const`/`let`/`var`
+  // declarations (previously the assignment regex missed them entirely).
+  it('tracks taint through a const declaration into a query (concat)', () => {
+    const code = "const sql = \"SELECT * FROM u WHERE id = '\" + id + \"'\";\nquery(sql);\n";
+    expect(df.analyze(code, 'app.ts').some((f) => f.cweId === 'CWE-89')).toBe(true);
+  });
+
+  it('tracks taint through a template literal into a sink', () => {
+    const code = 'const sql = `SELECT * FROM u WHERE id = ${id}`;\ndb.execute(sql);\n';
+    expect(df.analyze(code, 'api.ts').some((f) => f.cweId === 'CWE-89')).toBe(true);
+  });
+
+  it('respects a type annotation on the declaration', () => {
+    const code = 'let cmd: string = "rm -rf " + dir;\nsystem(cmd);\n';
+    expect(df.analyze(code, 'sh.ts').length).toBeGreaterThan(0);
+  });
+
+  it('does not mistake a variable named "constant" for a declaration', () => {
+    // Bug guard: keyword stripping requires a following space, so the name is
+    // captured as `constant` (not mangled to `ant`) and the sink still resolves.
+    expect(df.analyze('constant = "id=" + uid\nquery(constant)', 'x.ts').length).toBeGreaterThan(0);
+  });
+
+  it('leaves benign template literals and parameterized queries clean', () => {
+    expect(df.analyze('const g = `Hello, ${name}!`;\nconsole.log(g);', 'ok.ts')).toHaveLength(0);
+    expect(df.analyze('const sql = "SELECT * FROM t WHERE id = ?";\ndb.query(sql, [id]);', 'ok.ts')).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
