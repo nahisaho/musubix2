@@ -177,6 +177,34 @@ describe('DES-FV-001: EarsToSmtConverter', () => {
     expect(script).toContain('(check-sat)');
     expect(script).toContain('(get-model)');
   });
+
+  // v0.5.62 — every symbol used in an assertion must be declared, or z3 rejects
+  // the script with "unknown constant". Previously per-word tokens were declared
+  // ("grant"/"access") while assertions used the compound ("grant_access").
+  it('declares every symbol referenced in the assertions', () => {
+    const reqs: ParsedRequirement[] = [
+      { id: 'REQ-ACC-001', title: 'Grant', text: 'THE system SHALL grant access.', pattern: 'ubiquitous', action: 'grant access' },
+      { id: 'REQ-EVT-001', title: 'Validate', text: 'WHEN a user submits a form, THE system SHALL validate the fields.', pattern: 'event-driven', action: 'validate the fields', trigger: 'a user submits a form' },
+      { id: 'REQ-CPX-001', title: 'Apply', text: 'WHILE night mode is active, WHEN a setpoint changes, THE system SHALL apply the limit.', pattern: 'complex', action: 'apply the limit', condition: 'night mode is active', trigger: 'a setpoint changes' },
+    ];
+    const formulas = converter.convertBatch(reqs).map((r) => r.formula!);
+    const script = converter.generateSmtLib2Script(formulas);
+
+    const declared = new Set([...script.matchAll(/\(declare-const (\w+) Bool\)/g)].map((m) => m[1]));
+    // Collect symbols used inside each `(assert …)` line, excluding SMT keywords.
+    const KEYWORDS = new Set(['assert', 'not', 'and', 'or', 'true', 'false']);
+    for (const line of script.split('\n').filter((l) => l.trimStart().startsWith('(assert'))) {
+      for (const m of line.matchAll(/\b([a-z][a-z0-9_]+)\b/g)) {
+        const sym = m[1];
+        if (!KEYWORDS.has(sym)) {
+          expect(declared, `symbol "${sym}" must be declared`).toContain(sym);
+        }
+      }
+    }
+    // Sanity: the compound action symbol is what gets declared (not the words).
+    expect(declared.has('grant_access')).toBe(true);
+    expect(declared.has('grant')).toBe(false);
+  });
 });
 
 // ── Z3Adapter ───────────────────────────────────────────────────

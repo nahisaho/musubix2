@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.62] - 2026-07-11
+
+### Fixed
+
+- **`generateSmtLib2Script` が未宣言シンボルを含む不正な SMT-LIB2 を生成していた** — 変数宣言は要件文を単語分割したトークン（`grant`・`access`）から作られる一方、assertion はサニタイズした複合シンボル（`grant_access`）を使っており、z3 に通すと「unknown constant」で拒否されていた。**assertion が実際に参照するシンボル（action / trigger / condition のサニタイズ名）を宣言する** よう修正し、生成スクリプトが z3 で検査可能に:
+  - 例: `THE system SHALL grant access.` → `(declare-const grant_access Bool)` ＋ `(assert (=> true grant_access))`
+  - 全 EARS パターン（event-driven の trigger、state-driven / complex の condition/trigger 等）で assertion シンボルと宣言が一致
+  - これにより、z3 を導入すれば要件間の論理矛盾（例: `SHALL grant` と `SHALL NOT grant`）が正しく unsat として検出可能に
+
+### Tests
+
+- formal-verify: 全 assertion シンボルが宣言されること、複合シンボル（`grant_access`）が宣言され単語（`grant`）は宣言されないことを検証
+- 全 **1907 テスト**緑 / lint 0 errors / branch coverage 81.7% / clean `tsc -b`
+
 ## [0.5.61] - 2026-07-10
 
 ### Fixed

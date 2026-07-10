@@ -151,7 +151,11 @@ export class EarsToSmtConverter {
       };
     }
 
-    const variables = extractVariables(requirement.text);
+    // Declare exactly the symbols the assertions reference (the sanitized
+    // action / trigger / condition variables). Declaring per-word tokens instead
+    // produced undeclared-symbol scripts that z3 rejects (e.g. "grant_access"
+    // asserted but only "grant"/"access" declared).
+    const symbols = new Set<string>([actionVar]);
     // A "SHALL NOT" anywhere in the requirement negates the action, regardless
     // of pattern (e.g. "WHILE paused, THE system SHALL NOT accept events" →
     // while paused the action must NOT happen). Without this, the negation was
@@ -167,6 +171,7 @@ export class EarsToSmtConverter {
 
       case 'event-driven': {
         const triggerVar = requirement.trigger ? sanitizeName(requirement.trigger) : 'trigger';
+        symbols.add(triggerVar);
         assertions = [`(assert (=> ${triggerVar} ${actionExpr}))`];
         if (!requirement.trigger) {
           warnings.push('No trigger specified; using default "trigger"');
@@ -176,6 +181,7 @@ export class EarsToSmtConverter {
 
       case 'state-driven': {
         const condVar = requirement.condition ? sanitizeName(requirement.condition) : 'condition';
+        symbols.add(condVar);
         assertions = [`(assert (=> ${condVar} ${actionExpr}))`];
         if (!requirement.condition) {
           warnings.push('No condition specified; using default "condition"');
@@ -188,7 +194,9 @@ export class EarsToSmtConverter {
           // "IF <condition> THEN THE system SHALL [NOT] <action>" — a guarded
           // response: the (possibly negated) action applies when the condition
           // holds, so it is an implication.
-          assertions = [`(assert (=> ${sanitizeName(requirement.condition)} ${actionExpr}))`];
+          const condVar = sanitizeName(requirement.condition);
+          symbols.add(condVar);
+          assertions = [`(assert (=> ${condVar} ${actionExpr}))`];
         } else {
           // "THE system SHALL NOT <action>" — a prohibition (actionExpr already
           // carries the negation).
@@ -200,6 +208,7 @@ export class EarsToSmtConverter {
         const featureVar = requirement.trigger
           ? sanitizeName(requirement.trigger)
           : 'feature_enabled';
+        symbols.add(featureVar);
         assertions = [`(assert (=> ${featureVar} ${actionExpr}))`];
         if (!requirement.trigger) {
           warnings.push('No feature trigger specified; using default "feature_enabled"');
@@ -210,6 +219,8 @@ export class EarsToSmtConverter {
       case 'complex': {
         const condVar = requirement.condition ? sanitizeName(requirement.condition) : 'condition';
         const triggerVar = requirement.trigger ? sanitizeName(requirement.trigger) : 'trigger';
+        symbols.add(condVar);
+        symbols.add(triggerVar);
         assertions = [`(assert (=> (and ${condVar} ${triggerVar}) ${actionExpr}))`];
         if (!requirement.condition) {
           warnings.push('No condition specified; using default "condition"');
@@ -222,6 +233,8 @@ export class EarsToSmtConverter {
     }
 
     const id = makeFormulaId(requirement.id);
+
+    const variables: SmtVariable[] = [...symbols].map((name) => ({ name, sort: 'Bool' as const }));
 
     const formula: SmtFormula = {
       id,
