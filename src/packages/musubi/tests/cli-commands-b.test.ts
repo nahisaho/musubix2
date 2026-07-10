@@ -99,6 +99,46 @@ describe('CLI Commands B — Traceability', () => {
     }
   });
 
+  // v0.5.50 — impact is symbol-level: requirements sharing a *file* but not a
+  // class must not be reported as coupled; those sharing a class must be.
+  it('trace impact couples requirements by class, not by file', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_impact_sym');
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'reqs.md'),
+      '## REQ-PAY-001: Charge\n**要件**: shall charge.\n## REQ-PAY-002: Refund\n**要件**: shall refund.\n## REQ-LOG-001: Audit\n**要件**: shall log.\n',
+    );
+    // PAY-001 & PAY-002 share PaymentService; LOG-001 is a separate class in the
+    // same file.
+    writeFileSync(
+      join(dir, 'src', 'pay.ts'),
+      [
+        '// Implements: REQ-PAY-001, REQ-PAY-002',
+        'export class PaymentService { charge() {} refund() {} }',
+        '// Implements: REQ-LOG-001',
+        'export class AuditLogger { log() {} }',
+      ].join('\n'),
+    );
+    try {
+      logSpy.mockClear();
+      expect(await handleTrace('impact', ['REQ-PAY-001'], { specs: join(dir, 'reqs.md'), src: join(dir, 'src') }))
+        .toBe(ExitCode.SUCCESS);
+      let out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('PaymentService');
+      expect(out).toContain('REQ-PAY-002'); // coupled — shares the class
+      expect(out).not.toContain('REQ-LOG-001'); // different class, not coupled
+
+      logSpy.mockClear();
+      expect(await handleTrace('impact', ['REQ-LOG-001'], { specs: join(dir, 'reqs.md'), src: join(dir, 'src') }))
+        .toBe(ExitCode.SUCCESS);
+      out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('AuditLogger');
+      expect(out).not.toContain('REQ-PAY-001'); // isolated despite same file
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('trace default shows help', async () => {
     const code = await handleTrace(undefined, []);
     expect(code).toBe(ExitCode.SUCCESS);

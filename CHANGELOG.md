@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.50] - 2026-07-10
+
+0.5.49 の E2E ドッグフーディングで判明した `trace impact` の粒度問題を修正。
+
+### Improved
+
+- **`trace impact` をシンボル（クラス/関数）単位の解析に変更** — 従来は要件をファイル単位でリンクしていたため、**同じファイルに含まれる無関係な要件がすべて「影響あり」と過剰報告**されていた（例: `REQ-AUTH-001` の影響に task 系要件が全て混入）。`// Implements: REQ-…` コメントや本体参照から要件を**実装クラス/関数に対応付け**、実際にコードを共有する要件だけを「Coupled requirements」として報告するよう改善
+  - 出力を「Implementing code（影響を受けるシンボル）」と「Coupled requirements（実装を共有する要件）」に分離
+  - シンボルを解決できない参照（例: `export const a = 1` 直前のコメント）はファイル単位にフォールバックし、カバレッジは維持
+  - 例: 1 ファイルに 5 クラスがある場合でも、`REQ-AUTH-001` の影響は `AuthenticateService` の 1 シンボルのみ（従来は 5 要件を誤報）。同一クラスを共有する要件（`PaymentService` を実装する `REQ-PAY-001`/`REQ-PAY-002`）は正しく coupled と判定
+
+### Tests
+
+- musubi: 同一ファイル内でクラスが異なる要件は coupled にならず、同一クラスを共有する要件は coupled になることを検証
+- 全 **1823 テスト**緑 / lint 0 errors / branch coverage 80.3% / clean `tsc -b`
+
 ## [0.5.49] - 2026-07-10
 
 SDD パイプライン全体（init → requirements → design → codegen → test:gen → trace → verify → security）を新規プロジェクトで通し実行するエンドツーエンド ドッグフーディングを実施。パッケージ間連携（connective tissue）の重大な欠陥 2 件を発見・修正。

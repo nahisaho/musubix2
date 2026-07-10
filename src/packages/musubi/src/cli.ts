@@ -601,6 +601,68 @@ export function buildCodeTraceData(specsFile: string, srcDir: string): CodeTrace
   return { requirementIds, fileIds: [...fileSet].sort(), links, refsByReq };
 }
 
+const DECL_RE =
+  /(?:export\s+)?(?:default\s+)?(?:abstract\s+)?(?:class|interface|enum)\s+([A-Za-z_$][\w$]*)|(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s+([A-Za-z_$][\w$]*)|(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/;
+
+/**
+ * Build symbol-level traceability links for impact analysis: each requirement
+ * is linked to the specific class/function that implements it (resolved from a
+ * preceding `// Implements: REQ-…` comment or an in-body reference), rather than
+ * to the whole file. This stops requirements that merely share a file from being
+ * reported as impacting one another. Falls back to a file-level link when no
+ * enclosing symbol can be resolved.
+ */
+export function buildSymbolTraceLinks(
+  specsFile: string,
+  srcDir: string,
+): Array<{ source: string; target: string }> {
+  const reqSet = new Set(buildCodeTraceData(specsFile, srcDir).requirementIds);
+  if (reqSet.size === 0 || !existsSync(srcDir)) {return [];}
+
+  const links: Array<{ source: string; target: string }> = [];
+  const seen = new Set<string>();
+  const addLink = (source: string, target: string): void => {
+    const key = `${source}\t${target}`;
+    if (!seen.has(key)) { seen.add(key); links.push({ source, target }); }
+  };
+
+  for (const file of collectFiles(srcDir, (ext) => ext in EXT_TO_LANG)) {
+    let code: string;
+    try {
+      code = readFileSync(file, 'utf-8');
+    } catch {
+      continue;
+    }
+    const lines = code.split('\n');
+    let currentSymbol: string | null = null;
+    let pending: string[] = []; // req ids from comments awaiting the next declaration
+    for (const raw of lines) {
+      const line = raw.trim();
+      const idsHere = [...raw.matchAll(REQ_ID_RE)].map((m) => m[0]).filter((id) => reqSet.has(id));
+      const decl = DECL_RE.exec(raw);
+      if (decl) {
+        const symbol = `${file}::${decl[1] ?? decl[2] ?? decl[3]}`;
+        currentSymbol = symbol;
+        for (const id of [...pending, ...idsHere]) {addLink(id, symbol);}
+        pending = [];
+        continue;
+      }
+      if (idsHere.length === 0) {continue;}
+      if (line.startsWith('//') || line.startsWith('*') || line.startsWith('/*')) {
+        // A comment reference attaches to the declaration that follows it.
+        pending.push(...idsHere);
+      } else if (currentSymbol) {
+        for (const id of idsHere) {addLink(id, currentSymbol);}
+      } else {
+        for (const id of idsHere) {addLink(id, file);}
+      }
+    }
+    // Any comment refs with no following declaration fall back to the file.
+    for (const id of pending) {addLink(id, file);}
+  }
+  return links;
+}
+
 function resolveTraceInputs(flags: Record<string, unknown>): { specsFile: string; srcDir: string } {
   return {
     specsFile: (flags['specs'] as string | undefined) ?? 'storage/specs/requirements.md',
@@ -669,20 +731,27 @@ export async function handleTrace(
         console.error('❌ Usage: musubix trace impact <target-id> [--specs <file>] [--src <dir>]');
         return ExitCode.GENERAL_ERROR;
       }
-      // Build real traceability links (requirement ↔ source file) so impact
-      // analysis reflects the actual codebase, not an empty graph.
+      // Build symbol-level traceability links (requirement ↔ implementing
+      // class/function) so impact analysis reflects what actually shares code,
+      // not merely what shares a file.
       const { specsFile, srcDir } = resolveTraceInputs(flags);
-      const data = buildCodeTraceData(specsFile, srcDir);
+      const links = buildSymbolTraceLinks(specsFile, srcDir);
       const analyzer = createImpactAnalyzer();
-      const result = analyzer.analyze(
-        targetId,
-        data.links.map((l) => ({ source: l.source, target: l.target })),
-      );
+      const result = analyzer.analyze(targetId, links);
+      // Separate the affected symbols (files) from affected requirements.
+      const affectedReqs = result.affectedIds.filter((id) => /^REQ-[A-Z]{2,6}-\d{3}$/.test(id));
+      const affectedSymbols = result.affectedIds.filter((id) => !/^REQ-[A-Z]{2,6}-\d{3}$/.test(id));
       console.log(`Impact analysis for ${targetId}:`);
       console.log(`  Level: ${result.level}`);
-      console.log(`  Affected: ${result.affectedIds.length} item(s)`);
-      for (const id of result.affectedIds) {
-        console.log(`    - ${id}`);
+      console.log(`  Affected: ${result.affectedIds.length} item(s)` +
+        ` (${affectedSymbols.length} symbol(s), ${affectedReqs.length} requirement(s))`);
+      if (affectedSymbols.length > 0) {
+        console.log('  Implementing code:');
+        for (const s of affectedSymbols) {console.log(`    - ${s}`);}
+      }
+      if (affectedReqs.length > 0) {
+        console.log('  Coupled requirements (share implementing code):');
+        for (const r of affectedReqs) {console.log(`    - ${r}`);}
       }
       if (result.affectedIds.length === 0) {
         console.log(`  ℹ No trace links for '${targetId}' in ${specsFile} / ${srcDir}.`);
