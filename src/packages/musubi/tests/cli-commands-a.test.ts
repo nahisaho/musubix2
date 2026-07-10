@@ -126,6 +126,19 @@ describe('handleDesignC4', () => {
     const code = await handleDesignC4(file);
     expect(code).toBe(ExitCode.GENERAL_ERROR);
   });
+
+  // v0.5.40 — dogfooding: accept Markdown requirements, not only JSON models.
+  it('derives a C4 model from a Markdown requirements file', async () => {
+    const file = join(FIXTURE_DIR, 'reqs-c4.md');
+    writeFileSync(file, '## REQ-AUT-001: Auth\n**要件**: The system shall authenticate.\n');
+    expect(await handleDesignC4(file, 'container')).toBe(ExitCode.SUCCESS);
+  });
+
+  it('returns VALIDATION_ERROR for non-JSON, non-requirements input', async () => {
+    const file = join(FIXTURE_DIR, 'plain-c4.txt');
+    writeFileSync(file, 'just some prose, no model and no requirements');
+    expect(await handleDesignC4(file)).toBe(ExitCode.VALIDATION_ERROR);
+  });
 });
 
 // ── handleDesignVerify ─────────────────────────────────────────────────────

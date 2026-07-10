@@ -41,6 +41,30 @@ describe('CLI Commands B — Traceability', () => {
     expect(code).toBe(ExitCode.SUCCESS);
   });
 
+  // v0.5.40 — dogfooding: validate actually checks coverage from specs/src.
+  it('trace validate reports uncovered requirements and --strict fails', async () => {
+    const dir = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_trace');
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'reqs.md'),
+      '## REQ-AUT-001: Auth\n**要件**: shall authenticate.\n## REQ-PAY-001: Pay\n**要件**: shall pay.\n',
+    );
+    writeFileSync(join(dir, 'src', 'auth.ts'), '// Implements REQ-AUT-001\nexport const a = 1;\n');
+    const specs = join(dir, 'reqs.md');
+    const src = join(dir, 'src');
+    try {
+      logSpy.mockClear();
+      // Non-strict: reports the gap but still SUCCESS.
+      expect(await handleTrace('validate', [], { specs, src })).toBe(ExitCode.SUCCESS);
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(out).toContain('REQ-PAY-001'); // uncovered
+      // Strict: fails.
+      expect(await handleTrace('validate', [], { specs, src, strict: true })).toBe(ExitCode.GENERAL_ERROR);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('trace impact returns SUCCESS with target', async () => {
     const code = await handleTrace('impact', ['REQ-001']);
     expect(code).toBe(ExitCode.SUCCESS);

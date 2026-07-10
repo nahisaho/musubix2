@@ -11,7 +11,6 @@
 import { ExitCode, type ExitCodeValue } from '@musubix2/core';
 import type { EntityType, RelationType } from '@musubix2/knowledge';
 import {
-  createTraceabilityManager,
   createMatrixGenerator,
   createImpactAnalyzer,
 } from '@musubix2/core';
@@ -616,8 +615,33 @@ export async function handleTrace(
       return ExitCode.SUCCESS;
     }
     case 'validate': {
-      const manager = createTraceabilityManager();
-      console.log(manager.toMarkdown());
+      // Validate that every requirement is traced to code. `--strict` fails
+      // (non-zero exit) when any requirement is uncovered — useful in CI.
+      const { specsFile, srcDir } = resolveTraceInputs(flags);
+      const data = buildCodeTraceData(specsFile, srcDir);
+      if (data.requirementIds.length === 0) {
+        console.log(`No requirements found in ${specsFile} — nothing to validate.`);
+        console.log('ℹ Pass --specs <file> to point at your requirements document.');
+        return ExitCode.SUCCESS;
+      }
+      const uncovered = data.requirementIds.filter((r) => (data.refsByReq.get(r)?.length ?? 0) === 0);
+      const covered = data.requirementIds.length - uncovered.length;
+      console.log(`Traceability validation (${specsFile}):`);
+      console.log(
+        `  Requirements: ${data.requirementIds.length}, covered: ${covered}, uncovered: ${uncovered.length}`,
+      );
+      if (uncovered.length > 0) {
+        console.log('\n  Uncovered requirements (no code reference):');
+        for (const r of uncovered) console.log(`    ✗ ${r}`);
+        const strict = flags['strict'] === true;
+        console.log(
+          strict
+            ? '\n❌ Traceability incomplete.'
+            : '\n⚠ Traceability incomplete (use --strict to fail the command).',
+        );
+        return strict ? ExitCode.GENERAL_ERROR : ExitCode.SUCCESS;
+      }
+      console.log('\n✅ All requirements are traced to code.');
       return ExitCode.SUCCESS;
     }
     case 'impact': {
@@ -2451,17 +2475,63 @@ export async function handleDesignGenerate(filePath: string): Promise<ExitCodeVa
   }
 }
 
+/** Derive a plausible C4 model from a Markdown EARS requirements document. */
+function deriveC4FromRequirements(content: string): {
+  title: string;
+  elements: Array<Record<string, unknown>>;
+  relationships: Array<Record<string, unknown>>;
+} {
+  const reqRe = /^#{1,4}\s+(REQ-([A-Z]{3})-\d{3}):\s*(.*)$/gm;
+  const reqs: Array<{ id: string; domain: string; title: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = reqRe.exec(content)) !== null) {
+    reqs.push({ id: m[1], domain: m[2], title: m[3].trim() });
+  }
+  const domains = [...new Set(reqs.map((r) => r.domain))];
+  const elements: Array<Record<string, unknown>> = [
+    { id: 'user', name: 'User', type: 'person', description: 'A user of the system' },
+    { id: 'system', name: 'System', type: 'system', description: `Covers ${reqs.length} requirement(s)` },
+  ];
+  const relationships: Array<Record<string, unknown>> = [
+    { from: 'user', to: 'system', description: 'Uses' },
+  ];
+  for (const d of domains) {
+    elements.push({ id: d, name: `${d} Service`, type: 'container', description: `Handles ${d} requirements` });
+    relationships.push({ from: 'system', to: d, description: 'contains' });
+  }
+  for (const r of reqs) {
+    elements.push({ id: r.id, name: r.title || r.id, type: 'component', description: r.id });
+    relationships.push({ from: r.domain, to: r.id, description: 'implements' });
+  }
+  return { title: 'System Architecture', elements, relationships };
+}
+
 export async function handleDesignC4(
   filePath: string,
   level: string = 'context',
 ): Promise<ExitCodeValue> {
   try {
+    if (!existsSync(filePath)) {
+      console.error(`❌ Path not found: ${filePath}`);
+      return ExitCode.GENERAL_ERROR;
+    }
     const content = readFileSync(filePath, 'utf-8');
-    const data = JSON.parse(content) as {
+    let data: {
       title?: string;
       elements?: Array<Record<string, unknown>>;
       relationships?: Array<Record<string, unknown>>;
     };
+    if (content.trimStart().startsWith('{')) {
+      data = JSON.parse(content); // explicit C4 model JSON
+    } else if (/^#{1,4}\s+REQ-[A-Z]{3}-\d{3}/m.test(content)) {
+      data = deriveC4FromRequirements(content); // Markdown requirements → C4 model
+    } else {
+      console.error(
+        '❌ design:c4 expects a JSON C4 model {title, elements, relationships} ' +
+        'or a Markdown requirements file (## REQ-XXX-000: …).',
+      );
+      return ExitCode.VALIDATION_ERROR;
+    }
     const generator = createC4ModelGenerator();
 
     for (const el of data.elements ?? []) {

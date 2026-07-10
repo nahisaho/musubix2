@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.40] - 2026-07-10
+
+`trace` / `decisions` / `design:c4` / `deep-research` を dogfooding し、`design:c4` の不親切なクラッシュと `trace validate` のスタブ挙動を修正。
+
+### Fixed（design:c4）
+
+- **Markdown 入力での不可解なクラッシュ** — `design:c4 <requirements.md>` が入力を JSON として解析しようとし `❌ Unexpected token '#' … is not valid JSON` で落ちていた。以下に改善:
+  - JSON の C4 モデル（`{title, elements, relationships}`）はそのまま利用
+  - **Markdown 要件ファイル（`## REQ-XXX-000:`）から C4 モデルを自動導出**（User＋System、ドメインごとの Container、要件ごとの Component、関係を生成）→ そのまま Mermaid C4 図を出力
+  - どちらでもない入力には明確なエラーメッセージ（VALIDATION_ERROR）
+  - 入力ファイル不在時のパスチェックを追加
+
+### Fixed（trace validate）
+
+- **`trace validate` がスタブだった** — 空の TraceabilityManager を生成して空の表を出力するだけで、`--specs`/`--src` を無視していた。実際に仕様と実装を突き合わせ、**未カバー要件を列挙**するよう修正。`--strict` で未カバーがあれば非ゼロ終了（CI 用）
+
+### Validation（dogfooding）
+
+- `trace matrix` は正常動作を確認（REQ→コードのマッピング、カバレッジ率、ギャップ検出）
+- `decision create/list/get` は正常動作を確認
+- `deep-research query` はソース未設定時に妥当なメッセージを返すことを確認（クラッシュなし）
+- `design:c4 <requirements.md>` が context/container レベルで有効な Mermaid C4 を生成
+- `trace validate --strict` が未カバー要件（`REQ-PAY-001`）で非ゼロ終了
+
+### Tests
+
+- musubi: `design:c4` の Markdown 導出・不正入力エラー、`trace validate` のカバレッジ検査と `--strict` 失敗を検証
+
 ## [0.5.39] - 2026-07-10
 
 `requirements`（EARS 検証）と `knowledge`（グラフ）を dogfooding し、パーサーの厳格さと未処理クラッシュを修正。
