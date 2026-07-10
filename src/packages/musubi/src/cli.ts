@@ -753,6 +753,16 @@ export async function handleTrace(
       // Separate the affected symbols (files) from affected requirements.
       const affectedReqs = result.affectedIds.filter((id) => /^REQ-[A-Z]{2,6}-\d{3}$/.test(id));
       const affectedSymbols = result.affectedIds.filter((id) => !/^REQ-[A-Z]{2,6}-\d{3}$/.test(id));
+      if (flags['json'] === true) {
+        console.log(JSON.stringify({
+          target: targetId,
+          level: result.level,
+          affectedIds: result.affectedIds,
+          affectedSymbols,
+          affectedRequirements: affectedReqs,
+        }, null, 2));
+        return ExitCode.SUCCESS;
+      }
       console.log(`Impact analysis for ${targetId}:`);
       console.log(`  Level: ${result.level}`);
       console.log(`  Affected: ${result.affectedIds.length} item(s)` +
@@ -3559,13 +3569,44 @@ export async function handleDeepResearch(
 
 // ── REPL handler ───────────────────────────────────────────────────────────
 
-export async function handleRepl(): Promise<ExitCodeValue> {
+export async function handleRepl(
+  input: NodeJS.ReadableStream = process.stdin,
+  output: NodeJS.WritableStream = process.stdout,
+): Promise<ExitCodeValue> {
   const { ReplEngine } = await import('@musubix2/core');
+  const readline = await import('node:readline');
   const repl = new ReplEngine();
   console.log('MUSUBIX2 Interactive REPL');
   console.log('Type "help" for commands, "exit" to quit.\n');
-  console.log(repl.getPrompt());
-  return ExitCode.SUCCESS;
+
+  const rl = readline.createInterface({
+    input,
+    output,
+    prompt: repl.getPrompt(),
+  });
+  rl.prompt();
+
+  // Wire the read-eval-print loop (previously a no-op stub that only printed the
+  // banner). Pause during async eval so lines don't interleave.
+  return await new Promise<ExitCodeValue>((resolve) => {
+    rl.on('line', (line) => {
+      const trimmed = line.trim();
+      if (trimmed === 'exit' || trimmed === 'quit' || trimmed === 'q') {
+        rl.close();
+        return;
+      }
+      if (!trimmed) {
+        rl.prompt();
+        return;
+      }
+      rl.pause();
+      repl.eval(trimmed)
+        .then((out) => { if (out) {console.log(out);} })
+        .catch((err) => console.error(`❌ ${err instanceof Error ? err.message : String(err)}`))
+        .finally(() => { rl.resume(); rl.prompt(); });
+    });
+    rl.on('close', () => resolve(ExitCode.SUCCESS));
+  });
 }
 
 // ── Scaffold handler ───────────────────────────────────────────────────────

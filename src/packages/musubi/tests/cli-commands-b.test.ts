@@ -1437,6 +1437,17 @@ describe('v0.5.6 trace real data', () => {
     expect(printed).toContain('referenced in code: 2');
   });
 
+  // v0.5.75 — trace impact supports --json (was human-readable only).
+  it('trace impact emits JSON with --json', async () => {
+    logSpy.mockClear();
+    const code = await handleTrace('impact', ['REQ-AUT-001'], { specs, src, json: true });
+    expect(code).toBe(ExitCode.SUCCESS);
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    const parsed = JSON.parse(out);
+    expect(parsed.target).toBe('REQ-AUT-001');
+    expect(Array.isArray(parsed.affectedIds)).toBe(true);
+  });
+
   // v0.5.74 — trace matrix supports --json (was markdown-only, unlike impact/diff).
   it('trace matrix emits JSON with --json', async () => {
     logSpy.mockClear();

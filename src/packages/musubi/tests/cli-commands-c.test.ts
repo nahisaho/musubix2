@@ -18,6 +18,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable, Writable } from 'node:stream';
 
 // ── Registration ───────────────────────────────────────────────────────────
 
@@ -285,10 +286,21 @@ describe('CLI Commands C — REPL', () => {
     logSpy.mockRestore();
   });
 
+  const devnull = (): NodeJS.WritableStream =>
+    new Writable({ write(_c, _e, cb) { cb(); } });
+
   it('repl handler prints welcome message', async () => {
-    const code = await handleRepl();
+    const code = await handleRepl(Readable.from([]), devnull());
     expect(code).toBe(ExitCode.SUCCESS);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('MUSUBIX2 Interactive REPL'));
+  });
+
+  // v0.5.75 — the REPL is a working read-eval-print loop (was a no-op stub).
+  it('evaluates commands from input until exit', async () => {
+    const code = await handleRepl(Readable.from(['help\n', 'bogus\n', 'exit\n']), devnull());
+    expect(code).toBe(ExitCode.SUCCESS);
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(out).toContain('Available commands'); // `help` was evaluated
   });
 });
 

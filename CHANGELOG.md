@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.75] - 2026-07-11
+
+dogfooding 実装テスト 50 本（第 5 巡）を実施し、2 件の不具合を修正。
+
+### Fixed
+
+- **`repl` が実質的に動作していなかった** — ハンドラがバナーとプロンプトを表示して即座に return するだけのスタブで、標準入力を読まず REPL ループが存在しなかった（`help` 等のコマンドを実行できなかった）。`ReplEngine.eval` を readline ループに接続し、実際に対話実行できるよう実装（`help`/`history`/`clear`/`exit`、未知コマンドのエラー表示）。テスト容易性のため入出力ストリームを引数で受け取れるようにした
+- **`trace impact --json` が無視されていた** — 常に人間可読形式で出力していた（`trace matrix`（0.5.74 で修正）・`cg impact`・`cg diff` は対応済み）。`--json` で target/level/affectedIds/affectedSymbols/affectedRequirements を含む JSON を出力するよう対応
+
+### Verified
+
+- REPL コマンド実行（help/history/clear/未知コマンド）、CodeGraph リファクタリングワークフロー（cycles/candidates）、100 要件のパフォーマンス（0.3 秒）、フルチェーンの REQ-ID 整合性（design→codegen→test→trace）、コードブロック内の偽 REQ 無視、多条件 IF の形式化が正常動作
+
 ## [0.5.74] - 2026-07-11
 
 dogfooding 実装テスト 50 本（第 4 巡）を実施し、4 件の不具合を修正。
