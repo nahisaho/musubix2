@@ -200,6 +200,37 @@ describe('handleCodegen', () => {
     const code = await handleCodegen('IUserRepo', 'interface');
     expect(code).toBe(ExitCode.SUCCESS);
   });
+
+  // v0.5.43 — pipeline: codegen consumes design artifacts / requirements files.
+  it('generates a skeleton per requirement from a Markdown file', async () => {
+    const file = join(FIXTURE_DIR, 'codegen-reqs.md');
+    writeFileSync(file, '## REQ-AUT-001: Authentication\n**要件**: shall authenticate.\n');
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleCodegen(file)).toBe(ExitCode.SUCCESS);
+      expect(logs.join('\n')).toContain('class Authentication');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('sanitizes an invalid name into a valid identifier', async () => {
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleCodegen('my service', 'class')).toBe(ExitCode.SUCCESS);
+      expect(logs.join('\n')).toContain('class MyService');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('returns VALIDATION_ERROR for a file with no components/requirements', async () => {
+    const file = join(FIXTURE_DIR, 'codegen-empty.md');
+    writeFileSync(file, '# Just a heading\nno requirements here');
+    expect(await handleCodegen(file)).toBe(ExitCode.VALIDATION_ERROR);
+  });
 });
 
 // ── handleTestGen ──────────────────────────────────────────────────────────

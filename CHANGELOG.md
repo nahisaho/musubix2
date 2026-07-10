@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.43] - 2026-07-10
+
+SDD パイプラインの下流連携（続き）。`codegen` が設計成果物・要件ファイルを受け取れず、ファイルパスを渡すと**不正なクラス名**を生成していた問題を修正。
+
+### Fixed / Added（codegen）
+
+- **設計成果物・要件ファイルからの生成** — `codegen generate <design.json | requirements.md>` が引数を常にクラス名として扱っていたため、`codegen generate requirements.md` が `export class requirements.md {}`（不正な識別子）を生成していた。ファイルの場合は内容を解析し、**コンポーネント／要件ごとにスケルトンを生成**するよう修正:
+  - 設計 JSON（`elements`）→ `component`/`container` 要素ごとにクラス
+  - 設計 JSON（`sections`）→ セクションごとにクラス
+  - Markdown 要件 → 要件ごとにクラス（タイトルから PascalCase 命名）
+  - コンポーネント／要件が無いファイルは明確なエラー（VALIDATION_ERROR）
+- **名前のサニタイズ** — プレーンな名前指定時、既に有効な識別子（`UserService`/`myFunc`）はそのまま、無効な名前（`my service`）は PascalCase 化（`MyService`）
+
+### Impact（パイプライン疎通）
+
+- `design generate --out design.json` → `codegen generate design.json` がコンポーネント別スケルトンを生成し、設計→コード生成が連携
+- `codegen generate requirements.md` が要件別クラス（`Authentication`/`Session` 等）を生成
+
+### Notes（正常動作を確認）
+
+- `test:gen <file|dir>` はソースを解析してクラス・関数ごとの vitest スケルトンを正しく生成
+
+### Tests
+
+- musubi: 要件ファイルからのスケルトン生成、名前サニタイズ、空ファイルのエラーを検証（27 → 30）
+
 ## [0.5.42] - 2026-07-10
 
 SDD の end-to-end フロー検証。`design generate` の出力が下流（`design:verify` / `design:c4`）に渡せず**パイプラインが設計工程で途切れていた**問題を解消。

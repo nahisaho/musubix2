@@ -2595,15 +2595,80 @@ export async function handleDesignVerify(filePath: string): Promise<ExitCodeValu
   }
 }
 
+/** Turn an arbitrary string into a PascalCase identifier suitable for a type. */
+function toPascalCase(s: string): string {
+  const parts = s.replace(/[^A-Za-z0-9]+/g, ' ').trim().split(/\s+/);
+  const pascal = parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
+  return /^[0-9]/.test(pascal) ? `_${pascal}` : pascal || 'Component';
+}
+
+/**
+ * Extract code-generation targets from a design artifact or requirements file:
+ *  - a design JSON with `elements` → one class per component/container element
+ *  - a Markdown requirements doc → one class per requirement (named from title)
+ */
+function extractCodegenTargets(content: string): Array<{ name: string; type: string }> {
+  const trimmed = content.trimStart();
+  if (trimmed.startsWith('{')) {
+    try {
+      const data = JSON.parse(content) as {
+        elements?: Array<{ id?: string; name?: string; type?: string }>;
+        sections?: Array<{ id?: string; title?: string }>;
+      };
+      const els = (data.elements ?? []).filter((e) => e.type === 'component' || e.type === 'container');
+      if (els.length > 0) {
+        return els.map((e) => ({ name: toPascalCase(e.name ?? e.id ?? 'Component'), type: 'class' }));
+      }
+      if (data.sections?.length) {
+        return data.sections.map((s) => ({ name: toPascalCase(s.title ?? s.id ?? 'Section'), type: 'class' }));
+      }
+    } catch {
+      /* fall through */
+    }
+    return [];
+  }
+  const reqRe = /^#{1,4}\s+(REQ-[A-Z]{3}-\d{3}):\s*(.*)$/gm;
+  const targets: Array<{ name: string; type: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = reqRe.exec(content)) !== null) {
+    targets.push({ name: toPascalCase(m[2] || m[1]), type: 'class' });
+  }
+  return targets;
+}
+
 export async function handleCodegen(
-  name: string,
+  nameOrFile: string,
   type: string = 'class',
 ): Promise<ExitCodeValue> {
   try {
     const generator = createCodeGenerator();
+    // A design artifact / requirements file → generate a skeleton per component.
+    if (existsSync(nameOrFile) && statSync(nameOrFile).isFile()) {
+      const content = readFileSync(nameOrFile, 'utf-8');
+      const targets = extractCodegenTargets(content);
+      if (targets.length === 0) {
+        console.error(
+          `❌ No components or requirements found in ${nameOrFile}. ` +
+          'Pass a design JSON (with elements/sections) or a Markdown requirements file.',
+        );
+        return ExitCode.VALIDATION_ERROR;
+      }
+      for (const t of targets) {
+        const result = generator.generate({
+          templateType: t.type as Parameters<typeof generator.generate>[0]['templateType'],
+          name: t.name,
+        });
+        console.log(result.code);
+        console.log('');
+      }
+      console.error(`✅ Generated ${targets.length} skeleton(s) from ${nameOrFile}`);
+      return ExitCode.SUCCESS;
+    }
+    // A plain identifier → one skeleton (kept as-is if already valid).
+    const safeName = /^[A-Za-z_$][\w$]*$/.test(nameOrFile) ? nameOrFile : toPascalCase(nameOrFile);
     const result = generator.generate({
       templateType: type as Parameters<typeof generator.generate>[0]['templateType'],
-      name,
+      name: safeName,
     });
     console.log(result.code);
     return ExitCode.SUCCESS;
