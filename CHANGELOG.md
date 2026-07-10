@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.38] - 2026-07-10
+
+`security` の taint データフロー解析に**サニタイザ認識**を追加。エスケープ／キャスト済みの値を汚染源から除外し、誤検知を削減。
+
+### Fixed
+
+- **サニタイザを通った値の誤検知** — `cmd = "ls " + shlex.quote(x)` や `q = "…%d" % int(uid)`、PHP `"…" . escapeshellarg($x)` のように、動的部分が既知のエスケープ／クォート／数値キャスト関数を通っている場合は汚染扱いしないよう修正
+- 認識するサニタイザ: `shlex.quote`/`pipes.quote`/`escapeshellarg`/`escapeshellcmd`、`mysqli_real_escape_string`/`real_escape_string`/`pg_escape_*`/`quote_ident*`、`re.escape`/`html.escape`/`htmlspecialchars`/`htmlentities`、数値キャスト `int`/`float`/`Number`/`parseInt`/`parseFloat`/`Integer.parseInt`
+- 汚染の伝播（変数間）にも同じサニタイザ判定を適用
+
+### Impact
+
+- サニタイズ済み／未サニタイズが混在するフィクスチャで、**未サニタイズのケースのみ**を検知（サニタイズ済み 3 件を除外、真陽性 1 件は維持）
+- 0.5.37 の検知能力は不変（Django 1・Laravel 0）
+
+### Tests
+
+- security: サニタイザ（`shlex.quote`/`int()`/`escapeshellarg`）経由の値が非検知、未サニタイズは検知を検証（39 → 40）
+
 ## [0.5.37] - 2026-07-10
 
 `security` に**ファイル内 taint データフロー解析**（`TaintDataflowAnalyzer`）を追加。パターン検知では見逃していた「変数経由」の注入を検出。

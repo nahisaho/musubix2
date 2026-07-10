@@ -252,6 +252,15 @@ describe('TaintDataflowAnalyzer', () => {
     // No dynamic construction at all.
     expect(df.analyze('x = 1\ncursor.execute(x)', 'a.py')).toHaveLength(0);
   });
+
+  it('does not flag values passed through a sanitizer', () => {
+    // shlex.quote / int() / escapeshellarg sanitize the dynamic part.
+    expect(df.analyze('cmd = "ls " + shlex.quote(d)\nos.system(cmd)', 'a.py')).toHaveLength(0);
+    expect(df.analyze('q = "… WHERE id = %d" % int(uid)\ncursor.execute(q)', 'a.py')).toHaveLength(0);
+    expect(df.analyze('$c = "ping " . escapeshellarg($h);\nsystem($c);', 'a.php')).toHaveLength(0);
+    // …but the unsanitized sibling is still flagged.
+    expect(df.analyze('cmd = "ls " + d\nos.system(cmd)', 'a.py').length).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

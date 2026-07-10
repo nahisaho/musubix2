@@ -627,10 +627,20 @@ export class TaintDataflowAnalyzer {
     },
   ];
 
+  /**
+   * Known escaping / quoting / casting helpers. When the dynamic part of a
+   * built string passes through one of these, the value is treated as
+   * sanitized and not tainted (e.g. `"ls " + shlex.quote(x)`, `"…%d" % int(n)`).
+   */
+  private static readonly SANITIZERS =
+    /\b(?:shlex\.quote|pipes\.quote|escapeshellarg|escapeshellcmd|mysqli_real_escape_string|real_escape_string|pg_escape_(?:string|literal|identifier)|quote_ident(?:ifier)?|re\.escape|html\.escape|htmlspecialchars|htmlentities|int|float|Number|parseInt|parseFloat|Integer\.parseInt)\s*\(/;
+
   private isDynamicRhs(rhs: string): boolean {
     // A list/array literal (`args = [exe] + [...]`) is an argument vector, not a
     // dynamic *string* — passing it to subprocess is the safe form.
     if (/^\s*\[/.test(rhs)) return false;
+    // A value whose dynamic part is escaped/quoted/cast is considered safe.
+    if (TaintDataflowAnalyzer.SANITIZERS.test(rhs)) return false;
     return (
       /\.\s*format\s*\(/.test(rhs) || // "…".format(x)
       /\bf['"]/.test(rhs) || // f-string
@@ -659,7 +669,7 @@ export class TaintDataflowAnalyzer {
         const rhs = m[2];
         if (tainted.has(name)) return;
         let taint = this.isDynamicRhs(rhs);
-        if (!taint) {
+        if (!taint && !TaintDataflowAnalyzer.SANITIZERS.test(rhs)) {
           for (const t of tainted.keys()) {
             if (t !== name && new RegExp(`(?<![\\w$])${escapeRe(t)}(?![\\w])`).test(rhs) &&
                 /[+%]|\.\s*format|f['"]/.test(rhs)) {
