@@ -147,17 +147,32 @@ export class TfIdfEmbeddingModel implements IEmbeddingModel {
       tf.set(token, (tf.get(token) ?? 0) + 1);
     }
 
-    // Compute TF-IDF and project via hashing trick
+    // A fitted model knows its corpus; an unfitted one falls back to a uniform
+    // bag-of-words weighting so embeddings still work without a corpus.
+    const fitted = this.idfScores.size > 0;
+
     for (const [term, count] of tf) {
+      const known = this.idfScores.get(term);
+      // In a fitted model, a term absent from the corpus cannot match any
+      // document — skip it rather than letting an out-of-vocabulary term
+      // dominate the vector (and collide, via hashing, onto unrelated docs).
+      if (known === undefined && fitted) {continue;}
       const termFreq = count / tokens.length;
-      const idf = this.idfScores.get(term) ?? Math.log(this.documentCount + 1);
+      const idf = known ?? 1;
       const tfidf = termFreq * idf;
 
-      // Hashing trick: deterministic bucket assignment
-      const bucket = this._hash(term) % this.dimensions;
-      // Sign hash for variance reduction
-      const sign = this._signHash(term) ? 1 : -1;
-      vec[bucket] += sign * tfidf;
+      // When fitted, use the term's own vocabulary index as its bucket — this
+      // is collision-free for vocabularies up to `dimensions`, so unrelated
+      // terms (e.g. "redis" vs "oauth") can't be conflated. Only the unfitted
+      // fallback needs the hashing trick.
+      const vocabIdx = this.vocabulary.get(term);
+      if (fitted && vocabIdx !== undefined) {
+        vec[vocabIdx % this.dimensions] += tfidf;
+      } else {
+        const bucket = this._hash(term) % this.dimensions;
+        const sign = this._signHash(term) ? 1 : -1;
+        vec[bucket] += sign * tfidf;
+      }
     }
 
     return vec;

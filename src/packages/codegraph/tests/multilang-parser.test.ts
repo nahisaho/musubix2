@@ -635,6 +635,45 @@ func (s *UserService) GetUser(id string) (*User, error) {
     expect(svc!.children[0].modifiers).toContain('exported');
   });
 
+  // v0.5.47 — Go allows a method to be declared before its receiver type.
+  it('attaches a receiver method declared before its struct', () => {
+    const result = parser.parse(`
+func (s *Server) Start() error {
+    return nil
+}
+
+type Server struct {
+    port int
+}
+`);
+    const server = result.nodes.find((n) => n.name === 'Server');
+    expect(server).toBeDefined();
+    expect(server!.children.map((c) => c.name)).toContain('Start');
+    // The method must no longer dangle at the top level.
+    expect(result.nodes.some((n) => n.type === 'method' && n.name === 'Start')).toBe(false);
+  });
+
+  // v0.5.47 — interface method signatures are extracted as members.
+  it('extracts interface method signatures as children', () => {
+    const result = parser.parse(`
+type Handler interface {
+    Serve(w Writer) error
+    Name() string
+}
+`);
+    const iface = result.nodes.find((n) => n.name === 'Handler');
+    expect(iface!.children.map((c) => c.name)).toEqual(['Serve', 'Name']);
+    expect(iface!.children.every((c) => c.type === 'method')).toBe(true);
+  });
+
+  // v0.5.47 — generic functions/methods (`[T any]`) are captured.
+  it('captures a generic function', () => {
+    const result = parser.parse('package main\nfunc Map[T any](xs []T) []T { return xs }\n');
+    const fn = result.nodes.find((n) => n.name === 'Map');
+    expect(fn).toBeDefined();
+    expect(fn!.type).toBe('function');
+  });
+
   it('should detect package-level functions', () => {
     const result = parser.parse(`
 func NewUserService(db *Database) *UserService {

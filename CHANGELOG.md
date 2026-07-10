@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.47] - 2026-07-10
+
+0.5.46 で挙げた残タスク 3 件を実施。CodeGraph の Go パーサ精度、未ドッグフーディング パッケージ（neural-search 他）、MCP catalog のテストカバレッジ。
+
+### CodeGraph パーサ精度（Go）
+
+ドッグフーディングで 3 件の実バグを発見・修正:
+
+- **後方参照のレシーバメソッド** — `func (s *Server) Start()` が `type Server` より前に書かれると struct に紐付かず top-level に浮いていた。パース後に受信側型へ再割り当てするよう修正
+- **インターフェースのメソッド未抽出** — `type Handler interface { Serve(...); Name() }` のメソッドシグネチャが children に入っていなかったのを抽出
+- **ジェネリック関数の欠落** — `func Map[T any](...)` が型パラメータで正規表現に一致せず捕捉されていなかったのを修正（メソッドも同様）
+
+### 未ドッグフーディング パッケージ（neural-search）
+
+- **TF-IDF 検索の精度バグを修正** — クエリ「redis cache」に対し、共通語を持たない無関係文書が最上位になっていた。原因は 2 つ:
+  1. **語彙外（OOV）クエリ語に高い フォールバック IDF** を与えていた（`log(N+1)`）→ どの文書にも一致しない語が最大重みでベクトルを支配。fit 済みモデルでは OOV 語を無視するよう修正
+  2. **ハッシュトリックの衝突**（128 次元で `redis`↔`oauth` 等が同一バケットに）→ fit 済みモデルでは語彙インデックスを直接バケットに使い、語彙サイズ ≤ 次元数なら衝突ゼロに
+  - 結果: 「redis cache」→ 関連文書が最上位、無関係文書は cos 類似度 0
+- git-knowledge / formal-verify / dfg は API 契約どおり正常動作を確認
+
+### テスト（MCP catalog）
+
+- sdd-core 系ツールの**任意パラメータ省略時の既定値経路**を検証するテストを追加（`@musubix2/core` は既にロード済みのため、カバレッジ分母を増やさず catalog.ts の branch を 44% → 48% に改善）
+
+### 検証
+
+- 全 **1812 テスト**緑 / lint 0 errors / branch coverage 80.7% / clean `tsc -b`
+- codegraph: Go の後方参照メソッド・interface メソッド・generics、neural-search: OOV/衝突の精度、mcp-server: sdd-core 既定値
+
 ## [0.5.46] - 2026-07-10
 
 4 テーマ（A: 生成品質の深掘り、B: MCP 実地検証、C: CodeGraph パーサ精度、D: 未ドッグフーディング パッケージ）を設計・実装。各テーマはドッグフーディングで実バグを発見して修正。

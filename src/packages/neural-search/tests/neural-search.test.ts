@@ -216,6 +216,40 @@ describe('DES-LRN-004: TfIdfEmbeddingModel', () => {
     expect(simSimilar).toBeGreaterThan(simUnrelated);
   });
 
+  // v0.5.47 — a fitted model must not conflate unrelated terms (no hash
+  // collisions) nor let out-of-vocabulary query terms invent matches.
+  it('gives zero similarity to a document sharing no terms', async () => {
+    const catMat = await model.embed('the cat sat on the mat');
+    const ml = await model.embed('machine learning is a subset of artificial intelligence');
+    expect(cosine(catMat, ml)).toBeCloseTo(0, 5);
+  });
+
+  it('ignores out-of-vocabulary query terms instead of scoring on them', async () => {
+    // "purple" and "helicopter" are not in the corpus; only "cat" should count.
+    const query = await model.embed('purple cat helicopter');
+    const catMat = await model.embed('the cat sat on the mat');
+    const ml = await model.embed('machine learning is a subset of artificial intelligence');
+    expect(cosine(query, catMat)).toBeGreaterThan(0);
+    expect(cosine(query, ml)).toBeCloseTo(0, 5);
+  });
+
+  it('ranks relevant documents above unrelated ones end-to-end', async () => {
+    const engine = createNeuralSearchEngine();
+    const docs: Array<[string, string]> = [
+      ['d1', 'cache invalidation strategy for redis'],
+      ['d2', 'user authentication with oauth tokens'],
+      ['d3', 'redis cache eviction policy'],
+    ];
+    const m = new TfIdfEmbeddingModel(128);
+    m.fit(docs.map((d) => d[1]));
+    for (const [id, text] of docs) {
+      engine.addDocument(id, await m.embed(text), { text });
+    }
+    const hits = engine.search(await m.embed('redis cache'), 3);
+    expect([hits[0].id, hits[1].id].sort()).toEqual(['d1', 'd3']);
+    expect(hits.find((h) => h.id === 'd2')!.score).toBeCloseTo(0, 5);
+  });
+
   it('should update vocabulary when fit() is called', () => {
     const model2 = new TfIdfEmbeddingModel(32);
     expect(model2.getVocabularySize()).toBe(0);

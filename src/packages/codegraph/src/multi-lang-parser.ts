@@ -779,9 +779,44 @@ export class GoParser implements LanguageParser {
         continue;
       }
 
-      // Method with receiver
+      // Interface members: inside a `type X interface { … }` block, each
+      // `Method(params) ret` line is a method of the interface.
+      const currentBlock = tracker.getCurrentBlock();
+      const currentNode = currentBlock ? blockNodeMap.get(currentBlock) : undefined;
+      if (currentBlock?.type === 'interface' && currentNode) {
+        const ifaceMethod = trimmed.match(/^(\w+)\s*\(([^)]*)\)\s*(.*)$/);
+        if (ifaceMethod) {
+          const mName = ifaceMethod[1];
+          const mParams = ifaceMethod[2]
+            ? ifaceMethod[2].split(',').map((p) => p.trim()).filter(Boolean)
+            : [];
+          const mRet = ifaceMethod[3]?.replace(/\{$/, '').trim() || undefined;
+          currentNode.children.push({
+            type: 'method',
+            name: mName,
+            startLine: lineNum,
+            endLine: lineNum,
+            children: [],
+            modifiers: mName[0] === mName[0].toUpperCase() ? ['exported'] : [],
+            params: mParams,
+            returnType: mRet,
+            parent: currentNode.name,
+            language: 'go',
+          });
+          const { closed } = tracker.processLine(line, lineNum);
+          if (closed) {
+            for (const c of closed) {
+              const n = blockNodeMap.get(c);
+              if (n) {n.endLine = lineNum;}
+            }
+          }
+          continue;
+        }
+      }
+
+      // Method with receiver (optional generic type params on the method name)
       const methodMatch = trimmed.match(
-        /^func\s+\((\w+)\s+\*?(\w+)\)\s+(\w+)\s*\(([^)]*)\)(?:\s*(?:\(([^)]*)\)|(\S+)))?/,
+        /^func\s+\((\w+)\s+\*?(\w+)\)\s+(\w+)\s*(?:\[[^\]]*\])?\s*\(([^)]*)\)(?:\s*(?:\(([^)]*)\)|(\S+)))?/,
       );
       if (methodMatch) {
         const receiverType = methodMatch[2];
@@ -844,9 +879,9 @@ export class GoParser implements LanguageParser {
         continue;
       }
 
-      // Package-level function
+      // Package-level function (optional generic type params `[T any]`)
       const funcMatch = trimmed.match(
-        /^func\s+(\w+)\s*\(([^)]*)\)(?:\s*(?:\(([^)]*)\)|(\S+)))?/,
+        /^func\s+(\w+)\s*(?:\[[^\]]*\])?\s*\(([^)]*)\)(?:\s*(?:\(([^)]*)\)|(\S+)))?/,
       );
       if (funcMatch) {
         const name = funcMatch[1];
@@ -926,6 +961,22 @@ export class GoParser implements LanguageParser {
           const n = blockNodeMap.get(c);
           if (n) {n.endLine = lineNum;}
         }
+      }
+    }
+
+    // Re-parent methods whose receiver type was declared *after* the method
+    // (Go allows this): move any top-level method onto its struct/interface.
+    const typeByName = new Map<string, ASTNode>();
+    for (const n of nodes) {
+      if (n.type === 'struct' || n.type === 'interface') {typeByName.set(n.name, n);}
+    }
+    for (let idx = nodes.length - 1; idx >= 0; idx--) {
+      const n = nodes[idx];
+      if (n.type !== 'method' || !n.parent) {continue;}
+      const owner = typeByName.get(n.parent);
+      if (owner && owner !== n && !owner.children.includes(n)) {
+        owner.children.push(n);
+        nodes.splice(idx, 1);
       }
     }
 

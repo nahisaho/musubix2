@@ -447,3 +447,58 @@ describe('v0.5.11 MCP tool wiring', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// v0.5.47 — sdd-core tools with optional parameters omitted, exercising their
+// `?? default` fallbacks. Scoped to sdd-core (the @musubix2/core package is
+// already loaded by its own tests, so this adds no coverage-denominator mass).
+// ---------------------------------------------------------------------------
+
+describe('sdd-core tools apply defaults when optional params are omitted', () => {
+  const core = (name: string) => findTool('sdd-core', name);
+
+  it('requirements.create defaults the id', async () => {
+    const r = await core('sdd.requirements.create').handler({ text: 'THE system SHALL log events.' });
+    expect(r.success).toBe(true);
+    expect((r.data as { id: string }).id).toBe('REQ-XXX-001');
+  });
+
+  it('requirements.validate tolerates object items and an empty list', async () => {
+    const r = await core('sdd.requirements.validate').handler({ requirements: [{ text: 'THE system SHALL run.' }, 'THE system SHALL stop.'] });
+    expect(r.success).toBe(true);
+    expect((r.data as { results: unknown[] }).results).toHaveLength(2);
+    const empty = await core('sdd.requirements.validate').handler({});
+    expect(empty.success).toBe(true);
+    expect((empty.data as { allValid: boolean }).allValid).toBe(true);
+  });
+
+  it('requirements.list defaults empty markdown', async () => {
+    const r = await core('sdd.requirements.list').handler({});
+    expect(r.success).toBe(true);
+    expect(r.data).toEqual([]);
+  });
+
+  it('design.generate fills missing requirement fields with defaults', async () => {
+    const r = await core('sdd.design.generate').handler({ requirements: [{}] });
+    expect(r.success).toBe(true);
+    expect((r.data as { sections: unknown[] }).sections.length).toBeGreaterThan(0);
+  });
+
+  it('design.verify accepts requirements with defaults', async () => {
+    const r = await core('sdd.design.verify').handler({ requirements: [{ id: 'REQ-AAA-001' }] });
+    expect(r.success).toBe(true);
+    expect((r.data as { score: number }).score).toBeGreaterThanOrEqual(0);
+  });
+
+  it('codegen.generate defaults templateType and name', async () => {
+    const r = await core('sdd.codegen.generate').handler({});
+    expect(r.success).toBe(true);
+    expect((r.data as { code: string }).code).toContain('Generated');
+  });
+
+  it('test.generate defaults the style to unit', async () => {
+    const r = await core('sdd.test.generate').handler({ code: 'export function f() {}' });
+    expect(r.success).toBe(true);
+    expect((r.data as { style: string }).style).toBe('unit');
+  });
+});
+
