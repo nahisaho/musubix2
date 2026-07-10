@@ -411,7 +411,7 @@ export class Z3Adapter {
     const start = Date.now();
 
     try {
-      if (smtScript.includes('(assert false)')) {
+      if (smtScript.includes('(assert false)') || this.hasBooleanContradiction(smtScript)) {
         return {
           status: 'unsat',
           time: Date.now() - start,
@@ -441,6 +441,32 @@ export class Z3Adapter {
         error: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  /**
+   * Detect a basic Boolean contradiction without a real solver: an atom that is
+   * *unconditionally* forced both true and false. Covers the common EARS cases —
+   * `SHALL X` (`(=> true X)` or `(assert X)`) versus `SHALL NOT X`
+   * (`(not X)`) — so `verify` flags e.g. "grant access" / "not grant access".
+   * Conditional assertions (`(=> cond X)` with cond ≠ true) are not forcing and
+   * are ignored. This is a sound-but-incomplete check (real z3 covers the rest).
+   */
+  private hasBooleanContradiction(smtScript: string): boolean {
+    const forced = new Map<string, boolean>();
+    let contradiction = false;
+    const set = (atom: string, value: boolean): void => {
+      if (forced.has(atom) && forced.get(atom) !== value) {contradiction = true;}
+      forced.set(atom, value);
+    };
+    for (const raw of smtScript.split('\n')) {
+      const line = raw.trim();
+      let m: RegExpExecArray | null;
+      if ((m = /^\(assert \(=> true \(not (\w+)\)\)\)$/.exec(line))) {set(m[1], false);}
+      else if ((m = /^\(assert \(=> true (\w+)\)\)$/.exec(line))) {set(m[1], true);}
+      else if ((m = /^\(assert \(not (\w+)\)\)$/.exec(line))) {set(m[1], false);}
+      else if ((m = /^\(assert (\w+)\)$/.exec(line))) {set(m[1], true);}
+    }
+    return contradiction;
   }
 }
 

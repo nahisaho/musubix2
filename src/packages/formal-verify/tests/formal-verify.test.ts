@@ -259,6 +259,23 @@ describe('DES-FV-001: PreconditionVerifier', () => {
     expect(result.conflicts).toHaveLength(0);
   });
 
+  // v0.5.63 — the mock solver flags a basic contradiction (an atom forced both
+  // true and false) even without a real z3 installed.
+  it('detects an unconditional contradiction without z3', async () => {
+    const grant: ParsedRequirement = {
+      id: 'REQ-ACC-001', title: 'Grant', text: 'THE system SHALL grant access.',
+      pattern: 'ubiquitous', action: 'grant access',
+    };
+    const deny: ParsedRequirement = {
+      id: 'REQ-ACC-002', title: 'Deny', text: 'THE system SHALL NOT grant access.',
+      pattern: 'unwanted', action: 'grant access',
+    };
+    const formulas = [converter.convert(grant).formula!, converter.convert(deny).formula!];
+    const result = await verifier.checkConsistency(formulas, solver);
+    expect(result.consistent).toBe(false);
+    expect(result.conflicts.length).toBeGreaterThan(0);
+  });
+
   it('should verify postcondition in valid context', async () => {
     const result = await verifier.verifyPostcondition('system initialized', {
       system: true,

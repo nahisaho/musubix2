@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.63] - 2026-07-11
+
+監査で見つかった 2 件を修正。
+
+### Fixed
+
+- **非ASCII（日本語）タイトルのコンポーネント名が空の `Service` になっていた** — 要件タイトルが日本語（例: 「クリック計測」）だと PascalCase 化で ASCII が残らず、コンポーネント名が単なる `Service` になっていた。**タイトルから ASCII が得られない場合は導出した操作名にフォールバック**するよう修正（「クリック計測」→ `RecordClickEventService`）
+- **モックソルバー（z3 未導入時）が明白な論理矛盾を検出できていなかった** — `THE system SHALL grant access` と `THE system SHALL NOT grant access` を両方含む要件が「consistent」と報告されていた。**同一アトムが無条件に真と偽の両方で assert される矛盾を検出**する健全（sound）なチェックを追加し、z3 なしでも `verify` が inconsistent（終了コード 1）を返すように。条件付き assert（`(=> cond X)`）は強制ではないため無視（完全ではないが健全 —— 残りは実 z3 が担う）
+
+### Tests
+
+- core: 非ASCII タイトルの命名フォールバック（`RecordClickEventService`）
+- formal-verify: z3 なしでの無条件矛盾検出（`grant` vs `not grant` → inconsistent）
+- 全 **1909 テスト**緑 / lint 0 errors / branch coverage 81.7% / clean `tsc -b`
+
 ## [0.5.62] - 2026-07-11
 
 ### Fixed

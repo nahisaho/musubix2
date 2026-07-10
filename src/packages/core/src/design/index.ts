@@ -312,8 +312,11 @@ export class DesignGenerator {
     if (reqs.length === 1) {
       const r = reqs[0];
       const sig = deriveMethodSignature(r.text, r.title);
-      const compName = this.pascal(r.title || sig.name) +
-        (/(service|manager|controller|repository)$/i.test(r.title) ? '' : 'Service');
+      // Prefer the title; fall back to the derived operation name when the title
+      // yields no ASCII (e.g. a Japanese title), so the name is never empty.
+      const base = this.pascal(r.title) || this.pascal(sig.name) || 'Component';
+      const compName = base +
+        (/(service|manager|controller|repository)$/i.test(base) ? '' : 'Service');
       return [{
         name: compName,
         responsibility: r.title || `Handle ${r.id}`,
@@ -373,10 +376,11 @@ export class DesignGenerator {
     return [...entities];
   }
 
+  /** PascalCase the ASCII words of a string; returns '' if none survive (e.g. a
+   * fully non-ASCII title), so callers can fall back to another name source. */
   private pascal(text: string): string {
-    const words = text.split(/[\s_\-,、]+/).filter(Boolean);
-    if (words.length === 0) {return 'Component';}
-    return words
+    return text
+      .split(/[\s_\-,、]+/)
       .map((w) => w.replace(/[^A-Za-z0-9]/g, ''))
       .filter(Boolean)
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))

@@ -117,6 +117,15 @@ describe('DesignGenerator — enriched sections (v0.5.45)', () => {
     expect(doc.sections[0].components[0].states).toEqual(['Running', 'Draining']);
   });
 
+  // v0.5.63 — a non-ASCII (e.g. Japanese) title must not yield an empty name.
+  it('falls back to the operation name when the title has no ASCII', () => {
+    const gen = new DesignGenerator();
+    const doc = gen.generate([
+      { id: 'REQ-STAT-001', title: 'クリック計測', text: 'WHEN a link is visited, THE system SHALL record a click event.', pattern: 'event-driven' },
+    ]);
+    expect(doc.sections[0].components[0].name).toBe('RecordClickEventService');
+  });
+
   it('uses the last word when a WHILE clause has no "is"', () => {
     const gen = new DesignGenerator();
     const doc = gen.generate([
