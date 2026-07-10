@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.56] - 2026-07-10
+
+RBAC/権限ドメイン（禁止・ロール条件が多い）で E2E ドッグフーディングを実施。新しい要件構造（`WHERE <条件>, SHALL NOT <動作>` の複合、ハイフン語 "re-authentication"、多数の prohibition）を通したが**ハードなバグは検出されず**、直近の修正（0.5.49〜0.5.55）でパイプラインが堅牢化したことを確認。その不変条件を統合テストとして固定化。
+
+### Tests（Article IX: Integration Testing）
+
+- **SDD パイプライン全体の統合テストを追加** — requirements → design → codegen → verify → trace を実際のハンドラで通し、4 ドメインの E2E で確立した不変条件を回帰から保護:
+  - ドメイン凝集（ACC×3 → 1 `AccService`）、Feature Toggle パターン（WHERE）
+  - codegen のトレーサビリティ コメント（`// Implements: REQ-`）
+  - **SMT の意味論**: `WHERE + SHALL NOT` → ガード付き否定 `(=> lacks_permission (not expose_resource))`、`IF-THEN` → 正の含意、単独 `SHALL NOT` → 否定
+  - trace 100% とシンボル単位の結合（同一サービスの要件のみ coupled）
+- RBAC E2E 検証: analyze 8/8、verify 全 SMT 正常（WHERE+SHALL NOT の複合含む）、trace 100%、security 0、test:gen 13
+- 全 **1893 テスト**緑 / lint 0 errors / branch coverage 81.7% / clean `tsc -b`
+
 ## [0.5.55] - 2026-07-10
 
 複数の E2E ドッグフーディングで確認されていた唯一の未対応（optional/WHERE の設計パターン欠落）を修正。
