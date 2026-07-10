@@ -487,3 +487,80 @@ describe('Integration: Interview to generation', () => {
     expect(doc.markdown).toContain('QAエンジニア');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// answer() — every question category maps into the context
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('RequirementsInterviewer — answer() applies each category', () => {
+  it('routes each question id to the matching context field', () => {
+    const iv = new RequirementsInterviewer();
+    iv.answer('stakeholders', 'PO, QA');
+    iv.answer('use-cases', 'ログイン, 検索');
+    iv.answer('performance', 'p95 < 100ms');
+    iv.answer('security', 'OAuth2');
+    iv.answer('scalability', '10k rps');
+    iv.answer('tech-stack', 'TypeScript, Node.js');
+    iv.answer('constraints', '予算, 期限');
+    iv.answer('integrations', 'Stripe, Slack');
+    const ctx = iv.getState().context;
+    expect(ctx.stakeholders).toEqual(['PO', 'QA']);
+    expect(ctx.useCases).toEqual(['ログイン', '検索']);
+    expect(ctx.performance).toBe('p95 < 100ms');
+    expect(ctx.security).toBe('OAuth2');
+    expect(ctx.scalability).toBe('10k rps');
+    expect(ctx.techStack).toEqual(['TypeScript', 'Node.js']);
+    expect(ctx.constraints).toEqual(['予算', '期限']);
+    expect(ctx.integrations).toEqual(['Stripe', 'Slack']);
+  });
+
+  it('ignores a blank answer without recording it', () => {
+    const iv = new RequirementsInterviewer();
+    iv.answer('security', '   ');
+    expect(iv.getState().context.security).toBeUndefined();
+  });
+
+  it('throws on an unknown question id', () => {
+    const iv = new RequirementsInterviewer();
+    expect(() => iv.answer('no-such-question', 'x')).toThrow(/Unknown question ID/);
+  });
+
+  it('completes once name, description, users and features are gathered', () => {
+    const iv = new RequirementsInterviewer();
+    expect(iv.isReadyToGenerate()).toBe(false);
+    iv.answer('project-name', 'Ready');
+    iv.answer('project-description', 'A complete-enough project description here.');
+    iv.answer('target-users', 'Devs');
+    iv.answer('main-features', 'Feature A, Feature B');
+    expect(iv.isReadyToGenerate()).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// analyzeInput() — labelled fields are extracted from free text
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('RequirementsInterviewer — analyzeInput extracts labelled fields', () => {
+  it('pulls users, features, tech, integrations, security and performance', () => {
+    const iv = new RequirementsInterviewer();
+    iv.analyzeInput(
+      [
+        'プロジェクト名: LabelExtract',
+        '概要: ラベル付きフィールドを抽出できることを検証するプロジェクトです。',
+        'ユーザー: 管理者, 一般ユーザー',
+        '機能: 登録, 検索, 通知',
+        '技術: TypeScript, PostgreSQL',
+        '連携: Stripe, SendGrid',
+        'セキュリティ: TLS必須',
+        'パフォーマンス: 応答200ms以内',
+      ].join('\n'),
+    );
+    const ctx = iv.getState().context;
+    expect(ctx.targetUsers).toContain('管理者');
+    expect(ctx.features?.map((f) => f.name)).toContain('登録');
+    expect(ctx.techStack).toContain('TypeScript');
+    expect(ctx.integrations).toContain('Stripe');
+    expect(ctx.security).toContain('TLS');
+    expect(ctx.performance).toContain('200ms');
+  });
+});
