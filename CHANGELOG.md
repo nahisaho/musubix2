@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.48] - 2026-07-10
+
+これまで CLI から使えなかった 3 パッケージを **CLI サブコマンドとして公開**（憲法 Article II: CLI Interface Mandate に適合）。ユーザーが直接利用できるようになった。
+
+### Added — 3 つの新コマンド
+
+- **`musubix search <query> [--corpus <dir>] [--top <n>]`**（neural-search）
+  コーパス内の文書を TF-IDF でランク付けするセマンティック検索。0.5.47 で修正した精度改善により、共通語を持たない文書は類似度 0 で正しく下位に。
+  例: `musubix search "redis cache" --corpus docs/`
+- **`musubix verify <requirements.md>`**（formal-verify）
+  EARS 要件を SMT-LIB2 に変換し、論理整合性を検証。各要件から action/trigger/condition を抽出して `(assert …)` 式を生成し、全体の consistency をチェック（z3 未導入時は mock ソルバーにフォールバック）。
+  例: `WHEN … SHALL issue a session token` → `(assert (=> … issue_a_session_token))`
+- **`musubix dfg <file> [--unused]`**（dfg）
+  簡易 JS/TS データフロー解析。宣言・代入・return・呼び出しから DFG を構築し、**未使用の定義（デッドストア）**を検出。
+  例: `const dead = 99;`（以降未使用）→ `Unused definitions (1): - dead (line 3)`
+
+### Tests
+
+- musubi: search のランキング（無関係文書 0）、verify の SMT 変換＋整合性、dfg の未使用定義検出、各コマンドの引数バリデーション
+- 全 **1819 テスト**緑 / lint 0 errors / branch coverage 80.4% / clean `tsc -b`
+
 ## [0.5.47] - 2026-07-10
 
 0.5.46 で挙げた残タスク 3 件を実施。CodeGraph の Go パーサ精度、未ドッグフーディング パッケージ（neural-search 他）、MCP catalog のテストカバレッジ。

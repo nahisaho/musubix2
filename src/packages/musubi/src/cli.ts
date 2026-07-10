@@ -204,6 +204,18 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     usage: 'musubix2 mcp [--transport stdio|sse] [--port 3100]',
     description: 'MCP サーバー起動',
   },
+  search: {
+    usage: 'musubix search <query> [--corpus <dir>] [--top <n>]',
+    description: 'TF-IDF セマンティック検索（コーパス内の文書をランク付け）',
+  },
+  verify: {
+    usage: 'musubix verify <requirements.md>',
+    description: 'EARS 要件を SMT に変換し論理整合性を検証（formal-verify）',
+  },
+  dfg: {
+    usage: 'musubix dfg <file> [--unused]',
+    description: 'データフロー解析（定義・使用・到達定義、未使用変数の検出）',
+  },
 };
 
 /**
@@ -3582,6 +3594,225 @@ async function reqAction(args: Record<string, unknown>): Promise<ExitCodeValue |
   return await handleReqValidate(filePath);
 }
 
+// ── Semantic search (neural-search) ────────────────────────────────────────
+
+/** File extensions treated as searchable documents. */
+const SEARCH_EXTS = new Set([
+  'ts', 'js', 'py', 'go', 'rs', 'java', 'rb', 'php', 'c', 'cpp', 'cs',
+  'md', 'txt', 'rst', 'json', 'yaml', 'yml',
+]);
+
+export async function handleSearch(
+  query: string | undefined,
+  flags: Record<string, unknown> = {},
+): Promise<ExitCodeValue> {
+  if (!query) {
+    console.error('❌ Usage: musubix search <query> [--corpus <dir>] [--top <n>]');
+    return ExitCode.VALIDATION_ERROR;
+  }
+  try {
+    const { createNeuralSearchEngine, createTfIdfEmbeddingModel } = await import('@musubix2/neural-search');
+    const corpus = (flags['corpus'] as string | undefined) ?? '.';
+    const topK = flags['top'] ? Math.max(1, parseInt(String(flags['top']), 10) || 5) : 5;
+    if (!existsSync(corpus)) {
+      console.error(`❌ Corpus not found: ${corpus}`);
+      return ExitCode.GENERAL_ERROR;
+    }
+    const files = collectFiles(corpus, (ext) => SEARCH_EXTS.has(ext));
+    if (files.length === 0) {
+      console.error(`❌ No searchable documents under: ${corpus}`);
+      return ExitCode.GENERAL_ERROR;
+    }
+    const docs: Array<{ id: string; text: string }> = [];
+    for (const f of files) {
+      try {
+        docs.push({ id: f, text: readFileSync(f, 'utf-8') });
+      } catch {
+        /* skip unreadable file */
+      }
+    }
+    const model = createTfIdfEmbeddingModel();
+    model.fit(docs.map((d) => d.text));
+    const engine = createNeuralSearchEngine();
+    for (const d of docs) {
+      engine.addDocument(d.id, await model.embed(d.text), {});
+    }
+    const hits = engine.search(await model.embed(query), topK);
+    console.log(`Top ${hits.length} result(s) for "${query}" (corpus: ${corpus}, ${docs.length} docs):`);
+    if (hits.every((h) => h.score === 0)) {
+      console.log('  (no document shares any term with the query)');
+    }
+    for (const h of hits) {
+      console.log(`  ${h.score.toFixed(3)}  ${h.id}`);
+    }
+    return ExitCode.SUCCESS;
+  } catch (err) {
+    console.error(`❌ ${err instanceof Error ? err.message : String(err)}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+// ── Formal verification (formal-verify) ────────────────────────────────────
+
+/** Extract action/trigger/condition from an EARS sentence for SMT conversion. */
+function toFormalRequirement(r: { id: string; title: string; text: string; pattern?: string }): {
+  id: string; title: string; text: string; pattern: string; action: string; trigger?: string; condition?: string;
+} {
+  const text = r.text;
+  const actionMatch = /\bSHALL\s+(?:NOT\s+)?(.+?)[.。]?\s*$/i.exec(text);
+  const action = (actionMatch?.[1] ?? r.title ?? 'act').trim();
+  const trigger = /\bWHEN\s+(.+?)[,，]/i.exec(text)?.[1]?.trim();
+  const condition =
+    /\b(?:WHILE|IF|WHERE)\s+(.+?)[,，]/i.exec(text)?.[1]?.trim();
+  return { id: r.id, title: r.title, text, pattern: r.pattern ?? 'ubiquitous', action, trigger, condition };
+}
+
+export async function handleVerify(filePath: string | undefined): Promise<ExitCodeValue> {
+  if (!filePath) {
+    console.error('❌ Usage: musubix verify <requirements.md>');
+    return ExitCode.VALIDATION_ERROR;
+  }
+  try {
+    if (!existsSync(filePath)) {
+      console.error(`❌ Path not found: ${filePath}`);
+      return ExitCode.GENERAL_ERROR;
+    }
+    const { createEarsToSmtConverter, createZ3Adapter, createPreconditionVerifier } =
+      await import('@musubix2/formal-verify');
+    const content = readFileSync(filePath, 'utf-8');
+    const parsed = new MarkdownEARSParser().parse(content);
+    if (parsed.length === 0) {
+      console.log(`No EARS requirements found in ${filePath}.`);
+      return ExitCode.SUCCESS;
+    }
+    const converter = createEarsToSmtConverter();
+    const solver = createZ3Adapter();
+    const formulas = [];
+    console.log(`Formal verification of ${parsed.length} requirement(s) in ${filePath}:`);
+    for (const r of parsed) {
+      const req = toFormalRequirement(r);
+      const conv = converter.convert(req as Parameters<typeof converter.convert>[0]);
+      if (conv.success && conv.formula) {
+        formulas.push(conv.formula);
+        console.log(`  ✓ ${r.id} [${req.pattern}] → ${conv.formula.assertions.join(' ')}`);
+      } else {
+        console.log(`  ✗ ${r.id} [${req.pattern}] → ${conv.error ?? 'conversion failed'}`);
+      }
+    }
+    const verifier = createPreconditionVerifier();
+    const check = await verifier.checkConsistency(formulas, solver);
+    if (check.consistent) {
+      console.log(`\n✅ The ${formulas.length} formalised requirement(s) are logically consistent (solver: ${solver.getVersion()}).`);
+      return ExitCode.SUCCESS;
+    }
+    console.log(`\n⚠ Requirements are inconsistent — ${check.conflicts.length} conflict(s):`);
+    for (const c of check.conflicts) {
+      console.log(`  - ${c.explanation}`);
+    }
+    return ExitCode.GENERAL_ERROR;
+  } catch (err) {
+    console.error(`❌ ${err instanceof Error ? err.message : String(err)}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
+// ── Data-flow analysis (dfg) ───────────────────────────────────────────────
+
+/** JS/TS identifiers referenced on the right-hand side of a statement. */
+function usedIdentifiers(expr: string): string[] {
+  const ids = new Set<string>();
+  for (const m of expr.matchAll(/\b([A-Za-z_$][\w$]*)\b(?!\s*:)/g)) {
+    const id = m[1];
+    if (!DFG_KEYWORDS.has(id)) {ids.add(id);}
+  }
+  return [...ids];
+}
+const DFG_KEYWORDS = new Set([
+  'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while',
+  'true', 'false', 'null', 'undefined', 'new', 'await', 'async', 'typeof',
+  'this', 'void', 'in', 'of', 'instanceof',
+]);
+
+/** Best-effort extraction of simple statements from JS/TS source for the DFG. */
+function extractSimpleStatements(source: string): Array<Record<string, unknown>> {
+  const stmts: Array<Record<string, unknown>> = [];
+  const lines = source.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim().replace(/;$/, '');
+    const lineNum = i + 1;
+    if (line === '' || line.startsWith('//')) {continue;}
+
+    const decl = /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(.+)$/.exec(line);
+    if (decl) {
+      stmts.push({ type: 'declaration', line: lineNum, variable: decl[1], value: decl[2], usedVariables: usedIdentifiers(decl[2]) });
+      continue;
+    }
+    const ret = /^return\s+(.+)$/.exec(line);
+    if (ret) {
+      stmts.push({ type: 'return', line: lineNum, usedVariables: usedIdentifiers(ret[1]) });
+      continue;
+    }
+    const assign = /^([A-Za-z_$][\w$]*)\s*=\s*(.+)$/.exec(line);
+    if (assign && !line.includes('==')) {
+      stmts.push({ type: 'assignment', line: lineNum, variable: assign[1], value: assign[2], usedVariables: usedIdentifiers(assign[2]) });
+      continue;
+    }
+    const call = /^([A-Za-z_$][\w$.]*)\s*\((.*)\)$/.exec(line);
+    if (call) {
+      stmts.push({ type: 'call', line: lineNum, usedVariables: usedIdentifiers(call[2]) });
+    }
+  }
+  return stmts;
+}
+
+export async function handleDfg(
+  filePath: string | undefined,
+  flags: Record<string, unknown> = {},
+): Promise<ExitCodeValue> {
+  if (!filePath) {
+    console.error('❌ Usage: musubix dfg <file> [--unused]');
+    return ExitCode.VALIDATION_ERROR;
+  }
+  try {
+    if (!existsSync(filePath)) {
+      console.error(`❌ Path not found: ${filePath}`);
+      return ExitCode.GENERAL_ERROR;
+    }
+    const { createDataFlowAnalyzer } = await import('@musubix2/dfg');
+    const source = readFileSync(filePath, 'utf-8');
+    const statements = extractSimpleStatements(source);
+    if (statements.length === 0) {
+      console.log(`No analyzable statements found in ${filePath} (supports simple JS/TS).`);
+      return ExitCode.SUCCESS;
+    }
+    const analyzer = createDataFlowAnalyzer();
+    const dfg = analyzer.buildDFG(statements as never, filePath);
+    console.log(`Data-flow graph for ${filePath}: ${dfg.nodes.length} node(s), ${dfg.edges.length} edge(s).`);
+
+    // A definition is a `variable` node; it is used iff a `def-use` edge starts
+    // from it. Definitions with no such edge are potential dead stores.
+    const defs = dfg.nodes.filter((n) => n.type === 'variable');
+    const usedDefIds = new Set(dfg.edges.filter((e) => e.type === 'def-use').map((e) => e.from));
+    const unused = defs.filter((d) => !usedDefIds.has(d.id));
+    if (flags['unused']) {
+      if (unused.length === 0) {
+        console.log('No unused definitions found.');
+      } else {
+        console.log(`Unused definitions (${unused.length}):`);
+        for (const u of unused) {
+          console.log(`  - ${u.name}${u.line ? ` (line ${u.line})` : ''}`);
+        }
+      }
+    } else {
+      console.log(`Definitions: ${defs.length}, unused: ${unused.length} (use --unused to list).`);
+    }
+    return ExitCode.SUCCESS;
+  } catch (err) {
+    console.error(`❌ ${err instanceof Error ? err.message : String(err)}`);
+    return ExitCode.GENERAL_ERROR;
+  }
+}
+
 export function getDefaultCommands(): CLICommand[] {
   return [
     {
@@ -4064,6 +4295,43 @@ export function getDefaultCommands(): CLICommand[] {
         const transport = (args['transport'] as string) === 'sse' ? 'sse' as const : 'stdio' as const;
         const port = typeof args['port'] === 'string' ? parseInt(args['port'], 10) : undefined;
         await launcher.start({ transport, port });
+      },
+    },
+    {
+      name: 'search',
+      description: 'TF-IDF semantic search over a corpus',
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('search'));
+          return;
+        }
+        const positionalArgs = (args['args'] as string[] | undefined) ?? [];
+        const query = (args['subcommand'] as string | undefined) ?? positionalArgs[0];
+        return await handleSearch(query, args);
+      },
+    },
+    {
+      name: 'verify',
+      description: 'Formally verify EARS requirements (EARS → SMT → consistency)',
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('verify'));
+          return;
+        }
+        const file = resolveTarget(args, ['verify']);
+        return await handleVerify(file);
+      },
+    },
+    {
+      name: 'dfg',
+      description: 'Data-flow analysis (definitions, uses, unused variables)',
+      action: async (args) => {
+        if (args['help'] === true || args['h'] === true) {
+          console.log(showHelp('dfg'));
+          return;
+        }
+        const file = resolveTarget(args, ['analyze']);
+        return await handleDfg(file, args);
       },
     },
   ];
