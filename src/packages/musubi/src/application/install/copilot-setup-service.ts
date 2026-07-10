@@ -63,11 +63,24 @@ export class CopilotSetupService {
   }
 
   private readAsset(pkgRoot: string, entry: AssetEntry): string {
-    const fullPath = resolve(pkgRoot, entry.sourcePath.replace(/^\./, ''));
-    try {
-      return readFileSync(fullPath, 'utf-8');
-    } catch {
-      return `# ${entry.skillName}\n\n_Asset not found during packaging._\n`;
+    const staged = entry.sourcePath.replace(/^\./, ''); // "..github/…" → ".github/…"
+    // Prefer the staged package asset (populated at publish); fall back to the
+    // monorepo source so a locally-built bin still ships real skill content.
+    // Claude skills are derived from .github/skills at staging time, so also
+    // map a .claude/skills source back to .github/skills for the dev fallback.
+    const githubRel = staged.replace(/^\.claude\/skills\//, '.github/skills/');
+    const candidates = [
+      resolve(pkgRoot, staged),
+      resolve(pkgRoot, '..', '..', staged),
+      resolve(pkgRoot, '..', '..', githubRel),
+    ];
+    for (const p of candidates) {
+      try {
+        return readFileSync(p, 'utf-8');
+      } catch {
+        /* try the next candidate */
+      }
     }
+    return `# ${entry.skillName}\n\n_Asset not found during packaging._\n`;
   }
 }

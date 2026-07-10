@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.61] - 2026-07-10
+
+### Fixed
+
+- **ローカル ビルドの `init --platform` が空のスキルを生成する開発体験の問題を修正** — スキル資産はパッケージ内のステージ済みパス（`prepublishOnly` の `copy-assets` で配置）からのみ読まれていた。公開版は正常だが、ローカルでビルドしたバイナリで dogfooding すると `.claude/skills/*/SKILL.md` が `_Asset not found during packaging._` の空スタブになっていた。`readAsset` にモノレポ ソース（`src/.github/skills/`）へのフォールバックを追加し、ステージ済み資産が無くても実スキル内容を配置するよう修正:
+  - 探索順: ①ステージ済み（公開版・高速パス）→ ②リポジトリ ソース（同一相対パス）→ ③`.claude/skills/…` を `.github/skills/…` にマップ（Claude スキルは `.github/skills` から派生生成されるため）
+  - **公開版の挙動は不変**（①が最初にヒット）。ローカル `init` が本物のスキル（orchestrator 454 行等）を配置するようになった
+  - 注: 公開済み `musubix2@0.5.60` の `npx … init --platform claude` は元々正常（本修正はローカル/ソース ビルドの開発体験向上）
+
+### Tests
+
+- 全 **1906 テスト**緑 / lint 0 errors / branch coverage 81.7% / clean `tsc -b`
+
 ## [0.5.60] - 2026-07-10
 
 開発ガイド作成中のドッグフーディングで発見した `init` の重大バグを修正。
