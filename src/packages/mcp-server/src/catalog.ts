@@ -406,11 +406,17 @@ function knowledgeTools(): CatalogEntry[] {
           const { createKnowledgeStore } = await import('@musubix2/knowledge');
           const store = createKnowledgeStore(params['basePath'] as string ?? '.knowledge');
           await store.load();
+          // Relation fields are source/target (not from/to) and need an id;
+          // the old from/to shape left relations invisible to traverse().
+          const relFrom = params['from'] as string;
+          const relTo = params['to'] as string;
+          const relType = params['type'] as RelationType;
           store.addRelation({
-            from: params['from'] as string,
-            to: params['to'] as string,
-            type: params['type'] as RelationType,
-          } as any);
+            id: `${relFrom}-${relType}-${relTo}`,
+            source: relFrom,
+            target: relTo,
+            type: relType,
+          });
           await store.save();
           return ok({ from: params['from'], to: params['to'], type: params['type'], added: true });
         } catch (err) {

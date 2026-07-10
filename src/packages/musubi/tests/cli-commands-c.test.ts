@@ -15,7 +15,7 @@ import {
 } from '../src/cli.js';
 import { ExitCode } from '@musubix2/core';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -138,6 +138,28 @@ describe('CLI Commands C — Knowledge', () => {
     const code = await handleKnowledge(undefined, [], {});
     expect(code).toBe(ExitCode.SUCCESS);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Usage'));
+  });
+
+  // v0.5.68 — a linked relation must be traversable. Previously the link
+  // handler stored {from,to} (via `as any`) instead of {id,source,target},
+  // so relations were invisible to traverse().
+  it('links entities and traverses the relation (multi-hop)', async () => {
+    const base = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_know_link');
+    rmSync(base, { recursive: true, force: true });
+    const flags = { path: base };
+    await handleKnowledge('put', ['A', 'entity', 'NodeA'], flags);
+    await handleKnowledge('put', ['B', 'entity', 'NodeB'], flags);
+    await handleKnowledge('put', ['C', 'entity', 'NodeC'], flags);
+    expect(await handleKnowledge('link', ['A', 'depends_on', 'B'], flags)).toBe(ExitCode.SUCCESS);
+    await handleKnowledge('link', ['B', 'depends_on', 'C'], flags);
+
+    logSpy.mockClear();
+    expect(await handleKnowledge('traverse', ['A'], flags)).toBe(ExitCode.SUCCESS);
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(out).toContain('3 nodes'); // A → B → C
+    expect(out).toContain('B (entity)');
+    expect(out).toContain('C (entity)');
+    rmSync(base, { recursive: true, force: true });
   });
 });
 

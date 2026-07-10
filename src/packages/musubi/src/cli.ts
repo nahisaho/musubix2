@@ -3157,7 +3157,14 @@ export async function handleKnowledge(
         console.error('❌ Usage: musubix knowledge link <from> <rel> <to>');
         return ExitCode.GENERAL_ERROR;
       }
-      await store.addRelation({ from, to, type: rel as RelationType } as any);
+      // Relation fields are source/target (not from/to); an id is required.
+      // Passing from/to left relations invisible to traverse()/getRelations().
+      await store.addRelation({
+        id: `${from}-${rel}-${to}`,
+        source: from,
+        target: to,
+        type: rel as RelationType,
+      });
       await store.save();
       console.log(`✅ Linked: ${from} —[${rel}]→ ${to}`);
       return ExitCode.SUCCESS;

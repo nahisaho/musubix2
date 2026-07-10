@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.68] - 2026-07-11
+
+dogfooding 実装テストで、知識グラフのリレーションが CLI/MCP 経由で壊れて保存される不具合を発見・修正。
+
+### Fixed
+
+- **`knowledge link` で作成したリレーションが `traverse` で辿れない** — CLI と MCP サーバーの両方が、リレーションを `{from, to, type}`（`as any` キャストで型エラーを握りつぶし）として保存していた。実際の `Relation` 型は `{id, source, target, type}` であり、`getRelations`/`traverse` は `source`/`target` を参照するため、保存されたリレーションはすべて不可視となり、`knowledge traverse` が始点ノード 1 件しか返さなかった。正しいフィールド名（＋安定した `id`）で保存するよう両方を修正。これによりリンクした先のノードまで多段でトラバースできるようになった
+
+`verify` の矛盾検出（無条件の `SHALL X` と `SHALL NOT X`）が正しく `inconsistent` を報告することも確認済み。
+
 ## [0.5.67] - 2026-07-11
 
 dogfooding 実装テストで、CodeGraph のフラグメント照合がディレクトリ接頭辞に誤反応する不具合を発見・修正。
