@@ -13,7 +13,7 @@ import {
   createCLIDispatcher,
 } from '../src/cli.js';
 import { ExitCode } from '@musubix2/core';
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const FIXTURE_DIR = join(import.meta.dirname ?? '.', '__fixtures_a__');
@@ -138,6 +138,18 @@ describe('handleDesignC4', () => {
     const file = join(FIXTURE_DIR, 'plain-c4.txt');
     writeFileSync(file, 'just some prose, no model and no requirements');
     expect(await handleDesignC4(file)).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
+  // v0.5.42 — SDD pipeline: `design generate --out` writes an artifact that
+  // both `design verify` and `design:c4` consume.
+  it('design generate --out writes an artifact usable by verify and c4', async () => {
+    const reqs = join(FIXTURE_DIR, 'e2e-reqs.md');
+    writeFileSync(reqs, '## REQ-AUT-001: Auth\n**要件**: The system shall authenticate users.\n');
+    const out = join(FIXTURE_DIR, 'e2e-design.json');
+    expect(await handleDesignGenerate(reqs, out)).toBe(ExitCode.SUCCESS);
+    expect(existsSync(out)).toBe(true);
+    expect(await handleDesignVerify(out)).toBe(ExitCode.SUCCESS); // reads sections
+    expect(await handleDesignC4(out, 'container')).toBe(ExitCode.SUCCESS); // reads elements
   });
 });
 

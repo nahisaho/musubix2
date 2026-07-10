@@ -117,8 +117,8 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: '要件分析',
   },
   design: {
-    usage: 'musubix design <generate|verify> [options]',
-    description: '設計生成',
+    usage: 'musubix design generate <requirements.md> [--out <design.json>] | musubix design verify <design.json>',
+    description: '設計生成 (--out で再利用可能な JSON 成果物を書き出し design:verify / design:c4 へ連携)',
   },
   codegen: {
     usage: 'musubix codegen [generate] <name> [--type class|interface|function|...]',
@@ -2449,7 +2449,10 @@ export async function handleReqInterview(args: Record<string, unknown>): Promise
   }
 }
 
-export async function handleDesignGenerate(filePath: string): Promise<ExitCodeValue> {
+export async function handleDesignGenerate(
+  filePath: string,
+  outPath?: string,
+): Promise<ExitCodeValue> {
   try {
     const content = readFileSync(filePath, 'utf-8');
     const parser = new MarkdownEARSParser();
@@ -2462,6 +2465,18 @@ export async function handleDesignGenerate(filePath: string): Promise<ExitCodeVa
       pattern: r.pattern ?? 'ubiquitous',
     }));
     const design = generator.generate(mapped);
+    if (outPath) {
+      // Write a reusable JSON design artifact. It carries the DesignDocument
+      // (`sections`, consumed by `design:verify`) plus a derived C4 model
+      // (`elements`/`relationships`, consumed by `design:c4`), so the SDD
+      // pipeline can flow requirements → design → verify/c4.
+      const c4 = deriveC4FromRequirements(content);
+      const artifact = { ...design, elements: c4.elements, relationships: c4.relationships };
+      writeFileSync(outPath, JSON.stringify(artifact, null, 2) + '\n', 'utf-8');
+      console.log(`✅ Wrote design artifact: ${outPath} (${design.sections.length} section(s))`);
+      console.log(`   Next: musubix design:verify ${outPath}  |  musubix design:c4 ${outPath}`);
+      return ExitCode.SUCCESS;
+    }
     console.log(`Design: ${design.title} (v${design.version})`);
     for (const section of design.sections) {
       console.log(`\n## ${section.title}`);
@@ -3543,10 +3558,10 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const filePath = resolveTarget(args, ['generate']);
         if (!filePath) {
-          console.error('❌ Usage: musubix design [generate] <requirements-file>');
+          console.error('❌ Usage: musubix design [generate] <requirements-file> [--out <design.json>]');
           return ExitCode.VALIDATION_ERROR;
         }
-        return await handleDesignGenerate(filePath);
+        return await handleDesignGenerate(filePath, args['out'] as string | undefined);
       },
     },
     {

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.42] - 2026-07-10
+
+SDD の end-to-end フロー検証。`design generate` の出力が下流（`design:verify` / `design:c4`）に渡せず**パイプラインが設計工程で途切れていた**問題を解消。
+
+### Added
+
+- **`design generate <requirements.md> --out <design.json>`** — 再利用可能な JSON 設計成果物を書き出し。成果物は `DesignDocument`（`sections` — `design:verify` が読む）と、要件から導出した C4 モデル（`elements`/`relationships` — `design:c4` が読む）を併せ持つため、**単一ファイルで両方の下流コマンドに連携可能**
+- `--out` 省略時は従来どおり Markdown を標準出力
+
+### Impact（パイプライン疎通）
+
+- `requirements analyze` → `design generate --out design.json` → `design verify design.json`（SOLID 100/100）→ `design:c4 design.json`（Mermaid C4）が一気通貫で動作
+- 従来は `design generate` が標準出力に Markdown を出すだけで、`design:verify`/`design:c4` が要求する JSON 成果物を生成できず、手動での橋渡しも不可能だった
+
+### Tests
+
+- musubi: `design generate --out` の成果物が `design:verify` と `design:c4` の両方で消費可能なことを検証（e2e）
+
 ## [0.5.41] - 2026-07-10
 
 `decisions` / `deep-research` / `skills` を dogfooding し、3 つのスタブ／未配線を実装。
