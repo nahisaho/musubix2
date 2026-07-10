@@ -139,7 +139,7 @@ export class TfIdfEmbeddingModel implements IEmbeddingModel {
     const tokens = tokenize(text);
     const vec = new Array<number>(this.dimensions).fill(0);
 
-    if (tokens.length === 0) return vec;
+    if (tokens.length === 0) {return vec;}
 
     // Compute term frequencies
     const tf = new Map<string, number>();

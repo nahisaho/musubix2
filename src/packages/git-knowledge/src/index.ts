@@ -91,7 +91,7 @@ const LOG_FORMAT = `${COMMIT_DELIMITER}%n%H%n%an%n%ae%n%aI%n%s`;
 
 function parseNumstatLine(line: string): GitFileChange | null {
   const match = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
-  if (!match) return null;
+  if (!match) {return null;}
 
   const additions = match[1] === '-' ? 0 : parseInt(match[1], 10);
   const deletions = match[2] === '-' ? 0 : parseInt(match[2], 10);
@@ -140,7 +140,7 @@ export class GitLogParser {
     const args = ['log', `--format=${LOG_FORMAT}`, '--numstat'];
 
     if (this.config.maxCommits) {
-      args.push(`-n`, `${this.config.maxCommits}`);
+      args.push('-n', `${this.config.maxCommits}`);
     }
     if (this.config.since) {
       args.push(`--since=${this.config.since}`);
@@ -159,7 +159,7 @@ export class GitLogParser {
 
     for (const block of blocks) {
       const lines = block.split('\n').filter((l) => l !== '');
-      if (lines.length < 4) continue;
+      if (lines.length < 4) {continue;}
 
       const hash = lines[0].trim();
       const author = lines[1].trim();
@@ -242,7 +242,7 @@ export class GitLogParser {
     const args = ['log', `--format=${LOG_FORMAT}`, '--numstat', '--follow', '--', filePath];
 
     if (this.config.maxCommits) {
-      args.splice(1, 0, `-n`, `${this.config.maxCommits}`);
+      args.splice(1, 0, '-n', `${this.config.maxCommits}`);
     }
 
     const { stdout } = await execFile('git', args, { cwd: this.config.repoPath });
@@ -288,7 +288,7 @@ export class GitLogParser {
   }
 
   private filterFiles(files: GitFileChange[]): GitFileChange[] {
-    if (!this.config.excludePaths?.length) return files;
+    if (!this.config.excludePaths?.length) {return files;}
     return files.filter(
       (f) => !this.config.excludePaths!.some((ex) => f.path.startsWith(ex)),
     );
@@ -516,10 +516,10 @@ export class GitKnowledgeBuilder {
 
   private extractFeature(message: string): string | null {
     const prefixMatch = message.match(/^(?:feat|feature|add|implement)\s*[:(]\s*(.+?)\s*\)?$/i);
-    if (prefixMatch) return prefixMatch[1];
+    if (prefixMatch) {return prefixMatch[1];}
 
     const scopeMatch = message.match(/^(?:feat|feature)\(([^)]+)\):\s*(.+)$/i);
-    if (scopeMatch) return scopeMatch[2].trim();
+    if (scopeMatch) {return scopeMatch[2].trim();}
 
     return null;
   }

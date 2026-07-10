@@ -272,17 +272,17 @@ function stripCommentsAndStrings(source: string, language: SupportedLanguage): s
     const next = i + 1 < n ? source[i + 1] : '';
     // line comment
     if (c === '/' && next === '/') {
-      while (i < n && source[i] !== '\n') i++;
+      while (i < n && source[i] !== '\n') {i++;}
       continue;
     }
     if (hashComments && c === '#') {
-      while (i < n && source[i] !== '\n') i++;
+      while (i < n && source[i] !== '\n') {i++;}
       continue;
     }
     // block comment
     if (c === '/' && next === '*') {
       i += 2;
-      while (i < n && !(source[i] === '*' && source[i + 1] === '/')) i++;
+      while (i < n && !(source[i] === '*' && source[i + 1] === '/')) {i++;}
       i += 2;
       continue;
     }
@@ -291,7 +291,7 @@ function stripCommentsAndStrings(source: string, language: SupportedLanguage): s
       const quote = c;
       i++;
       while (i < n && source[i] !== quote) {
-        if (source[i] === '\\') i++; // skip escaped char
+        if (source[i] === '\\') {i++;} // skip escaped char
         i++;
       }
       i++;
@@ -366,7 +366,7 @@ export class ASTParser {
     const nextNonEmptyIsBrace = (from: number): boolean => {
       for (let j = from; j < lines.length && j < from + 3; j++) {
         const t = lines[j].trim();
-        if (t === '') continue;
+        if (t === '') {continue;}
         return t.startsWith('{');
       }
       return false;
@@ -445,7 +445,7 @@ export class ASTParser {
 
     for (const statement of sourceFile.statements) {
       const node = this.visitTsNode(statement, sourceFile);
-      if (node) nodes.push(node);
+      if (node) {nodes.push(node);}
     }
 
     return nodes;
@@ -595,7 +595,7 @@ export class ASTParser {
     let m: RegExpExecArray | null;
     while ((m = re.exec(cleaned)) !== null) {
       const name = m[1];
-      if (!KW.has(name)) out.add(name);
+      if (!KW.has(name)) {out.add(name);}
     }
     return [...out];
   }

@@ -94,7 +94,7 @@ export class RequirementsDocGenerator {
     const earsText = this.buildEARSText(pattern, feature.name, feature.description);
     const acceptanceCriteria = [
       `- [ ] ${feature.name} が正常に動作すること`,
-      `- [ ] エラー時に適切なメッセージが表示されること`,
+      '- [ ] エラー時に適切なメッセージが表示されること',
       '- [ ] テストが作成されていること',
     ];
     const markdown = this.formatReqMarkdown(id, feature.name, earsText, pattern, acceptanceCriteria, feature.priority);
@@ -153,10 +153,10 @@ export class RequirementsDocGenerator {
     }
     const text = `${feature.name} ${feature.description}`.toLowerCase();
 
-    if (/\b(when|event|trigger|イベント|トリガー)\b/.test(text)) return 'event-driven';
-    if (/\b(while|state|状態|モード)\b/.test(text)) return 'state-driven';
-    if (/\b(not|禁止|しない|制限|error|エラー)\b/.test(text)) return 'unwanted';
-    if (/\b(if|optional|オプション|有効)\b/.test(text)) return 'optional';
+    if (/\b(when|event|trigger|イベント|トリガー)\b/.test(text)) {return 'event-driven';}
+    if (/\b(while|state|状態|モード)\b/.test(text)) {return 'state-driven';}
+    if (/\b(not|禁止|しない|制限|error|エラー)\b/.test(text)) {return 'unwanted';}
+    if (/\b(if|optional|オプション|有効)\b/.test(text)) {return 'optional';}
     return 'ubiquitous';
   }
 

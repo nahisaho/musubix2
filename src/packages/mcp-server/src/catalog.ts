@@ -214,7 +214,7 @@ function sddCoreTools(): CatalogEntry[] {
           const covered = new Set<string>();
           for (const s of sources) {
             for (const m of (s.code ?? '').matchAll(refRe)) {
-              if (reqIds.includes(m[0])) covered.add(m[0]);
+              if (reqIds.includes(m[0])) {covered.add(m[0]);}
             }
           }
           const gaps = reqIds.filter((r) => !covered.has(r));
@@ -379,7 +379,7 @@ function knowledgeTools(): CatalogEntry[] {
           const store = createKnowledgeStore(params['basePath'] as string ?? '.knowledge');
           await store.load();
           const deleted = await store.deleteEntity(params['id'] as string);
-          if (deleted) await store.save();
+          if (deleted) {await store.save();}
           return ok({ id: params['id'], deleted });
         } catch (err) {
           return fail(err instanceof Error ? err.message : String(err));
@@ -801,7 +801,7 @@ function sourceOf(params: Record<string, unknown>): string {
 }
 function severityOf(findings: Array<{ severity?: string }>): string {
   const order = ['critical', 'high', 'medium', 'low', 'info'];
-  for (const s of order) if (findings.some((f) => f.severity === s)) return s;
+  for (const s of order) {if (findings.some((f) => f.severity === s)) {return s;}}
   return 'none';
 }
 
@@ -1161,8 +1161,8 @@ function synthesisTools(): CatalogEntry[] {
           const mgr = createVersionSpaceManager();
           const name = (params['name'] as string) ?? 'default';
           mgr.create(name);
-          for (const p of (params['positive'] as string[]) ?? []) mgr.addPositive(name, p);
-          for (const n of (params['negative'] as string[]) ?? []) mgr.addNegative(name, n);
+          for (const p of (params['positive'] as string[]) ?? []) {mgr.addPositive(name, p);}
+          for (const n of (params['negative'] as string[]) ?? []) {mgr.addNegative(name, n);}
           return ok({ name, hypotheses: mgr.getConsistentHypotheses(name), spaces: mgr.getSpaces().size });
         } catch (err) {
           return fail(err instanceof Error ? err.message : String(err));
@@ -1297,7 +1297,7 @@ async function loadTracker(basePath: string) {
   const tracker = createStateTracker();
   const file = join(basePath, '.musubix', 'workflow-state.json');
   try {
-    if (existsSync(file)) tracker.restore(JSON.parse(readFileSync(file, 'utf-8')));
+    if (existsSync(file)) {tracker.restore(JSON.parse(readFileSync(file, 'utf-8')));}
   } catch { /* start fresh */ }
   return { tracker, file };
 }
@@ -1342,7 +1342,7 @@ function workflowTools(): CatalogEntry[] {
           const { createPhaseController } = await import('@musubix2/workflow-engine');
           const { tracker, file } = await loadTracker((params['basePath'] as string) ?? '.');
           const result = await createPhaseController(tracker).transitionTo(params['targetPhase'] as never);
-          if (result.success) await saveTracker(tracker, file);
+          if (result.success) {await saveTracker(tracker, file);}
           return ok(result);
         } catch (err) {
           return fail(err instanceof Error ? err.message : String(err));
@@ -1543,7 +1543,7 @@ function skillsTools(): CatalogEntry[] {
           const mgr = await getSkillManager();
           const name = (params['name'] as string) ?? '';
           const match = mgr.getAvailableSkills().find((s) => s.metadata.name === name);
-          if (!match) return fail(`Skill not registered in this session: ${name}`);
+          if (!match) {return fail(`Skill not registered in this session: ${name}`);}
           const output = await match.execute((params['input'] as Record<string, unknown>) ?? {});
           return ok({ executed: true, name, output });
         } catch (err) {

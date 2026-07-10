@@ -378,12 +378,12 @@ export class ResearchEngine {
     // Subsequent rounds: use strategies to guide sub-queries
     for (let round = 1; round < maxRounds; round++) {
       const subQueries = this.getNextSubQueries(allResults, query);
-      if (subQueries.length === 0) break;
+      if (subQueries.length === 0) {break;}
 
       let foundNew = false;
       for (const subQuery of subQueries.slice(0, 3)) {
         const subSources = sourceProvider(subQuery);
-        if (subSources.length === 0) continue;
+        if (subSources.length === 0) {continue;}
 
         const subResult = this.research(
           { topic: subQuery, depth: query.depth, maxSources: query.maxSources },
@@ -400,12 +400,12 @@ export class ResearchEngine {
         }
       }
 
-      if (!foundNew) break;
+      if (!foundNew) {break;}
 
       // Check confidence threshold
       const avgConfidence =
         allResults.reduce((sum, r) => sum + r.confidence, 0) / allResults.length;
-      if (avgConfidence >= 0.8) break;
+      if (avgConfidence >= 0.8) {break;}
     }
 
     // Merge all results into a final comprehensive result
@@ -418,7 +418,7 @@ export class ResearchEngine {
 
     for (const term of topicTerms) {
       const related = this.crossReferenceIndex.get(term);
-      if (!related) continue;
+      if (!related) {continue;}
       for (const relatedTerm of related) {
         if (!topicTerms.includes(relatedTerm)) {
           result.set(relatedTerm, (result.get(relatedTerm) ?? 0) + 1);
@@ -431,7 +431,7 @@ export class ResearchEngine {
 
   generateEvidenceChain(topic: string): EvidenceChainLink[] {
     const results = this.accumulator.query(topic);
-    if (results.length === 0) return [];
+    if (results.length === 0) {return [];}
 
     // Group sources by content similarity to form claims
     const allSources: ResearchSource[] = [];
@@ -441,7 +441,7 @@ export class ResearchEngine {
       }
     }
 
-    if (allSources.length === 0) return [];
+    if (allSources.length === 0) {return [];}
 
     // Cluster sources into claim groups by extracting key phrases
     const claimGroups = this.clusterSourcesByClaim(allSources, topic);
@@ -493,7 +493,7 @@ export class ResearchEngine {
   }
 
   private computeConfidence(sources: ResearchSource[], query: ResearchQuery): number {
-    if (sources.length === 0) return 0;
+    if (sources.length === 0) {return 0;}
 
     // Base confidence from average relevance
     const avgRelevance = sources.reduce((sum, s) => sum + s.relevance, 0) / sources.length;
@@ -511,7 +511,7 @@ export class ResearchEngine {
   }
 
   private extractKeyFindings(sources: ResearchSource[], query: ResearchQuery): string[] {
-    if (sources.length === 0) return [];
+    if (sources.length === 0) {return [];}
 
     const findings: string[] = [];
     const queryTerms = new Set(tokenize(query.topic));
@@ -557,7 +557,7 @@ export class ResearchEngine {
   }
 
   private getNextSubQueries(results: ResearchResult[], query: ResearchQuery): string[] {
-    if (this.strategies.length === 0) return [];
+    if (this.strategies.length === 0) {return [];}
 
     const allSuggestions: string[] = [];
     for (const strategy of this.strategies) {
@@ -615,7 +615,7 @@ export class ResearchEngine {
     sources: ResearchSource[],
     topic: string,
   ): Array<{ claim: string; sources: ResearchSource[] }> {
-    if (sources.length === 0) return [];
+    if (sources.length === 0) {return [];}
 
     // Group sources by their primary type for claim generation
     const byType = new Map<string, ResearchSource[]>();

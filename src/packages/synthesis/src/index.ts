@@ -338,7 +338,7 @@ export class DSLBuilder {
           .trim()
           .split(/\s+/)
           .filter((w) => w.length > 0);
-        if (words.length === 0) return '';
+        if (words.length === 0) {return '';}
         return (
           words[0].toLowerCase() +
           words
@@ -418,9 +418,9 @@ export class VersionSpaceManager {
       throw new Error(`Version space "${name}" not found`);
     }
     const total = space.hypotheses.length;
-    if (total === 0) return 0;
+    if (total === 0) {return 0;}
     const consistent = space.hypotheses.filter((h) => this.isConsistent(h, space)).length;
-    if (consistent === 0) return 0;
+    if (consistent === 0) {return 0;}
     // Confidence is higher when fewer hypotheses remain (more constrained)
     // and there are enough examples to support them
     const exampleCount = space.positiveExamples.length + space.negativeExamples.length;
@@ -471,19 +471,19 @@ export class VersionSpaceManager {
       // Pattern-based hypotheses
       if (/^[A-Z]/.test(example)) {
         const h = 'pattern:startsWithUpper';
-        if (!space.hypotheses.includes(h)) space.hypotheses.push(h);
+        if (!space.hypotheses.includes(h)) {space.hypotheses.push(h);}
       }
       if (/^[a-z]/.test(example)) {
         const h = 'pattern:startsWithLower';
-        if (!space.hypotheses.includes(h)) space.hypotheses.push(h);
+        if (!space.hypotheses.includes(h)) {space.hypotheses.push(h);}
       }
       if (/\d/.test(example)) {
         const h = 'pattern:containsDigit';
-        if (!space.hypotheses.includes(h)) space.hypotheses.push(h);
+        if (!space.hypotheses.includes(h)) {space.hypotheses.push(h);}
       }
       if (/^[a-zA-Z]+$/.test(example)) {
         const h = 'pattern:alphaOnly';
-        if (!space.hypotheses.includes(h)) space.hypotheses.push(h);
+        if (!space.hypotheses.includes(h)) {space.hypotheses.push(h);}
       }
     }
   }
@@ -584,11 +584,11 @@ export class SynthesisEngine {
 
     // Try camelCase
     const camelRule = this.tryCamelCase(examples);
-    if (camelRule) return camelRule;
+    if (camelRule) {return camelRule;}
 
     // Try snakeCase
     const snakeRule = this.trySnakeCase(examples);
-    if (snakeRule) return snakeRule;
+    if (snakeRule) {return snakeRule;}
 
     // Try substring
     const substringRule = this.trySubstringRule(examples);
@@ -604,11 +604,11 @@ export class SynthesisEngine {
 
     // Try compositional synthesis (2-step combinations)
     const compositional = this.synthesizeCompositional(examples);
-    if (compositional) return compositional;
+    if (compositional) {return compositional;}
 
     // Try conditional synthesis
     const conditional = this.synthesizeConditional(examples);
-    if (conditional) return conditional;
+    if (conditional) {return conditional;}
 
     return null;
   }
@@ -660,7 +660,7 @@ export class SynthesisEngine {
         .trim()
         .split(/\s+/)
         .filter((w) => w.length > 0);
-      if (words.length === 0) return '';
+      if (words.length === 0) {return '';}
       return (
         words[0].toLowerCase() +
         words
@@ -735,7 +735,7 @@ export class SynthesisEngine {
     const branches = body.split(';');
     for (const branch of branches) {
       const [condition, branchRule] = branch.split('=>');
-      if (!branchRule) continue;
+      if (!branchRule) {continue;}
       if (condition === 'default') {
         return this.applySingleRule(branchRule, input);
       }
@@ -825,7 +825,7 @@ export class SynthesisEngine {
 
   private tryRepeatRule(examples: Array<SynthesisExample>): string | null {
     const first = examples[0];
-    if (first.input.length === 0) return null;
+    if (first.input.length === 0) {return null;}
     if (first.output.length % first.input.length === 0) {
       const times = first.output.length / first.input.length;
       if (times >= 2 && first.output === first.input.repeat(times)) {
@@ -846,7 +846,7 @@ export class SynthesisEngine {
           .trim()
           .split(/\s+/)
           .filter((w) => w.length > 0);
-        if (words.length === 0) return e.output === '';
+        if (words.length === 0) {return e.output === '';}
         const expected =
           words[0].toLowerCase() +
           words
@@ -893,7 +893,7 @@ export class SynthesisEngine {
     // Try all pairs of single rules
     for (const r1 of singleRules) {
       for (const r2 of singleRules) {
-        if (r1 === r2) continue;
+        if (r1 === r2) {continue;}
         const composite = `${r1} |> ${r2}`;
         if (this.verify(composite, examples)) {
           return composite;
@@ -903,7 +903,7 @@ export class SynthesisEngine {
 
     // Try single rule + replace
     const replaceRule = this.findReplacePart(examples, singleRules);
-    if (replaceRule) return replaceRule;
+    if (replaceRule) {return replaceRule;}
 
     return null;
   }
@@ -944,7 +944,7 @@ export class SynthesisEngine {
   }
 
   private synthesizeConditional(examples: Array<SynthesisExample>): string | null {
-    if (examples.length < 2) return null;
+    if (examples.length < 2) {return null;}
 
     const singleRules = [
       'uppercase',
@@ -959,14 +959,14 @@ export class SynthesisEngine {
       const r1Matches = examples.filter(
         (e) => this.applySingleRule(r1, e.input) === e.output,
       );
-      if (r1Matches.length === 0 || r1Matches.length === examples.length) continue;
+      if (r1Matches.length === 0 || r1Matches.length === examples.length) {continue;}
 
       const remaining = examples.filter(
         (e) => this.applySingleRule(r1, e.input) !== e.output,
       );
 
       for (const r2 of singleRules) {
-        if (r1 === r2) continue;
+        if (r1 === r2) {continue;}
         const r2Matches = remaining.filter(
           (e) => this.applySingleRule(r2, e.input) === e.output,
         );
@@ -1041,7 +1041,7 @@ export class SynthesisEngine {
   }
 
   generalizePattern(examples: Array<SynthesisExample>): string | null {
-    if (examples.length < 2) return this.synthesize(examples);
+    if (examples.length < 2) {return this.synthesize(examples);}
 
     // Try synthesizing from subsets and find the most general rule
     const rules: string[] = [];
@@ -1049,10 +1049,10 @@ export class SynthesisEngine {
     // Try pairs of examples
     for (let i = 0; i < examples.length - 1; i++) {
       const pairRule = this.synthesize([examples[i], examples[i + 1]]);
-      if (pairRule) rules.push(pairRule);
+      if (pairRule) {rules.push(pairRule);}
     }
 
-    if (rules.length === 0) return null;
+    if (rules.length === 0) {return null;}
 
     // Find the rule that works for all examples
     for (const rule of rules) {

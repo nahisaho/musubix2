@@ -184,7 +184,7 @@ export class StateTracker {
 
   /** Restore tracker state produced by {@link toJSON}. Ignores malformed input. */
   restore(data: unknown): void {
-    if (!data || typeof data !== 'object') return;
+    if (!data || typeof data !== 'object') {return;}
     const d = data as Record<string, unknown>;
     if (typeof d.currentPhase === 'string') {
       this.state.currentPhase = d.currentPhase as WorkflowPhase;

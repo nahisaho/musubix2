@@ -550,11 +550,11 @@ export function buildCodeTraceData(specsFile: string, srcDir: string): CodeTrace
     const content = readFileSync(specsFile, 'utf-8');
     for (const line of content.split('\n')) {
       const m = line.match(/^#{1,4}\s+(REQ-[A-Z]{3}-\d{3})\b/);
-      if (m) reqIds.push(m[1]);
+      if (m) {reqIds.push(m[1]);}
     }
     if (reqIds.length === 0) {
       // Fallback: any requirement id anywhere in the specs document.
-      for (const m of content.matchAll(REQ_ID_RE)) reqIds.push(m[0]);
+      for (const m of content.matchAll(REQ_ID_RE)) {reqIds.push(m[0]);}
     }
   }
   const requirementIds = [...new Set(reqIds)];
@@ -568,7 +568,7 @@ export function buildCodeTraceData(specsFile: string, srcDir: string): CodeTrace
       const code = readFileSync(file, 'utf-8');
       const refs = new Set<string>();
       for (const m of code.matchAll(REQ_ID_RE)) {
-        if (reqSet.has(m[0])) refs.add(m[0]);
+        if (reqSet.has(m[0])) {refs.add(m[0]);}
       }
       for (const reqId of refs) {
         fileSet.add(file);
@@ -632,7 +632,7 @@ export async function handleTrace(
       );
       if (uncovered.length > 0) {
         console.log('\n  Uncovered requirements (no code reference):');
-        for (const r of uncovered) console.log(`    ✗ ${r}`);
+        for (const r of uncovered) {console.log(`    ✗ ${r}`);}
         const strict = flags['strict'] === true;
         console.log(
           strict
@@ -696,9 +696,9 @@ export async function handleTraceVerify(
   console.log(`Requirements: ${covered.length}/${data.requirementIds.length} referenced in ${srcDir}`);
   if (gaps.length > 0) {
     console.log('Gaps (requirements not referenced in code):');
-    for (const id of gaps) console.log(`  - ${id}`);
+    for (const id of gaps) {console.log(`  - ${id}`);}
     // `--strict` turns uncovered requirements into a failing quality gate.
-    if (flags['strict'] === true) return ExitCode.VALIDATION_ERROR;
+    if (flags['strict'] === true) {return ExitCode.VALIDATION_ERROR;}
   } else {
     console.log('No gaps found — every requirement is referenced in code.');
   }
@@ -863,18 +863,18 @@ const WALK_IGNORE = new Set(['node_modules', '.git', 'dist', 'coverage', '.next'
  */
 export function collectFiles(target: string, extFilter?: (ext: string) => boolean): string[] {
   const stat = statSync(target);
-  if (stat.isFile()) return [target];
+  if (stat.isFile()) {return [target];}
   const out: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name.startsWith('.') && entry.name !== '.') continue;
-      if (WALK_IGNORE.has(entry.name)) continue;
+      if (entry.name.startsWith('.') && entry.name !== '.') {continue;}
+      if (WALK_IGNORE.has(entry.name)) {continue;}
       const full = joinPath(dir, entry.name);
       if (entry.isDirectory()) {
         walk(full);
       } else if (entry.isFile()) {
         const ext = entry.name.split('.').pop() ?? '';
-        if (!extFilter || extFilter(ext)) out.push(full);
+        if (!extFilter || extFilter(ext)) {out.push(full);}
       }
     }
   };
@@ -919,8 +919,8 @@ function loadCodeGraph(): ReturnType<typeof createGraphEngine> {
         nodes?: Array<Parameters<typeof engine.addNode>[0]>;
         edges?: Array<Parameters<typeof engine.addEdge>[0]>;
       };
-      for (const node of data.nodes ?? []) engine.addNode(node);
-      for (const edge of data.edges ?? []) engine.addEdge(edge);
+      for (const node of data.nodes ?? []) {engine.addNode(node);}
+      for (const edge of data.edges ?? []) {engine.addEdge(edge);}
     }
   } catch {
     // Corrupt/unreadable — start empty.
@@ -1088,9 +1088,9 @@ function resolveImportToFiles(
     // segment names a file rather than a defined symbol.
     return [...(filesByBasename.get(last.replace(/\.[a-z]+$/i, '')) ?? [])];
   }
-  if (candidates.length <= 1) return candidates;
+  if (candidates.length <= 1) {return candidates;}
   const middle = segs.slice(0, -1).map((s) => s.toLowerCase());
-  if (middle.length === 0) return candidates;
+  if (middle.length === 0) {return candidates;}
   const scored = candidates.map((f) => {
     const parts = f.toLowerCase().split(/[\\/]/);
     const score = middle.filter((m) => parts.some((p) => p === m || p.includes(m) || m.includes(p))).length;
@@ -1112,7 +1112,7 @@ function resolveFileEdges(
   const fileEdges = new Map<string, { from: string; to: string; kind: string }>();
   for (const e of edges) {
     for (const to of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
-      if (to === e.from) continue;
+      if (to === e.from) {continue;}
       fileEdges.set(`${e.from}\t${to}\t${e.kind}`, { from: e.from, to, kind: e.kind });
     }
   }
@@ -1131,7 +1131,7 @@ function findDependencyCycles(
   const adj = new Map<string, Set<string>>();
   for (const e of edges) {
     for (const to of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
-      if (to === e.from) continue;
+      if (to === e.from) {continue;}
       const set = adj.get(e.from) ?? new Set<string>();
       set.add(to);
       adj.set(e.from, set);
@@ -1144,9 +1144,9 @@ function findDependencyCycles(
   const sccs: string[][] = [];
   let idx = 0;
   const allNodes = new Set<string>([...adj.keys()]);
-  for (const set of adj.values()) for (const t of set) allNodes.add(t);
+  for (const set of adj.values()) {for (const t of set) {allNodes.add(t);}}
   for (const start of allNodes) {
-    if (index.has(start)) continue;
+    if (index.has(start)) {continue;}
     const work: Array<{ v: string; it: Iterator<string> }> = [];
     const pushNode = (v: string) => {
       index.set(v, idx);
@@ -1176,11 +1176,11 @@ function findDependencyCycles(
             onStack.delete(w);
             comp.push(w);
           } while (w !== frame.v);
-          if (comp.length > 1) sccs.push(comp);
+          if (comp.length > 1) {sccs.push(comp);}
         }
         work.pop();
         const parent = work[work.length - 1];
-        if (parent) low.set(parent.v, Math.min(low.get(parent.v)!, low.get(frame.v)!));
+        if (parent) {low.set(parent.v, Math.min(low.get(parent.v)!, low.get(frame.v)!));}
       }
     }
   }
@@ -1192,7 +1192,7 @@ function loadGraphFromPath(
   path: string,
 ): { nodes: StoredGraphNode[]; edges: StoredGraphEdge[] } | null {
   try {
-    if (!existsSync(path)) return null;
+    if (!existsSync(path)) {return null;}
     const data = JSON.parse(readFileSync(path, 'utf-8')) as {
       nodes?: StoredGraphNode[];
       edges?: StoredGraphEdge[];
@@ -1270,7 +1270,7 @@ const CG_SUBCOMMAND_HELP: Record<string, string> = {
 
 /** Help text for `cg` — subcommand-specific when a known sub is given. */
 export function cgSubcommandHelp(sub: string | undefined): string {
-  if (sub && CG_SUBCOMMAND_HELP[sub]) return CG_SUBCOMMAND_HELP[sub];
+  if (sub && CG_SUBCOMMAND_HELP[sub]) {return CG_SUBCOMMAND_HELP[sub];}
   return (
     showHelp('cg') +
     '\n\nSubcommands: ' +
@@ -1317,7 +1317,7 @@ export async function handleCodegraph(
         for (const file of files) {
           const ext = file.split('.').pop() ?? '';
           const lang = EXT_TO_LANG[ext];
-          if (!lang) continue;
+          if (!lang) {continue;}
           const content = readFileSync(file, 'utf-8');
           const nodes = parser.parse(content, lang);
           for (const node of nodes) {
@@ -1353,7 +1353,7 @@ export async function handleCodegraph(
             // Flatten class method children into the graph so `obj.method()`
             // calls can resolve (methods are parsed as children of the class).
             for (const child of node.children ?? []) {
-              if (child.kind !== 'method' || !child.name) continue;
+              if (child.kind !== 'method' || !child.name) {continue;}
               const mEntry = {
                 id: `${file}:${node.name}.${child.name}`,
                 name: child.name,
@@ -1389,12 +1389,12 @@ export async function handleCodegraph(
           // Languages without a bucket (C/Go/Java) are unaffected.
           const denylist = BUILTINS_BY_LANG[lang];
           for (const name of calls) {
-            if (denylist?.has(name)) continue;
-            if (localDefs?.has(name)) continue; // local binding (static/own def)
+            if (denylist?.has(name)) {continue;}
+            if (localDefs?.has(name)) {continue;} // local binding (static/own def)
             const defs = globalFnToFiles.get(name);
-            if (!defs || defs.size !== 1) continue; // undefined or ambiguous global
+            if (!defs || defs.size !== 1) {continue;} // undefined or ambiguous global
             const target = [...defs][0];
-            if (target === file) continue;
+            if (target === file) {continue;}
             const edge = { from: file, to: name, kind: 'calls' as const };
             engine.addEdge(edge);
             savedEdges.push(edge);
@@ -1433,7 +1433,7 @@ export async function handleCodegraph(
       console.log(`Results for "${query}": ${results.length} found`);
       for (const r of results.slice(0, 20)) {
         const node = (r as { node?: { name?: string; filePath?: string } }).node ?? (r as { name?: string; filePath?: string });
-        if (node?.name) console.log(`  ${node.name}${node.filePath ? ` (${node.filePath})` : ''}`);
+        if (node?.name) {console.log(`  ${node.name}${node.filePath ? ` (${node.filePath})` : ''}`);}
       }
       return ExitCode.SUCCESS;
     }
@@ -1453,7 +1453,7 @@ export async function handleCodegraph(
         files.add(n.filePath);
       }
       const edgeKinds = new Map<string, number>();
-      for (const e of edges) edgeKinds.set(e.kind, (edgeKinds.get(e.kind) ?? 0) + 1);
+      for (const e of edges) {edgeKinds.set(e.kind, (edgeKinds.get(e.kind) ?? 0) + 1);}
       console.log(`Files: ${files.size}`);
       if (nodeKinds.size > 0) {
         const parts = [...nodeKinds.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`);
@@ -1467,12 +1467,12 @@ export async function handleCodegraph(
       // Top-5 most-called functions (in-degree over `calls` edges).
       const callInDegree = new Map<string, number>();
       for (const e of edges) {
-        if (e.kind === 'calls') callInDegree.set(e.to, (callInDegree.get(e.to) ?? 0) + 1);
+        if (e.kind === 'calls') {callInDegree.set(e.to, (callInDegree.get(e.to) ?? 0) + 1);}
       }
       const top = [...callInDegree.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
       if (top.length > 0) {
-        console.log(`Top called functions:`);
-        for (const [name, deg] of top) console.log(`  ${name} — ${deg} caller(s)`);
+        console.log('Top called functions:');
+        for (const [name, deg] of top) {console.log(`  ${name} — ${deg} caller(s)`);}
       }
       return ExitCode.SUCCESS;
     }
@@ -1488,7 +1488,7 @@ export async function handleCodegraph(
       // Per-file metrics.
       const fnCount = new Map<string, number>();
       for (const n of nodes) {
-        if (n.kind === 'function') fnCount.set(n.filePath, (fnCount.get(n.filePath) ?? 0) + 1);
+        if (n.kind === 'function') {fnCount.set(n.filePath, (fnCount.get(n.filePath) ?? 0) + 1);}
       }
       // External dependencies = distinct call/import edges leaving the file.
       const extDeps = new Map<string, Set<string>>();
@@ -1503,11 +1503,11 @@ export async function handleCodegraph(
       const { defFiles } = buildResolutionMaps(nodes);
       const dependents = new Map<string, Set<string>>();
       for (const e of edges) {
-        if (e.kind !== 'calls') continue;
+        if (e.kind !== 'calls') {continue;}
         const defs = defFiles.get(e.to);
-        if (!defs || defs.size !== 1) continue;
+        if (!defs || defs.size !== 1) {continue;}
         const target = [...defs][0];
-        if (target === e.from) continue;
+        if (target === e.from) {continue;}
         const set = dependents.get(target) ?? new Set<string>();
         set.add(e.from);
         dependents.set(target, set);
@@ -1516,14 +1516,14 @@ export async function handleCodegraph(
       // Map each cyclic file → (its SCC size − 1) as an extraction penalty.
       const cyclePenalty = new Map<string, number>();
       for (const scc of findDependencyCycles(nodes, edges)) {
-        for (const f of scc) cyclePenalty.set(f, scc.length - 1);
+        for (const f of scc) {cyclePenalty.set(f, scc.length - 1);}
       }
       // Score: reward logic (functions) and being depended-upon; penalise the
       // external deps you would also have to port and any cycle entanglement.
       type Cand = { file: string; fns: number; deps: number; users: number; cycle: number; score: number };
       const cands: Cand[] = [];
       for (const [file, fns] of fnCount) {
-        if (fns < 1 || isTestFile(file)) continue; // skip test/fixture files
+        if (fns < 1 || isTestFile(file)) {continue;} // skip test/fixture files
         const deps = extDeps.get(file)?.size ?? 0;
         const users = dependents.get(file)?.size ?? 0;
         const cycle = cyclePenalty.get(file) ?? 0;
@@ -1574,7 +1574,7 @@ export async function handleCodegraph(
       console.log(`Dependencies (${matched.length} edges across ${byFile.size} file(s)):`);
       for (const [file, targets] of byFile) {
         console.log(`  ${file}`);
-        for (const t of [...new Set(targets)].sort()) console.log(`    → ${t}`);
+        for (const t of [...new Set(targets)].sort()) {console.log(`    → ${t}`);}
       }
       return ExitCode.SUCCESS;
     }
@@ -1588,15 +1588,15 @@ export async function handleCodegraph(
       let filter: string | undefined;
       for (let i = 0; i < args.length; i++) {
         const a = args[i];
-        if (a === '--direct') continue;
+        if (a === '--direct') {continue;}
         if (a === '--depth') {
           const v = Number(args[++i]);
-          if (Number.isFinite(v) && v >= 1) maxDepth = Math.floor(v);
+          if (Number.isFinite(v) && v >= 1) {maxDepth = Math.floor(v);}
           continue;
         }
-        if (!a.startsWith('--') && filter === undefined) filter = a;
+        if (!a.startsWith('--') && filter === undefined) {filter = a;}
       }
-      if (maxDepth === 1) directOnly = true; // depth 1 == direct
+      if (maxDepth === 1) {directOnly = true;} // depth 1 == direct
       if (!filter) {
         console.error('❌ Usage: musubix cg impact <path-fragment> [--direct] [--depth N]');
         return ExitCode.VALIDATION_ERROR;
@@ -1613,7 +1613,7 @@ export async function handleCodegraph(
       const dependents = new Map<string, Set<string>>();
       for (const e of edges) {
         for (const defFile of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
-          if (defFile === e.from) continue;
+          if (defFile === e.from) {continue;}
           const set = dependents.get(defFile) ?? new Set<string>();
           set.add(e.from);
           dependents.set(defFile, set);
@@ -1629,7 +1629,7 @@ export async function handleCodegraph(
       const direct = new Set<string>();
       for (const s of seeds) {
         for (const dep of dependents.get(s) ?? []) {
-          if (!seedSet.has(dep)) direct.add(dep);
+          if (!seedSet.has(dep)) {direct.add(dep);}
         }
       }
       // BFS over reverse edges, bounded by --depth (default: unbounded). Each
@@ -1639,9 +1639,9 @@ export async function handleCodegraph(
       const queue: Array<[string, number]> = seeds.map((s) => [s, 0]);
       while (queue.length > 0) {
         const [f, d] = queue.shift()!;
-        if (d >= maxDepth) continue; // do not expand past the depth limit
+        if (d >= maxDepth) {continue;} // do not expand past the depth limit
         for (const dep of dependents.get(f) ?? []) {
-          if (seedSet.has(dep)) continue;
+          if (seedSet.has(dep)) {continue;}
           affected.add(dep);
           if (!seen.has(dep)) {
             seen.add(dep);
@@ -1666,13 +1666,13 @@ export async function handleCodegraph(
       }
 
       console.log(`Impact of ${seeds.length} file(s) matching '${filter}':`);
-      for (const s of seeds) console.log(`  ⦿ ${s}`);
+      for (const s of seeds) {console.log(`  ⦿ ${s}`);}
       if (affected.size === 0) {
         console.log('  No other indexed files depend on these (no transitive impact found).');
         return ExitCode.SUCCESS;
       }
       console.log(`\n  ${direct.size} direct dependent(s):`);
-      for (const a of [...direct].sort()) console.log(`    ← ${a}`);
+      for (const a of [...direct].sort()) {console.log(`    ← ${a}`);}
       if (directOnly) {
         if (indirect.length > 0) {
           console.log(`\n  (+${indirect.length} indirect; omitted — run without --direct to list)`);
@@ -1680,7 +1680,7 @@ export async function handleCodegraph(
       } else if (indirect.length > 0) {
         const depthNote = Number.isFinite(maxDepth) ? ` (within depth ${maxDepth})` : '';
         console.log(`\n  ${indirect.length} indirect (transitive) dependent(s)${depthNote}:`);
-        for (const a of indirect.sort()) console.log(`    ← ${a}`);
+        for (const a of indirect.sort()) {console.log(`    ← ${a}`);}
       }
       const scope = Number.isFinite(maxDepth) ? ` within depth ${maxDepth}` : '';
       console.log(
@@ -1742,25 +1742,25 @@ export async function handleCodegraph(
       const minDist = targets.length ? Math.min(...targets.map((f) => dist.get(f)!)) : Infinity;
       const nearest = targets.filter((f) => dist.get(f) === minDist);
       if (nearest.length === 0) {
-        if (asJson) console.log(JSON.stringify({ from: fromFrag, to: toFrag, paths: [] }, null, 2));
-        else console.log(`No dependency path from '${fromFrag}' to '${toFrag}'.`);
+        if (asJson) {console.log(JSON.stringify({ from: fromFrag, to: toFrag, paths: [] }, null, 2));}
+        else {console.log(`No dependency path from '${fromFrag}' to '${toFrag}'.`);}
         return ExitCode.SUCCESS;
       }
       // Reconstruct shortest paths (all if --all, else one), capped.
       const CAP = showAll ? 20 : 1;
       const paths: string[][] = [];
       const build = (node: string, tail: string[]) => {
-        if (paths.length >= CAP) return;
+        if (paths.length >= CAP) {return;}
         const chain = [node, ...tail];
         const ps = preds.get(node) ?? [];
         if (ps.length === 0) { paths.push(chain); return; }
         for (const p of ps) {
-          if (paths.length >= CAP) return;
+          if (paths.length >= CAP) {return;}
           build(p, chain);
         }
       };
       for (const t of nearest) {
-        if (paths.length >= CAP) break;
+        if (paths.length >= CAP) {break;}
         build(t, []);
       }
       if (asJson) {
@@ -1787,8 +1787,8 @@ export async function handleCodegraph(
       let limit = 20;
       let filter: string | undefined;
       for (const a of args) {
-        if (/^\d+$/.test(a)) limit = Number(a);
-        else if (!a.startsWith('--') && filter === undefined) filter = a;
+        if (/^\d+$/.test(a)) {limit = Number(a);}
+        else if (!a.startsWith('--') && filter === undefined) {filter = a;}
       }
       const { nodes, edges } = loadCodeGraphData();
       if (nodes.length === 0) {
@@ -1796,7 +1796,7 @@ export async function handleCodegraph(
         return ExitCode.SUCCESS;
       }
       let cycles = findDependencyCycles(nodes, edges);
-      if (filter) cycles = cycles.filter((c) => c.some((f) => f.includes(filter!)));
+      if (filter) {cycles = cycles.filter((c) => c.some((f) => f.includes(filter!)));}
       if (args.includes('--json')) {
         console.log(JSON.stringify({
           count: cycles.length,
@@ -1814,8 +1814,8 @@ export async function handleCodegraph(
       shown.forEach((c, i) => {
         const sorted = [...c].sort();
         console.log(`\n  Cycle ${i + 1} (${c.length} files):`);
-        for (const f of sorted.slice(0, PER_CYCLE)) console.log(`    ↻ ${f}`);
-        if (sorted.length > PER_CYCLE) console.log(`    … and ${sorted.length - PER_CYCLE} more`);
+        for (const f of sorted.slice(0, PER_CYCLE)) {console.log(`    ↻ ${f}`);}
+        if (sorted.length > PER_CYCLE) {console.log(`    … and ${sorted.length - PER_CYCLE} more`);}
       });
       return ExitCode.SUCCESS;
     }
@@ -1829,11 +1829,11 @@ export async function handleCodegraph(
         const a = args[i];
         if (a === '--max-cycles') {
           const v = Number(args[++i]);
-          if (Number.isFinite(v) && v >= 0) maxCycles = Math.floor(v);
+          if (Number.isFinite(v) && v >= 0) {maxCycles = Math.floor(v);}
         } else if (a === '--forbid') {
           for (const spec of (args[++i] ?? '').split(',')) {
             const [from, to] = spec.split(':');
-            if (from && to) forbidRules.push({ from: from.trim(), to: to.trim() });
+            if (from && to) {forbidRules.push({ from: from.trim(), to: to.trim() });}
           }
         }
       }
@@ -1877,7 +1877,7 @@ export async function handleCodegraph(
       } else {
         for (const c of checks) {
           console.log(`  ${c.pass ? '✅' : '❌'} ${c.rule} — ${c.detail}`);
-          if (!c.pass) for (const o of c.offenders ?? []) console.log(`       ${o}`);
+          if (!c.pass) {for (const o of c.offenders ?? []) {console.log(`       ${o}`);}}
         }
         console.log(
           failed.length === 0
@@ -1942,10 +1942,10 @@ export async function handleCodegraph(
 
       const CAP = 25;
       const list = (label: string, items: string[]) => {
-        if (items.length === 0) return;
+        if (items.length === 0) {return;}
         console.log(`\n  ${label} (${items.length}):`);
-        for (const s of items.slice(0, CAP)) console.log(`    ${s}`);
-        if (items.length > CAP) console.log(`    … and ${items.length - CAP} more`);
+        for (const s of items.slice(0, CAP)) {console.log(`    ${s}`);}
+        if (items.length > CAP) {console.log(`    … and ${items.length - CAP} more`);}
       };
 
       console.log(`Diff ${baselinePath} → ${currentPath ?? '.musubix/codegraph.json'}`);
@@ -1976,7 +1976,7 @@ export async function handleCodegraph(
         const a = args[i];
         if (a === '--format') { format = (args[++i] ?? 'dot').toLowerCase(); continue; }
         if (a === '--out') { outPath = args[++i]; continue; }
-        if (!a.startsWith('--') && filter === undefined) filter = a;
+        if (!a.startsWith('--') && filter === undefined) {filter = a;}
       }
       if (format !== 'dot' && format !== 'json') {
         console.error(`❌ Unknown format '${format}'. Use dot or json.`);
@@ -1993,8 +1993,8 @@ export async function handleCodegraph(
       const fileEdges = new Map<string, { from: string; to: string; kind: string }>();
       for (const e of edges) {
         for (const to of resolveImportToFiles(e.to, defFiles, filesByBasename)) {
-          if (to === e.from) continue;
-          if (filter && !e.from.includes(filter) && !to.includes(filter)) continue;
+          if (to === e.from) {continue;}
+          if (filter && !e.from.includes(filter) && !to.includes(filter)) {continue;}
           fileEdges.set(`${e.from} ${to} ${e.kind}`, { from: e.from, to, kind: e.kind });
         }
       }
@@ -2024,11 +2024,11 @@ export async function handleCodegraph(
             lines.push(`  subgraph "cluster_${ci++}" {`);
             lines.push(`    label="${dir.replace(/"/g, '')}";`);
             lines.push('    style=rounded; color="#999999";');
-            for (const f of files) lines.push(`    "${f}" [label="${label(f)}"];`);
+            for (const f of files) {lines.push(`    "${f}" [label="${label(f)}"];`);}
             lines.push('  }');
           }
         } else {
-          for (const f of [...fileSet].sort()) lines.push(`  "${f}" [label="${label(f)}"];`);
+          for (const f of [...fileSet].sort()) {lines.push(`  "${f}" [label="${label(f)}"];`);}
         }
         for (const r of rels) {
           const style = r.kind === 'imports' ? ' [style=dashed]' : '';
@@ -2348,7 +2348,7 @@ export async function handleReqWizard(): Promise<ExitCodeValue> {
 // Singleton interviewer for session persistence across CLI calls
 let _interviewer: RequirementsInterviewerType | null = null;
 function getInterviewer(): RequirementsInterviewerType {
-  if (!_interviewer) _interviewer = createRequirementsInterviewer();
+  if (!_interviewer) {_interviewer = createRequirementsInterviewer();}
   return _interviewer;
 }
 
@@ -2706,7 +2706,7 @@ export async function handleTestGen(filePath: string): Promise<ExitCodeValue> {
     for (const file of files) {
       const content = readFileSync(file, 'utf-8');
       const suite = generator.generate(content, 'unit');
-      if (!single) console.log(`// ── ${file} ──────────────────────────────`);
+      if (!single) {console.log(`// ── ${file} ──────────────────────────────`);}
       console.log(suite.code);
     }
     return ExitCode.SUCCESS;
@@ -2749,11 +2749,11 @@ export async function handleSkills(
         const content = readFileSync(path, 'utf-8');
         const definition = JSON.parse(content) as Record<string, unknown>;
         const errors: string[] = [];
-        if (!definition['name']) errors.push('Missing required field: name');
-        if (!definition['description']) errors.push('Missing required field: description');
-        if (!definition['action']) errors.push('Missing required field: action');
+        if (!definition['name']) {errors.push('Missing required field: name');}
+        if (!definition['description']) {errors.push('Missing required field: description');}
+        if (!definition['action']) {errors.push('Missing required field: action');}
         if (errors.length > 0) {
-          for (const e of errors) console.error(`  ❌ ${e}`);
+          for (const e of errors) {console.error(`  ❌ ${e}`);}
           return ExitCode.VALIDATION_ERROR;
         }
         console.log(`✅ Skill definition valid: ${definition['name']}`);
@@ -2788,14 +2788,14 @@ export async function handleSkills(
         joinPath(dir, 'index.ts'),
         `export const ${toIdentifier(name)} = {\n` +
           `  name: ${JSON.stringify(name)},\n` +
-          `  run(): void {\n    // TODO: implement\n  },\n};\n`,
+          '  run(): void {\n    // TODO: implement\n  },\n};\n',
         'utf-8',
       );
       writeFileSync(
         joinPath(dir, 'tests', 'index.test.ts'),
-        `import { describe, it, expect } from 'vitest';\n\n` +
+        'import { describe, it, expect } from \'vitest\';\n\n' +
           `describe(${JSON.stringify(name)}, () => {\n` +
-          `  it('is a placeholder', () => {\n    expect(true).toBe(true);\n  });\n});\n`,
+          '  it(\'is a placeholder\', () => {\n    expect(true).toBe(true);\n  });\n});\n',
         'utf-8',
       );
       console.log(`✅ Scaffolded skill at ${dir}/`);
@@ -2893,9 +2893,9 @@ export async function handleKnowledge(
       const byType = await store.query({ type: filter as EntityType });
       const byText = await store.query({ text: filter });
       const merged = new Map<string, (typeof byType)[number]>();
-      for (const e of [...byType, ...byText]) merged.set(e.id, e);
+      for (const e of [...byType, ...byText]) {merged.set(e.id, e);}
       for (const e of await store.query({})) {
-        if (e.id.toLowerCase().includes(filter.toLowerCase())) merged.set(e.id, e);
+        if (e.id.toLowerCase().includes(filter.toLowerCase())) {merged.set(e.id, e);}
       }
       const results = [...merged.values()];
       console.log(`Results: ${results.length} entities`);
@@ -3065,7 +3065,7 @@ async function knowledgeSourcesForTopic(
     const byText = await store.query({ text: topic });
     const bySearch = await store.search(topic);
     const merged = new Map<string, (typeof byText)[number]>();
-    for (const e of [...byText, ...bySearch]) merged.set(e.id, e);
+    for (const e of [...byText, ...bySearch]) {merged.set(e.id, e);}
     return [...merged.values()].map((e) => ({
       title: e.name ?? e.id,
       type: 'documentation' as const,
@@ -3095,7 +3095,7 @@ export async function handleDeepResearch(
       const result = engine.research({ topic: question, depth: 'medium' }, sources);
       console.log(`Question: ${question}`);
       console.log(`Confidence: ${result.confidence}`);
-      console.log(`Sources: ${result.sources.length}${sources.length ? ` (from knowledge graph)` : ''}`);
+      console.log(`Sources: ${result.sources.length}${sources.length ? ' (from knowledge graph)' : ''}`);
       console.log(`Answer: ${result.summary}`);
       return ExitCode.SUCCESS;
     }
@@ -3176,7 +3176,7 @@ export async function handleScaffold(
           console.log(`  ${f}`);
         }
       } else {
-        for (const e of result.errors) console.error(`❌ ${e}`);
+        for (const e of result.errors) {console.error(`❌ ${e}`);}
         return ExitCode.GENERAL_ERROR;
       }
       return ExitCode.SUCCESS;
@@ -3209,7 +3209,7 @@ export async function handleScaffold(
           'tests/index.test.ts': `import { describe, it, expect } from 'vitest';\nimport { name } from '../src/index.js';\n\ndescribe('${name}', () => {\n  it('exports its name', () => {\n    expect(name).toBe('${name}');\n  });\n});\n`,
         });
         console.log(`✅ Scaffolded package: ${name}`);
-        for (const f of created) console.log(`  ${f}`);
+        for (const f of created) {console.log(`  ${f}`);}
       } catch (err) {
         console.error(`❌ ${err instanceof Error ? err.message : String(err)}`);
         return ExitCode.GENERAL_ERROR;
@@ -3233,7 +3233,7 @@ export async function handleScaffold(
           'tests/index.test.ts': `import { describe, it, expect } from 'vitest';\nimport { ${toIdentifier(name)} } from '../index.js';\n\ndescribe('${name}', () => {\n  it('runs', () => {\n    expect(${toIdentifier(name)}()).toBe('${name}');\n  });\n});\n`,
         });
         console.log(`✅ Scaffolded skill: ${name}`);
-        for (const f of created) console.log(`  ${f}`);
+        for (const f of created) {console.log(`  ${f}`);}
       } catch (err) {
         console.error(`❌ ${err instanceof Error ? err.message : String(err)}`);
         return ExitCode.GENERAL_ERROR;
@@ -3372,7 +3372,7 @@ export async function handleSynthesis(
         return { input: input ?? '', output: output ?? '' };
       });
       const result = engine.synthesize(examples);
-      console.log(`Synthesized program:`);
+      console.log('Synthesized program:');
       if (result) {
         console.log(`  Rule: ${result}`);
       } else {
@@ -3417,7 +3417,7 @@ export async function handleSynthesis(
         }
       }
       const result = builder.execute(input);
-      console.log(`DSL output:`);
+      console.log('DSL output:');
       console.log(`  Input:  ${input}`);
       console.log(`  Ops:    ${ops.join(' → ')}`);
       console.log(`  Result: ${result}`);
@@ -3427,7 +3427,7 @@ export async function handleSynthesis(
       const { createVersionSpaceManager } = await import('@musubix2/synthesis');
       const manager = createVersionSpaceManager();
       const spaces = manager.getSpaces();
-      console.log(`Version space:`);
+      console.log('Version space:');
       console.log(`  Spaces: ${spaces.size}`);
       return ExitCode.SUCCESS;
     }
@@ -3471,7 +3471,7 @@ export function resolveTarget(args: Record<string, unknown>, verbs: string[]): s
   const positional = (args['args'] as string[] | undefined) ?? [];
   const sub = args['subcommand'] as string | undefined;
   const explicitFile = args['file'] as string | undefined;
-  if (explicitFile) return explicitFile;
+  if (explicitFile) {return explicitFile;}
   if (sub && verbs.includes(sub.toLowerCase())) {
     // Subcommand is a verb — the target is the next positional token.
     return positional[0];
@@ -3532,11 +3532,11 @@ export function getDefaultCommands(): CLICommand[] {
           if (!flags['dry-run']) {
             console.log(`\n✅ Platform setup complete (${summary.durationMs}ms)`);
             console.log(`   Platforms: copilot=${summary.detectedPlatforms.copilot}, claude=${summary.detectedPlatforms.claude}`);
-            if (summary.created.length) console.log(`   Created: ${summary.created.length} files`);
-            if (summary.updated.length) console.log(`   Updated: ${summary.updated.length} files`);
-            if (summary.skipped.length) console.log(`   Skipped: ${summary.skipped.length} files`);
+            if (summary.created.length) {console.log(`   Created: ${summary.created.length} files`);}
+            if (summary.updated.length) {console.log(`   Updated: ${summary.updated.length} files`);}
+            if (summary.skipped.length) {console.log(`   Skipped: ${summary.skipped.length} files`);}
           }
-          for (const w of summary.warnings) console.warn(`   ⚠ ${w}`);
+          for (const w of summary.warnings) {console.warn(`   ⚠ ${w}`);}
           return;
         }
 
@@ -3568,13 +3568,10 @@ export function getDefaultCommands(): CLICommand[] {
               return ExitCode.VALIDATION_ERROR;
             }
             return await handleTasksValidate(filePath);
-            break;
           case 'list':
             return await handleTasksList(filePath);
-            break;
           case 'stats':
             return await handleTasksStats(filePath);
-            break;
           default:
             console.log(showHelp('tasks'));
             return;
@@ -3776,15 +3773,15 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const positionalArgs = [...((args['args'] as string[] | undefined) ?? [])];
         // Forward recognised flags so handleCodegraph can parse them uniformly.
-        if (args['direct'] === true) positionalArgs.push('--direct');
-        if (args['depth'] !== undefined) positionalArgs.push('--depth', String(args['depth']));
-        if (args['format'] !== undefined) positionalArgs.push('--format', String(args['format']));
-        if (args['out'] !== undefined) positionalArgs.push('--out', String(args['out']));
-        if (args['json'] === true) positionalArgs.push('--json');
-        if (args['max-cycles'] !== undefined) positionalArgs.push('--max-cycles', String(args['max-cycles']));
-        if (args['forbid'] !== undefined) positionalArgs.push('--forbid', String(args['forbid']));
-        if (args['cluster'] === true) positionalArgs.push('--cluster');
-        if (args['all'] === true) positionalArgs.push('--all');
+        if (args['direct'] === true) {positionalArgs.push('--direct');}
+        if (args['depth'] !== undefined) {positionalArgs.push('--depth', String(args['depth']));}
+        if (args['format'] !== undefined) {positionalArgs.push('--format', String(args['format']));}
+        if (args['out'] !== undefined) {positionalArgs.push('--out', String(args['out']));}
+        if (args['json'] === true) {positionalArgs.push('--json');}
+        if (args['max-cycles'] !== undefined) {positionalArgs.push('--max-cycles', String(args['max-cycles']));}
+        if (args['forbid'] !== undefined) {positionalArgs.push('--forbid', String(args['forbid']));}
+        if (args['cluster'] === true) {positionalArgs.push('--cluster');}
+        if (args['all'] === true) {positionalArgs.push('--all');}
         return await handleCodegraph(sub, positionalArgs);
       },
     },

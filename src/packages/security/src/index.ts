@@ -106,9 +106,9 @@ function escapeRe(s: string): string {
 
 /** Shannon entropy (bits per character) of a string. */
 function shannonEntropy(s: string): number {
-  if (s.length === 0) return 0;
+  if (s.length === 0) {return 0;}
   const freq = new Map<string, number>();
-  for (const ch of s) freq.set(ch, (freq.get(ch) ?? 0) + 1);
+  for (const ch of s) {freq.set(ch, (freq.get(ch) ?? 0) + 1);}
   let h = 0;
   for (const n of freq.values()) {
     const p = n / s.length;
@@ -128,7 +128,7 @@ function hasSequentialRun(s: string, len = 6): boolean {
   let run = 1;
   for (let i = 1; i < s.length; i++) {
     if (s.charCodeAt(i) === s.charCodeAt(i - 1) + 1) {
-      if (++run >= len) return true;
+      if (++run >= len) {return true;}
     } else {
       run = 1;
     }
@@ -141,14 +141,14 @@ export function isLikelySecret(raw: string): boolean {
   // Real keys/tokens mix letters AND digits. Requiring a digit rejects long
   // CamelCase/snake_case identifier strings (e.g. C-API symbol names like
   // "GDALGetRasterColorInterpretation") that are not secrets.
-  if (!/[0-9]/.test(s) || !/[a-zA-Z]/.test(s)) return false;
-  if (shannonEntropy(s) < 3.0) return false;
+  if (!/[0-9]/.test(s) || !/[a-zA-Z]/.test(s)) {return false;}
+  if (shannonEntropy(s) < 3.0) {return false;}
   // Character-set / alphabet constants (e.g. RANDOM_STRING_CHARS = "abc…XYZ0-9")
   // have high entropy but are not secrets — they contain long sequential runs.
-  if (hasSequentialRun(s)) return false;
+  if (hasSequentialRun(s)) {return false;}
   // Pure lowercase-hex strings of a hash length (MD5/SHA-1/256/512) are almost
   // always integrity checksums (package formulas, lockfiles), not secrets.
-  if (/^[0-9a-f]{32}$|^[0-9a-f]{40}$|^[0-9a-f]{64}$|^[0-9a-f]{128}$/.test(s)) return false;
+  if (/^[0-9a-f]{32}$|^[0-9a-f]{40}$|^[0-9a-f]{64}$|^[0-9a-f]{128}$/.test(s)) {return false;}
   return true;
 }
 
@@ -159,16 +159,16 @@ export function isLikelySecret(raw: string): boolean {
  */
 export function isNotFormatMarker(matchText: string): boolean {
   const lit = matchText.match(/['"]([^'"]*)['"]\s*$/)?.[1] ?? '';
-  if (/^\{[^}]*\}$/.test(lit)) return false; // {MD5}, {SHA}, {CRYPT}, ...
-  if (lit.trim().length < 3) return false; // empty / trivial placeholders
+  if (/^\{[^}]*\}$/.test(lit)) {return false;} // {MD5}, {SHA}, {CRYPT}, ...
+  if (lit.trim().length < 3) {return false;} // empty / trivial placeholders
   // Format/template strings with placeholders are not literal passwords, e.g.
   // `ALTER USER %(user)s IDENTIFIED BY "%(password)s"` or `pwd={0}` / `${pw}`.
-  if (/%\(?\w*\)?[sd]|%[sd]|\$\{[^}]*\}|#\{[^}]*\}|\{\d*\}|:\w+\b/.test(lit)) return false;
+  if (/%\(?\w*\)?[sd]|%[sd]|\$\{[^}]*\}|#\{[^}]*\}|\{\d*\}|:\w+\b/.test(lit)) {return false;}
   // CLI-flag fragments like `--password=` (value comes from a variable).
-  if (/^--?[\w-]+=?$/.test(lit.trim())) return false;
+  if (/^--?[\w-]+=?$/.test(lit.trim())) {return false;}
   // Variable interpolation / concatenation (`$connection[…]`, `.$var`) — the
   // regex spanned a concatenation, so the value is not a literal password.
-  if (/\$\w|\.\$/.test(lit)) return false;
+  if (/\$\w|\.\$/.test(lit)) {return false;}
   return true;
 }
 
@@ -178,8 +178,8 @@ export function isNotFormatMarker(matchText: string): boolean {
  */
 export function isNotUrlPlaceholder(matchText: string): boolean {
   const pass = matchText.match(/:\/\/[^:@/]+:([^:@/]+)@/)?.[1] ?? '';
-  if (/^(pass(word)?|secret|changeme|example|xxx+|\*+|test)$/i.test(pass)) return false;
-  if (/[$#]\{|<|%s|:\w+$/.test(pass)) return false; // ${..}, #{..}, <pass>, %s
+  if (/^(pass(word)?|secret|changeme|example|xxx+|\*+|test)$/i.test(pass)) {return false;}
+  if (/[$#]\{|<|%s|:\w+$/.test(pass)) {return false;} // ${..}, #{..}, <pass>, %s
   return true;
 }
 
@@ -194,25 +194,25 @@ export function blankNonCode(code: string, hashComments: boolean): string {
   const out = code.split('');
   const n = code.length;
   const blank = (from: number, to: number) => {
-    for (let k = from; k < to && k < n; k++) if (out[k] !== '\n') out[k] = ' ';
+    for (let k = from; k < to && k < n; k++) {if (out[k] !== '\n') {out[k] = ' ';}}
   };
   let i = 0;
   while (i < n) {
     const c = code[i];
     const next = i + 1 < n ? code[i + 1] : '';
     if (c === '/' && next === '/') {
-      let j = i; while (j < n && code[j] !== '\n') j++; blank(i, j); i = j; continue;
+      let j = i; while (j < n && code[j] !== '\n') {j++;} blank(i, j); i = j; continue;
     }
     if (hashComments && c === '#') {
-      let j = i; while (j < n && code[j] !== '\n') j++; blank(i, j); i = j; continue;
+      let j = i; while (j < n && code[j] !== '\n') {j++;} blank(i, j); i = j; continue;
     }
     if (c === '/' && next === '*') {
-      let j = i + 2; while (j < n && !(code[j] === '*' && code[j + 1] === '/')) j++;
+      let j = i + 2; while (j < n && !(code[j] === '*' && code[j + 1] === '/')) {j++;}
       j = Math.min(j + 2, n); blank(i, j); i = j; continue;
     }
     if (c === '"' || c === "'" || c === '`') {
       const q = c; let j = i + 1;
-      while (j < n && code[j] !== q) { if (code[j] === '\\') j++; j++; }
+      while (j < n && code[j] !== q) { if (code[j] === '\\') {j++;} j++; }
       blank(i + 1, j); // keep the quotes, blank the interior
       i = j + 1; continue;
     }
@@ -232,7 +232,7 @@ function runPatterns(
     const regex = new RegExp(p.regex.source, p.regex.flags);
     let match: RegExpExecArray | null;
     while ((match = regex.exec(code)) !== null) {
-      if (p.validate && !p.validate(match[0])) continue;
+      if (p.validate && !p.validate(match[0])) {continue;}
       const line = getLineNumber(code, match.index);
       findings.push({
         type: p.type,
@@ -330,7 +330,7 @@ export class SecretDetector {
     },
     {
       // Google API key.
-      regex: /\bAIza[A-Za-z0-9_\-]{35}\b/g,
+      regex: /\bAIza[A-Za-z0-9_-]{35}\b/g,
       severity: 'high',
       type: 'secret-leak',
       description: 'Google API key detected',
@@ -638,9 +638,9 @@ export class TaintDataflowAnalyzer {
   private isDynamicRhs(rhs: string): boolean {
     // A list/array literal (`args = [exe] + [...]`) is an argument vector, not a
     // dynamic *string* — passing it to subprocess is the safe form.
-    if (/^\s*\[/.test(rhs)) return false;
+    if (/^\s*\[/.test(rhs)) {return false;}
     // A value whose dynamic part is escaped/quoted/cast is considered safe.
-    if (TaintDataflowAnalyzer.SANITIZERS.test(rhs)) return false;
+    if (TaintDataflowAnalyzer.SANITIZERS.test(rhs)) {return false;}
     return (
       /\.\s*format\s*\(/.test(rhs) || // "…".format(x)
       /\bf['"]/.test(rhs) || // f-string
@@ -664,10 +664,10 @@ export class TaintDataflowAnalyzer {
       let changed = false;
       lines.forEach((line, i) => {
         const m = assignRe.exec(line);
-        if (!m) return;
+        if (!m) {return;}
         const name = m[1];
         const rhs = m[2];
-        if (tainted.has(name)) return;
+        if (tainted.has(name)) {return;}
         let taint = this.isDynamicRhs(rhs);
         if (!taint && !TaintDataflowAnalyzer.SANITIZERS.test(rhs)) {
           for (const t of tainted.keys()) {
@@ -680,9 +680,9 @@ export class TaintDataflowAnalyzer {
         }
         if (taint) { tainted.set(name, i + 1); changed = true; }
       });
-      if (!changed) break;
+      if (!changed) {break;}
     }
-    if (tainted.size === 0) return [];
+    if (tainted.size === 0) {return [];}
 
     // Find sinks whose argument is a tainted variable.
     const findings: SecurityFinding[] = [];
@@ -694,9 +694,9 @@ export class TaintDataflowAnalyzer {
         while ((m = re.exec(line)) !== null) {
           const arg = m[1];
           const def = tainted.get(arg);
-          if (def === undefined || def >= i + 1) continue; // must be defined earlier
+          if (def === undefined || def >= i + 1) {continue;} // must be defined earlier
           const key = `${i}:${arg}`;
-          if (seen.has(key)) continue;
+          if (seen.has(key)) {continue;}
           seen.add(key);
           findings.push({
             type: sink.type,

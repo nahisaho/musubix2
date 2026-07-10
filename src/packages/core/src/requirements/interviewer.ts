@@ -261,7 +261,7 @@ export class RequirementsInterviewer {
   // ─── Private Helpers ──────────────────────────────────────────────────────
 
   private extractFromInput(input: string): void {
-    if (!input.trim()) return;
+    if (!input.trim()) {return;}
 
     const lines = input.split('\n').map((l) => l.trim()).filter(Boolean);
 
@@ -395,7 +395,7 @@ export class RequirementsInterviewer {
           [/\bJava\b/, 'Java'],
         ];
         for (const [pat, name] of techPatterns) {
-          if (pat.test(input)) techs.push(name);
+          if (pat.test(input)) {techs.push(name);}
         }
         if (techs.length > 0) {
           this.state.context.techStack = techs;
@@ -483,10 +483,10 @@ export class RequirementsInterviewer {
 
   private applyAnswer(questionId: string, response: string): void {
     const question = this.questions.find((q) => q.id === questionId);
-    if (!question) return;
+    if (!question) {return;}
 
     const trimmed = response.trim();
-    if (!trimmed) return;
+    if (!trimmed) {return;}
 
     switch (question.category) {
       case 'projectName':

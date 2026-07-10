@@ -35,7 +35,7 @@ export class UnitTestGenerator {
     for (const cls of classes) {
       const methods = this.extractMethods(sourceCode, cls);
       const its: string[] = [
-        `  it('should be instantiable', () => {\n    // TODO: implement\n    expect(true).toBe(true);\n  });`,
+        '  it(\'should be instantiable\', () => {\n    // TODO: implement\n    expect(true).toBe(true);\n  });',
       ];
       for (const m of methods) {
         its.push(
@@ -111,14 +111,14 @@ export class UnitTestGenerator {
    */
   private extractMethods(code: string, className: string): string[] {
     const start = code.search(new RegExp(`\\bclass\\s+${className}\\b`));
-    if (start < 0) return [];
+    if (start < 0) {return [];}
     const open = code.indexOf('{', start);
-    if (open < 0) return [];
+    if (open < 0) {return [];}
     // Balance braces to isolate the class body.
     let depth = 0;
     let end = open;
     for (let i = open; i < code.length; i++) {
-      if (code[i] === '{') depth++;
+      if (code[i] === '{') {depth++;}
       else if (code[i] === '}') {
         depth--;
         if (depth === 0) { end = i; break; }
@@ -134,8 +134,8 @@ export class UnitTestGenerator {
     while ((m = methodRe.exec(body)) !== null) {
       const prefix = m[1];
       const name = m[2];
-      if (/\b(private|protected)\b/.test(prefix)) continue; // only public
-      if (KEYWORDS.has(name) || seen.has(name)) continue;
+      if (/\b(private|protected)\b/.test(prefix)) {continue;} // only public
+      if (KEYWORDS.has(name) || seen.has(name)) {continue;}
       seen.add(name);
       methods.push(name);
     }

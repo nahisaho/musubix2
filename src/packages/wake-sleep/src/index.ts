@@ -67,7 +67,7 @@ function computePMI(
   const pmi = new Map<string, number>();
   for (const [ngram, count] of ngramFreq) {
     const parts = ngram.split(' ');
-    if (parts.length < 2) continue;
+    if (parts.length < 2) {continue;}
 
     const pXY = count / totalBigrams;
     let pIndep = 1;
@@ -185,7 +185,7 @@ function jaccardSimilarity(a: string, b: string): number {
   const setB = new Set(b.split(/\s+/));
   let intersection = 0;
   for (const x of setA) {
-    if (setB.has(x)) intersection++;
+    if (setB.has(x)) {intersection++;}
   }
   const union = setA.size + setB.size - intersection;
   return union === 0 ? 0 : intersection / union;
@@ -221,12 +221,12 @@ export class SleepPhase {
     const assigned = new Set<number>();
 
     for (let i = 0; i < surviving.length; i++) {
-      if (assigned.has(i)) continue;
+      if (assigned.has(i)) {continue;}
       const cluster = [surviving[i]];
       assigned.add(i);
 
       for (let j = i + 1; j < surviving.length; j++) {
-        if (assigned.has(j)) continue;
+        if (assigned.has(j)) {continue;}
         if (jaccardSimilarity(surviving[i], surviving[j]) >= SIMILARITY_THRESHOLD) {
           cluster.push(surviving[j]);
           assigned.add(j);

@@ -10,7 +10,7 @@ const BOOTSTRAP_FLAGS = ['platform', 'dry-run', 'update'];
 export class InitModeResolver {
   resolve(flags: Record<string, string | boolean>): InitMode {
     for (const flag of BOOTSTRAP_FLAGS) {
-      if (flag in flags) return 'platform-bootstrap';
+      if (flag in flags) {return 'platform-bootstrap';}
     }
     return 'legacy-project-init';
   }

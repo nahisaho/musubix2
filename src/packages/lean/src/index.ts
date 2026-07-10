@@ -221,17 +221,17 @@ export class LeanProofRunner {
   private parseDiagnostics(stdout: string, stderr: string): LeanDiagnostic[] {
     const diagnostics: LeanDiagnostic[] = [];
     const combined = (stdout + '\n' + stderr).trim();
-    if (!combined) return diagnostics;
+    if (!combined) {return diagnostics;}
 
     for (const line of combined.split('\n')) {
       const diag = this.parseDiagnosticLine(line);
-      if (diag) diagnostics.push(diag);
+      if (diag) {diagnostics.push(diag);}
     }
     return diagnostics;
   }
 
   private parseDiagnosticsFromError(err: unknown): LeanDiagnostic[] {
-    if (!err || typeof err !== 'object') return [];
+    if (!err || typeof err !== 'object') {return [];}
     const stderr = ('stderr' in err ? String((err as { stderr: unknown }).stderr) : '').trim();
     const stdout = ('stdout' in err ? String((err as { stdout: unknown }).stdout) : '').trim();
     return this.parseDiagnostics(stdout, stderr);
@@ -239,7 +239,7 @@ export class LeanProofRunner {
 
   private parseDiagnosticLine(line: string): LeanDiagnostic | null {
     const trimmed = line.trim();
-    if (!trimmed) return null;
+    if (!trimmed) {return null;}
 
     // Lean 4 format: file:line:col: severity: message
     const match = /^[^:]+:(\d+):(\d+):\s*(error|warning|info(?:rmation)?)\s*:\s*(.+)$/.exec(trimmed);

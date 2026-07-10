@@ -38,8 +38,8 @@ export class StdioTransport implements MCPTransport {
 
   private async processLine(line: string): Promise<void> {
     const trimmed = line.trim();
-    if (!trimmed) return;
-    if (!this.handler) return;
+    if (!trimmed) {return;}
+    if (!this.handler) {return;}
 
     try {
       const parsed = JSON.parse(trimmed) as JsonRpcRequest;
@@ -70,7 +70,7 @@ export class StdioTransport implements MCPTransport {
    * can begin writing, so a separate wait hook is needed to block on.
    */
   async waitForClose(): Promise<void> {
-    if (!this.rl) return;
+    if (!this.rl) {return;}
     await new Promise<void>((resolve) => {
       this.rl!.once('close', () => resolve());
     });
@@ -209,7 +209,7 @@ export class InMemoryTransport implements MCPTransport {
   }
 
   async simulateRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
-    if (!this.handler) throw new Error('No handler registered');
+    if (!this.handler) {throw new Error('No handler registered');}
     return this.handler(request);
   }
 

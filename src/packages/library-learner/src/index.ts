@@ -115,7 +115,7 @@ function parseSignatures(snippet: string): ParsedSignature[] {
     let match: RegExpExecArray | null;
     while ((match = re.exec(snippet)) !== null) {
       const name = match[1];
-      if (seen.has(name)) continue;
+      if (seen.has(name)) {continue;}
       seen.add(name);
       const paramStr = match[2] ?? '';
       const params = paramStr
@@ -140,13 +140,13 @@ function parseSignatures(snippet: string): ParsedSignature[] {
  * - Same parameter names
  */
 function structurallySimilar(a: ParsedSignature, b: ParsedSignature): boolean {
-  if (a.arity !== b.arity) return false;
-  if (a.name === b.name) return true;
+  if (a.arity !== b.arity) {return false;}
+  if (a.name === b.name) {return true;}
 
   // Check for shared parameter names
   const paramsA = new Set(a.params);
   for (const p of b.params) {
-    if (paramsA.has(p)) return true;
+    if (paramsA.has(p)) {return true;}
   }
 
   // Check for common substring in names (length >= 3)
@@ -225,7 +225,7 @@ export class LibraryLearner {
     const seenNames = new Set<string>();
 
     for (const sig of allSigs) {
-      if (seenNames.has(sig.name)) continue;
+      if (seenNames.has(sig.name)) {continue;}
       seenNames.add(sig.name);
 
       const nodeKey = `${sig.name}/${sig.arity}`;
@@ -259,7 +259,7 @@ export class LibraryLearner {
     if (inputSigs.length > 0) {
       for (const inputSig of inputSigs) {
         for (const p of this.patterns) {
-          if (matched.has(p.name)) continue;
+          if (matched.has(p.name)) {continue;}
           // Check structural similarity with known patterns
           const pSig: ParsedSignature = {
             name: p.name,

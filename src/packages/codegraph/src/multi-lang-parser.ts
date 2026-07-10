@@ -192,9 +192,9 @@ export interface LanguageParser {
 
 function extractParams(sig: string): string[] | undefined {
   const match = sig.match(/\(([^)]*)\)/);
-  if (!match) return undefined;
+  if (!match) {return undefined;}
   const inner = match[1].trim();
-  if (!inner) return [];
+  if (!inner) {return [];}
   return inner.split(',').map((p) => p.trim()).filter(Boolean);
 }
 
@@ -228,7 +228,7 @@ export class PythonParser implements LanguageParser {
       const lineNum = i + 1;
       const trimmed = line.trim();
 
-      if (trimmed === '' || trimmed.startsWith('#')) continue;
+      if (trimmed === '' || trimmed.startsWith('#')) {continue;}
 
       const indent = getIndent(line);
 
@@ -334,12 +334,12 @@ export class PythonParser implements LanguageParser {
         const isConstructor = isMethod && name === '__init__';
 
         const modifiers: string[] = [];
-        if (isAsync) modifiers.push('async');
+        if (isAsync) {modifiers.push('async');}
         const consumedDecorators = pendingDecorators.splice(0);
         for (const d of consumedDecorators) {
           modifiers.push(`@${d.name}`);
         }
-        if (isConstructor) modifiers.push('constructor');
+        if (isConstructor) {modifiers.push('constructor');}
 
         const params = paramStr
           ? paramStr
@@ -420,7 +420,7 @@ export class JavaParser implements LanguageParser {
       const lineNum = i + 1;
       const trimmed = line.trim();
 
-      if (trimmed === '' || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) continue;
+      if (trimmed === '' || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {continue;}
 
       // Package — skip
       const pkgMatch = trimmed.match(/^package\s+([\w.]+)\s*;/);
@@ -465,9 +465,9 @@ export class JavaParser implements LanguageParser {
         const name = classMatch[5];
 
         const modifiers: string[] = [];
-        if (vis) modifiers.push(vis);
-        if (mod1) modifiers.push(mod1);
-        if (mod2) modifiers.push(mod2);
+        if (vis) {modifiers.push(vis);}
+        if (mod1) {modifiers.push(mod1);}
+        if (mod2) {modifiers.push(mod2);}
         const consumedAnnos = pendingAnnotations.splice(0);
         for (const a of consumedAnnos) {
           modifiers.push(`@${a.name}`);
@@ -510,7 +510,7 @@ export class JavaParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         blockNodeMap.set(blk, node);
@@ -541,10 +541,10 @@ export class JavaParser implements LanguageParser {
           const name = methodMatch[6];
 
           const modifiers: string[] = [];
-          if (vis) modifiers.push(vis);
-          if (isStatic) modifiers.push('static');
-          if (mod1) modifiers.push(mod1);
-          if (mod2) modifiers.push(mod2);
+          if (vis) {modifiers.push(vis);}
+          if (isStatic) {modifiers.push('static');}
+          if (mod1) {modifiers.push(mod1);}
+          if (mod2) {modifiers.push(mod2);}
           const consumedAnnos = pendingAnnotations.splice(0);
           for (const a of consumedAnnos) {
             modifiers.push(`@${a.name}`);
@@ -584,7 +584,7 @@ export class JavaParser implements LanguageParser {
           if (closed) {
             for (const c of closed) {
               const n = blockNodeMap.get(c);
-              if (n) n.endLine = lineNum;
+              if (n) {n.endLine = lineNum;}
             }
           }
           continue;
@@ -599,7 +599,7 @@ export class JavaParser implements LanguageParser {
       if (closed) {
         for (const c of closed) {
           const n = blockNodeMap.get(c);
-          if (n) n.endLine = lineNum;
+          if (n) {n.endLine = lineNum;}
         }
       }
     }
@@ -632,7 +632,7 @@ export class GoParser implements LanguageParser {
       const lineNum = i + 1;
       const trimmed = line.trim();
 
-      if (trimmed === '' || trimmed.startsWith('//')) continue;
+      if (trimmed === '' || trimmed.startsWith('//')) {continue;}
 
       // Package
       const pkgMatch = trimmed.match(/^package\s+(\w+)/);
@@ -709,7 +709,7 @@ export class GoParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -746,7 +746,7 @@ export class GoParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -773,7 +773,7 @@ export class GoParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -838,7 +838,7 @@ export class GoParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -888,7 +888,7 @@ export class GoParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -913,7 +913,7 @@ export class GoParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -924,7 +924,7 @@ export class GoParser implements LanguageParser {
       if (closed) {
         for (const c of closed) {
           const n = blockNodeMap.get(c);
-          if (n) n.endLine = lineNum;
+          if (n) {n.endLine = lineNum;}
         }
       }
     }
@@ -957,7 +957,7 @@ export class RustParser implements LanguageParser {
       const lineNum = i + 1;
       const trimmed = line.trim();
 
-      if (trimmed === '' || trimmed.startsWith('//')) continue;
+      if (trimmed === '' || trimmed.startsWith('//')) {continue;}
 
       // Attributes
       const attrMatch = trimmed.match(/^#\[(\w+(?:\([^)]*\))?)\]/);
@@ -993,7 +993,7 @@ export class RustParser implements LanguageParser {
         const name = modMatch[1];
         const modifiers = trimmed.startsWith('pub') ? ['pub'] : [];
         const consumedAttrs = pendingAttrs.splice(0);
-        for (const a of consumedAttrs) modifiers.push(`#[${a.name}]`);
+        for (const a of consumedAttrs) {modifiers.push(`#[${a.name}]`);}
 
         const node: ASTNode = {
           type: 'module',
@@ -1015,7 +1015,7 @@ export class RustParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -1029,7 +1029,7 @@ export class RustParser implements LanguageParser {
         const name = structMatch[1];
         const modifiers = trimmed.match(/^pub/) ? ['pub'] : [];
         const consumedAttrs = pendingAttrs.splice(0);
-        for (const a of consumedAttrs) modifiers.push(`#[${a.name}]`);
+        for (const a of consumedAttrs) {modifiers.push(`#[${a.name}]`);}
 
         const parentBlock = tracker.getCurrentBlock();
         const parentNode = parentBlock
@@ -1068,7 +1068,7 @@ export class RustParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -1082,7 +1082,7 @@ export class RustParser implements LanguageParser {
         const name = enumMatch[1];
         const modifiers = trimmed.match(/^pub/) ? ['pub'] : [];
         const consumedAttrs = pendingAttrs.splice(0);
-        for (const a of consumedAttrs) modifiers.push(`#[${a.name}]`);
+        for (const a of consumedAttrs) {modifiers.push(`#[${a.name}]`);}
 
         const node: ASTNode = {
           type: 'enum',
@@ -1110,7 +1110,7 @@ export class RustParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -1123,9 +1123,9 @@ export class RustParser implements LanguageParser {
       if (traitMatch) {
         const name = traitMatch[1];
         const modifiers = trimmed.match(/^pub/) ? ['pub'] : [];
-        if (trimmed.includes('unsafe')) modifiers.push('unsafe');
+        if (trimmed.includes('unsafe')) {modifiers.push('unsafe');}
         const consumedAttrs = pendingAttrs.splice(0);
-        for (const a of consumedAttrs) modifiers.push(`#[${a.name}]`);
+        for (const a of consumedAttrs) {modifiers.push(`#[${a.name}]`);}
 
         const node: ASTNode = {
           type: 'trait',
@@ -1147,7 +1147,7 @@ export class RustParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -1165,9 +1165,9 @@ export class RustParser implements LanguageParser {
           : typeName;
 
         const modifiers: string[] = [];
-        if (traitName) modifiers.push('impl_trait');
+        if (traitName) {modifiers.push('impl_trait');}
         const consumedAttrs = pendingAttrs.splice(0);
-        for (const a of consumedAttrs) modifiers.push(`#[${a.name}]`);
+        for (const a of consumedAttrs) {modifiers.push(`#[${a.name}]`);}
 
         const node: ASTNode = {
           type: 'class', // impl blocks act like class extensions
@@ -1189,7 +1189,7 @@ export class RustParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -1207,11 +1207,11 @@ export class RustParser implements LanguageParser {
         const retType = fnMatch[5]?.trim().replace(/\{$/, '').trim();
 
         const modifiers: string[] = [];
-        if (trimmed.match(/^pub/)) modifiers.push('pub');
-        if (isAsync) modifiers.push('async');
-        if (isUnsafe) modifiers.push('unsafe');
+        if (trimmed.match(/^pub/)) {modifiers.push('pub');}
+        if (isAsync) {modifiers.push('async');}
+        if (isUnsafe) {modifiers.push('unsafe');}
         const consumedAttrs = pendingAttrs.splice(0);
-        for (const a of consumedAttrs) modifiers.push(`#[${a.name}]`);
+        for (const a of consumedAttrs) {modifiers.push(`#[${a.name}]`);}
 
         const params = paramStr
           ? paramStr.split(',').map((p) => p.trim()).filter(Boolean)
@@ -1260,7 +1260,7 @@ export class RustParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -1274,7 +1274,7 @@ export class RustParser implements LanguageParser {
       if (closed) {
         for (const c of closed) {
           const n = blockNodeMap.get(c);
-          if (n) n.endLine = lineNum;
+          if (n) {n.endLine = lineNum;}
         }
       }
     }
@@ -1306,7 +1306,7 @@ export class RubyParser implements LanguageParser {
       const lineNum = i + 1;
       const trimmed = line.trim();
 
-      if (trimmed === '' || trimmed.startsWith('#')) continue;
+      if (trimmed === '' || trimmed.startsWith('#')) {continue;}
 
       // Require / require_relative
       const reqMatch = trimmed.match(
@@ -1438,7 +1438,7 @@ export class RubyParser implements LanguageParser {
         const paramStr = defMatch[3];
 
         const modifiers: string[] = [];
-        if (isSelf) modifiers.push('static');
+        if (isSelf) {modifiers.push('static');}
 
         const params = paramStr
           ? paramStr.split(',').map((p) => p.trim()).filter(Boolean)
@@ -1555,7 +1555,7 @@ export class PhpParser implements LanguageParser {
         trimmed.startsWith('*') ||
         trimmed === '<?php'
       )
-        continue;
+        {continue;}
 
       // Namespace
       const nsMatch = trimmed.match(/^namespace\s+([\w\\]+)\s*;/);
@@ -1599,8 +1599,8 @@ export class PhpParser implements LanguageParser {
         const name = classMatch[4];
 
         const modifiers: string[] = [];
-        if (mod1) modifiers.push(mod1);
-        if (mod2) modifiers.push(mod2);
+        if (mod1) {modifiers.push(mod1);}
+        if (mod2) {modifiers.push(mod2);}
 
         const type: ASTNode['type'] =
           kind === 'interface'
@@ -1640,7 +1640,7 @@ export class PhpParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -1658,8 +1658,8 @@ export class PhpParser implements LanguageParser {
         const retType = funcMatch[5]?.trim().replace(/\{$/, '').trim();
 
         const modifiers: string[] = [];
-        if (vis) modifiers.push(vis);
-        if (isStatic) modifiers.push('static');
+        if (vis) {modifiers.push(vis);}
+        if (isStatic) {modifiers.push('static');}
 
         const params = paramStr
           ? paramStr.split(',').map((p) => p.trim()).filter(Boolean)
@@ -1707,7 +1707,7 @@ export class PhpParser implements LanguageParser {
         if (closed) {
           for (const c of closed) {
             const n = blockNodeMap.get(c);
-            if (n) n.endLine = lineNum;
+            if (n) {n.endLine = lineNum;}
           }
         }
         continue;
@@ -1725,9 +1725,9 @@ export class PhpParser implements LanguageParser {
 
         if (vis || isStatic || isReadonly) {
           const modifiers: string[] = [];
-          if (vis) modifiers.push(vis);
-          if (isStatic) modifiers.push('static');
-          if (isReadonly) modifiers.push('readonly');
+          if (vis) {modifiers.push(vis);}
+          if (isStatic) {modifiers.push('static');}
+          if (isReadonly) {modifiers.push('readonly');}
 
           const parentBlock = tracker.getCurrentBlock();
           const parentNode = parentBlock
@@ -1758,7 +1758,7 @@ export class PhpParser implements LanguageParser {
       if (closed) {
         for (const c of closed) {
           const n = blockNodeMap.get(c);
-          if (n) n.endLine = lineNum;
+          if (n) {n.endLine = lineNum;}
         }
       }
     }
@@ -1784,7 +1784,7 @@ export class MultiLanguageParser {
 
   parse(source: string, language: string): ParseResult {
     const parser = this.parsers.get(language);
-    if (!parser) return this.fallbackParse(source, language);
+    if (!parser) {return this.fallbackParse(source, language);}
     return parser.parse(source);
   }
 
@@ -1829,7 +1829,7 @@ export class MultiLanguageParser {
       const line = lines[i];
       const lineNum = i + 1;
       const trimmed = line.trim();
-      if (trimmed === '') continue;
+      if (trimmed === '') {continue;}
 
       for (const { type, regex } of patterns) {
         const match = regex.exec(trimmed);

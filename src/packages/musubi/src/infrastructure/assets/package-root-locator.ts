@@ -10,9 +10,9 @@ export class PackageRootLocator {
     const thisFile = fileURLToPath(importMetaUrl);
     let dir = dirname(thisFile);
     for (let i = 0; i < 10; i++) {
-      if (existsSync(resolve(dir, 'package.json'))) return dir;
+      if (existsSync(resolve(dir, 'package.json'))) {return dir;}
       const parent = dirname(dir);
-      if (parent === dir) break;
+      if (parent === dir) {break;}
       dir = parent;
     }
     return dir;

@@ -9,7 +9,7 @@ export class ConfirmationResolver {
     selection: PlatformSelection,
     interactive: boolean,
   ): Promise<PlatformSelection> {
-    if (!selection.needsConfirmation) return selection;
+    if (!selection.needsConfirmation) {return selection;}
 
     if (!interactive) {
       return {

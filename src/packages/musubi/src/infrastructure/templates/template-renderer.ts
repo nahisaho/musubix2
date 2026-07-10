@@ -41,7 +41,7 @@ export class TemplateRenderer {
   }
 
   private buildSkillSection(skillNames: string[]): string {
-    if (skillNames.length === 0) return '_No skills configured._';
+    if (skillNames.length === 0) {return '_No skills configured._';}
     return skillNames.map(n => `- **${n}**`).join('\n');
   }
 }

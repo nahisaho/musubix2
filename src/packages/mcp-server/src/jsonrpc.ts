@@ -45,7 +45,7 @@ export function createJsonRpcError(
 }
 
 export function isJsonRpcRequest(value: unknown): value is JsonRpcRequest {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== 'object' || value === null) {return false;}
   const obj = value as Record<string, unknown>;
   return (
     obj['jsonrpc'] === '2.0' &&

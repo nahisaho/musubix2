@@ -12,7 +12,7 @@ export class PackageAssetCatalog {
   constructor(private readonly locator: PackageRootLocator) {}
 
   private load(): SkillsManifest {
-    if (this.manifest) return this.manifest;
+    if (this.manifest) {return this.manifest;}
     const root = this.locator.resolve(import.meta.url);
     const manifestPath = resolve(root, 'dist', 'assets', 'skills-manifest.json');
     if (!existsSync(manifestPath)) {

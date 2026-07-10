@@ -5,7 +5,7 @@ import type { SkillIndexItem } from '../../domain/install/types.js';
 
 export class ClaudeSkillIndexBuilder {
   build(items: SkillIndexItem[]): string {
-    if (items.length === 0) return '';
+    if (items.length === 0) {return '';}
 
     const lines: string[] = [
       '## スキル一覧',

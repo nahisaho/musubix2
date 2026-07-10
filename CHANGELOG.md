@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - mcp-server: 実エラーを surface する検証
 - musubi: `trace impact` の実リンク解析を検証
 
+### Chore（CI 復旧）
+
+- **Lint 失敗で CI が長期 red だった問題を修正** — `curly`/`no-unreachable`/`no-useless-escape` 違反 298 件を解消（大半は `eslint --fix` による波括弧補完、加えて `tasks` の到達不能 `break` 除去、Google API キー正規表現の不要エスケープ修正）。挙動変更なし・全 1763 テスト緑を確認
+
 ## [0.5.43] - 2026-07-10
 
 SDD パイプラインの下流連携（続き）。`codegen` が設計成果物・要件ファイルを受け取れず、ファイルパスを渡すと**不正なクラス名**を生成していた問題を修正。
