@@ -236,6 +236,21 @@ export class RequirementsInterviewer {
     return { ...this.state };
   }
 
+  /**
+   * Restore a previously serialized state so the 1問1答 flow can span separate
+   * CLI invocations (each a fresh process). Pairs with getState().
+   */
+  restoreState(state: InterviewState): void {
+    this.state = {
+      context: state.context ?? {},
+      answeredQuestions: state.answeredQuestions ?? [],
+      currentQuestion: state.currentQuestion ?? null,
+      isComplete: state.isComplete ?? false,
+      completionPercentage: state.completionPercentage ?? 0,
+      missingRequired: state.missingRequired ?? [],
+    };
+  }
+
   /** Reset the interview */
   reset(): void {
     this.state = {

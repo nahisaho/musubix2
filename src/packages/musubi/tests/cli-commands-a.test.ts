@@ -10,6 +10,7 @@ import {
   handleDesignVerify,
   handleCodegen,
   handleTestGen,
+  handleReqInterview,
   createCLIDispatcher,
 } from '../src/cli.js';
 import { ExitCode } from '@musubix2/core';
@@ -93,6 +94,37 @@ describe('handleReqValidate', () => {
       expect(out).not.toContain('3-letter');
     } finally {
       spy.mockRestore();
+    }
+  });
+});
+
+// ── handleReqInterview ─────────────────────────────────────────────────────
+
+describe('handleReqInterview persistence', () => {
+  // v0.5.74 — the 1問1答 flow must survive across separate CLI invocations
+  // (each a fresh process), so state persists to .musubix/interview.json.
+  it('persists interview state across separate calls', async () => {
+    const dir = join(FIXTURE_DIR, 'iv');
+    mkdirSync(dir, { recursive: true });
+    const prev = process.cwd();
+    process.chdir(dir);
+    try {
+      await handleReqInterview({ args: ['A todo app for teams'] }); // start (own process sim)
+      const logs: string[] = [];
+      const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+      try {
+        await handleReqInterview({ state: true }); // a "new process" reads persisted state
+      } finally {
+        spy.mockRestore();
+      }
+      const out = logs.join('\n');
+      expect(out).toContain('Answered:');
+      expect(out).not.toContain('Completion: 0%'); // progress survived, not reset
+      // reset clears it.
+      await handleReqInterview({ reset: true });
+    } finally {
+      process.chdir(prev);
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });
@@ -289,6 +321,14 @@ describe('handleCodegen', () => {
     const code = await handleCodegen('/no/such/file.md', 'class');
     expect(code).toBe(ExitCode.GENERAL_ERROR);
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('File not found'));
+  });
+
+  // v0.5.74 — --out must create missing parent directories.
+  it('creates parent directories for --out', async () => {
+    const nested = join(FIXTURE_DIR, 'aa', 'bb', 'cc', 'out.ts');
+    const code = await handleCodegen('Widget', 'class', nested);
+    expect(code).toBe(ExitCode.SUCCESS);
+    expect(existsSync(nested)).toBe(true);
   });
 
   // v0.5.73 — a reserved word as a name must not emit `class class {`.

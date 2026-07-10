@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.74] - 2026-07-11
+
+dogfooding 実装テスト 50 本（第 4 巡）を実施し、4 件の不具合を修正。
+
+### Fixed
+
+- **`req:interview`（1問1答）が回を進められなかった** — インタビュー状態をモジュール内シングルトンで保持していたため、CLI 呼び出しごとに別プロセスとなり状態が失われ、最初の質問から先へ進めなかった。状態を `.musubix/interview.json` に永続化し、呼び出しをまたいで継続できるよう修正（core に `restoreState` を追加）。`--reset` でクリア、入力テキスト指定で再スタート
+- **`--out` が親ディレクトリを作成しなかった** — `codegen … --out src/app.ts` を `src/` が無いプロジェクト（init 直後）で実行すると ENOENT で失敗していた（ガイド記載の手順が新規プロジェクトで失敗）。親ディレクトリを自動作成するよう修正（codegen / design generate / cg export の全 `--out` に適用）
+- **`trace matrix --json` が Markdown を出力** — `--json` フラグが無視され表形式のみだった（`trace impact` / `cg diff` は対応済み）。requirements/files/links/completeness/coverage を含む JSON を出力するよう対応
+- **MCP `synthesis.dsl.build` が `repeat` op 未対応** — CLI は `repeat:n` をサポートするが MCP ツールは未対応で CLI/MCP に差異があった。`repeat` を追加してパリティを回復
+
+### Verified
+
+- MCP 61 ツールを正しいパラメータで再検証（synthesis DSL 全 op、interview stateless フロー、neural/research/workflow 等）。EARS 6 パターン分類、SOLID 検証、多言語 CodeGraph、フルパイプライン（init→analyze→design→codegen→verify）が正常動作
+
 ## [0.5.73] - 2026-07-11
 
 dogfooding 実装テスト 50 本（第 3 巡）を実施し、2 件の不具合を修正。MCP サーバー 61 ツールを正しいパラメータで再検証し、全ツールのロジックが正常であることを確認。

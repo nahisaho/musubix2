@@ -1436,6 +1436,18 @@ describe('v0.5.6 trace real data', () => {
     const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
     expect(printed).toContain('referenced in code: 2');
   });
+
+  // v0.5.74 — trace matrix supports --json (was markdown-only, unlike impact/diff).
+  it('trace matrix emits JSON with --json', async () => {
+    logSpy.mockClear();
+    const code = await handleTrace('matrix', [], { specs, src, json: true });
+    expect(code).toBe(ExitCode.SUCCESS);
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    const parsed = JSON.parse(out);
+    expect(Array.isArray(parsed.requirements)).toBe(true);
+    expect(typeof parsed.completeness).toBe('number');
+    expect(typeof parsed.coveragePercent).toBe('number');
+  });
 });
 
 describe('v0.5.6 ontology persistence', () => {

@@ -382,7 +382,7 @@ import {
   type WorkflowPhase,
   PHASE_ORDER,
 } from '@musubix2/workflow-engine';
-import { readFileSync, existsSync, statSync, readdirSync, writeFileSync, mkdirSync, type Dirent } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync, writeFileSync, mkdirSync, rmSync, type Dirent } from 'node:fs';
 import { join as joinPath, dirname as dirnamePath } from 'node:path';
 
 /**
@@ -686,9 +686,21 @@ export async function handleTrace(
       }
       const generator = createMatrixGenerator();
       const report = generator.generate(data.requirementIds, data.fileIds, data.links);
-      console.log(generator.toMarkdown(report));
       const covered = data.requirementIds.filter((r) => (data.refsByReq.get(r)?.length ?? 0) > 0);
       const pct = Math.round((covered.length / data.requirementIds.length) * 100);
+      if (flags['json'] === true) {
+        console.log(JSON.stringify({
+          requirements: data.requirementIds,
+          files: data.fileIds,
+          links: data.links,
+          completeness: report.completeness,
+          gaps: report.gaps,
+          referencedInCode: covered.length,
+          coveragePercent: pct,
+        }, null, 2));
+        return ExitCode.SUCCESS;
+      }
+      console.log(generator.toMarkdown(report));
       console.log(
         `\nRequirements: ${data.requirementIds.length}, referenced in code: ${covered.length} ` +
           `(${pct}%), source files: ${data.fileIds.length} (scanned ${srcDir}).`,
@@ -2216,7 +2228,7 @@ export async function handleCodegraph(
       }
 
       if (outPath) {
-        writeFileSync(outPath, output, 'utf-8');
+        writeOut(outPath, output);
         console.log(
           `✅ Exported ${fileSet.size} file(s), ${rels.length} edge(s) as ${format} to ${outPath}`,
         );
@@ -2548,11 +2560,30 @@ export async function handleReqWizard(): Promise<ExitCodeValue> {
   }
 }
 
-// Singleton interviewer for session persistence across CLI calls
-let _interviewer: RequirementsInterviewerType | null = null;
+// The 1問1答 interview spans separate CLI invocations (each a fresh process),
+// so state is persisted to disk — a module singleton alone would reset every run.
+const INTERVIEW_STATE_FILE = '.musubix/interview.json';
 function getInterviewer(): RequirementsInterviewerType {
-  if (!_interviewer) {_interviewer = createRequirementsInterviewer();}
-  return _interviewer;
+  const interviewer = createRequirementsInterviewer();
+  if (existsSync(INTERVIEW_STATE_FILE)) {
+    try {
+      interviewer.restoreState(JSON.parse(readFileSync(INTERVIEW_STATE_FILE, 'utf-8')));
+    } catch {
+      // Corrupt/older state — start fresh rather than crashing the command.
+    }
+  }
+  return interviewer;
+}
+function saveInterview(interviewer: RequirementsInterviewerType): void {
+  mkdirSync(dirnamePath(INTERVIEW_STATE_FILE), { recursive: true });
+  writeFileSync(INTERVIEW_STATE_FILE, JSON.stringify(interviewer.getState(), null, 2), 'utf-8');
+}
+
+/** Write a file for a `--out` target, creating parent directories as needed. */
+function writeOut(filePath: string, content: string): void {
+  const dir = dirnamePath(filePath);
+  if (dir && dir !== '.') {mkdirSync(dir, { recursive: true });}
+  writeFileSync(filePath, content, 'utf-8');
 }
 
 export async function handleReqInterview(args: Record<string, unknown>): Promise<ExitCodeValue> {
@@ -2561,7 +2592,7 @@ export async function handleReqInterview(args: Record<string, unknown>): Promise
 
     // --reset: Reset interview state
     if (args['reset'] === true) {
-      _interviewer = createRequirementsInterviewer();
+      if (existsSync(INTERVIEW_STATE_FILE)) {rmSync(INTERVIEW_STATE_FILE, { force: true });}
       console.log('🔄 Interview state reset.');
       return ExitCode.SUCCESS;
     }
@@ -2607,6 +2638,7 @@ export async function handleReqInterview(args: Record<string, unknown>): Promise
       }
 
       const result = interviewer.answer(questionId, response);
+      saveInterview(interviewer);
       if (result.status === 'complete') {
         console.log('✅ Interview complete! All required info gathered.');
         console.log('   Run `musubix req:interview --generate` to generate the spec.');
@@ -2638,7 +2670,10 @@ export async function handleReqInterview(args: Record<string, unknown>): Promise
       return ExitCode.SUCCESS;
     }
 
+    // Providing input text starts (or restarts) the interview from scratch.
+    interviewer.reset();
     const result = interviewer.analyzeInput(inputText);
+    saveInterview(interviewer);
     if (result.status === 'complete') {
       console.log('✅ Sufficient info gathered! Generating requirements...');
       const generator = createRequirementsDocGenerator();
@@ -2685,7 +2720,7 @@ export async function handleDesignGenerate(
       // pipeline can flow requirements → design → verify/c4.
       const c4 = deriveC4FromRequirements(content);
       const artifact = { ...design, elements: c4.elements, relationships: c4.relationships };
-      writeFileSync(outPath, JSON.stringify(artifact, null, 2) + '\n', 'utf-8');
+      writeOut(outPath, JSON.stringify(artifact, null, 2) + '\n');
       console.log(`✅ Wrote design artifact: ${outPath} (${design.sections.length} section(s))`);
       console.log(`   Next: musubix design:verify ${outPath}  |  musubix design:c4 ${outPath}`);
       return ExitCode.SUCCESS;
@@ -3014,7 +3049,7 @@ export async function handleCodegen(
       const code = [...entityDecls, ...blocks].join('\n\n');
       if (outPath) {
         // Write a single source file so it can be fed straight into `test:gen`.
-        writeFileSync(outPath, code + '\n', 'utf-8');
+        writeOut(outPath, code + '\n');
         console.error(`✅ Wrote ${targets.length} skeleton(s) to ${outPath}`);
         console.error(`   Next: musubix test:gen ${outPath}`);
         return ExitCode.SUCCESS;
@@ -3048,7 +3083,7 @@ export async function handleCodegen(
       name: safeName,
     });
     if (outPath) {
-      writeFileSync(outPath, result.code + '\n', 'utf-8');
+      writeOut(outPath, result.code + '\n');
       console.error(`✅ Wrote skeleton to ${outPath}`);
       console.error(`   Next: musubix test:gen ${outPath}`);
       return ExitCode.SUCCESS;

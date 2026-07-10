@@ -1108,7 +1108,7 @@ function synthesisTools(): CatalogEntry[] {
       'synthesis',
       [
         param('input', 'string', 'Input string to transform'),
-        param('ops', 'array', 'Ops: trim | upper | lower | reverse | capitalize | camelCase | snakeCase | replace:from:to'),
+        param('ops', 'array', 'Ops: trim | upper | lower | reverse | capitalize | camelCase | snakeCase | replace:from:to | prefixRemove:p | suffixAppend:s | repeat:n'),
       ],
       async (params) => {
         try {
@@ -1128,6 +1128,7 @@ function synthesisTools(): CatalogEntry[] {
               case 'replace': builder.replace(a[0] ?? '', a[1] ?? ''); break;
               case 'prefixRemove': builder.prefixRemove(a[0] ?? ''); break;
               case 'suffixAppend': builder.suffixAppend(a[0] ?? ''); break;
+              case 'repeat': builder.repeat(Number.parseInt(a[0] ?? '1', 10) || 1); break;
               default: return fail(`Unknown DSL op: ${name}`);
             }
           }

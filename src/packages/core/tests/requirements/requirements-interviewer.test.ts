@@ -105,6 +105,23 @@ describe('RequirementsInterviewer — input analysis', () => {
     expect(result.state.context.security).toBe('HTTPS通信必須');
   });
 
+  // v0.5.74 — restoreState lets the 1問1答 flow span separate CLI processes.
+  it('restoreState round-trips state so a new instance can continue the interview', () => {
+    const a = new RequirementsInterviewer();
+    a.analyzeInput('A todo app for teams');
+    const q = a.getState().currentQuestion;
+    expect(q).not.toBeNull();
+    const snapshot = JSON.parse(JSON.stringify(a.getState()));
+
+    // Fresh instance (simulating a new process) restores and continues.
+    const b = new RequirementsInterviewer();
+    b.restoreState(snapshot);
+    expect(b.getState().answeredQuestions).toEqual(snapshot.answeredQuestions);
+    const before = b.getState().answeredQuestions.length;
+    b.answer(q!.id, 'Manages team todos and deadlines');
+    expect(b.getState().answeredQuestions.length).toBeGreaterThan(before);
+  });
+
   it('should extract from English input', () => {
     const interviewer = new RequirementsInterviewer();
     const result = interviewer.analyzeInput('project name: MyApp\nThis is a mobile app for tracking fitness');
