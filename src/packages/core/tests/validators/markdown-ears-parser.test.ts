@@ -121,6 +121,20 @@ describe('REQ-REQ-002: MarkdownEARSParser', () => {
     expect(reqs[0].confidence).toBeGreaterThan(0.5);
   });
 
+  // v0.5.77 — Windows/CRLF-edited files must parse (a trailing \r broke the
+  // heading regex, yielding zero requirements).
+  it('parses requirements with CRLF line endings', () => {
+    const md =
+      '# Reqs\r\n## REQ-CRL-001: Login\r\n' +
+      'WHEN a user submits, THE system SHALL authenticate.\r\n' +
+      '## REQ-CRL-002: Log\r\nTHE system SHALL log events.\r\n';
+    const reqs = parser.parse(md);
+    expect(reqs).toHaveLength(2);
+    expect(reqs[0].id).toBe('REQ-CRL-001');
+    expect(reqs[0].text).toContain('SHALL authenticate');
+    expect(reqs[0].pattern).toBe('event-driven');
+  });
+
   it('fallback text excludes field markers and checklist bullets', () => {
     const md =
       '## REQ-NTF-004: Retry\n' +

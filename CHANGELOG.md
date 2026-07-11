@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.77] - 2026-07-11
+
+dogfooding 実装テスト 50 本（第 7 巡）を実施し、1 件の不具合を修正。MCP 61 ツールを全数監査し、正常性を確認。
+
+### Fixed
+
+- **CRLF（Windows）改行の要件ファイルが「要件なし」と判定されていた** — MarkdownEARSParser が `\n` のみで行分割していたため、行末に残る `\r` が見出し正規表現の `(.*)$`（`.` は `\r` に一致しない）を破壊し、Windows で編集した要件ファイルが 0 件と解析されていた。`\r\n` / `\r`（旧 Mac）/ `\n` すべてで分割するよう修正。req validate / requirements analyze / design / codegen / verify / trace の全パイプラインで CRLF・CR-only・混在改行が扱えるようになった
+
+### Verified
+
+- **MCP 61 ツールを全数監査**（正しいパラメータで実行）— エラー 0・偽の空応答 0。0.5.76 で修正した policy カテゴリを含め、全ツールが健全であることを確認
+- State パターンの状態推論 → enum 生成（tsc 通過）、cg gate の多重 forbid/layering、design 生成の決定性、混在パターン検出、大文字小文字・タブ・BOM・特殊文字・10k 文字行などのロバスト性
+
 ## [0.5.76] - 2026-07-11
 
 dogfooding 実装テスト 50 本（第 6 巡）を実施し、5 件の不具合を修正。うち 3 件は MCP の policy カテゴリ全体が静かに機能不全だった問題。

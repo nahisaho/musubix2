@@ -33,7 +33,10 @@ export class MarkdownEARSParser {
 
   parse(markdown: string): ParsedRequirement[] {
     const requirements: ParsedRequirement[] = [];
-    const lines = markdown.split('\n');
+    // Normalize CRLF/CR (Windows/old-Mac) so the heading/field regexes — whose
+    // `$`/`.` don't span a trailing `\r` — match. Without this, a Windows-edited
+    // requirements file parses as zero requirements.
+    const lines = markdown.split(/\r\n|\r|\n/);
     let currentReq: Partial<ParsedRequirement> | null = null;
     let currentBlock = '';
     let blockStartLine = 0;

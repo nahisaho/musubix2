@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "lastModified": "2026-07-11T00:10:16.834Z",
+    "entityCount": 0,
+    "relationCount": 1
+  },
+  "entities": {},
+  "relations": [
+    {
+      "id": "a-related_to-b",
+      "source": "a",
+      "target": "b",
+      "type": "related_to"
+    }
+  ]
+}
