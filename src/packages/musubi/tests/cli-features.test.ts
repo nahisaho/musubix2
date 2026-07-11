@@ -136,6 +136,15 @@ describe('REQ-ARC-003: showHelp', () => {
     expect(help).toContain('policy');
   });
 
+  // v0.5.88 — the composite/variant commands must also be listed in root help
+  // (they were dispatchable but absent from `--help`).
+  it('lists the pipeline variant commands', () => {
+    const help = showHelp();
+    for (const cmd of ['design:c4', 'design:verify', 'test:gen', 'req:wizard', 'req:interview', 'trace:verify']) {
+      expect(help).toContain(cmd);
+    }
+  });
+
   it('returns subcommand help for init', () => {
     const help = showHelp('init');
     expect(help).toContain('MUSUBIX2 — init');

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.88] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 18 巡）を実施し、1 件の不具合を修正。
+
+### Fixed
+
+- **`--help` に 6 コマンドが表示されていなかった** — `design:c4` / `design:verify` / `test:gen` / `req` / `req:wizard` / `req:interview` はディスパッチ可能だが `--help` の一覧に無く、ユーザーが主要なパイプラインコマンド（design:c4/design:verify/test:gen）を発見できなかった。`COMMAND_HELP` に 6 件を追加し、ディスパッチャの全コマンドが help に載るようにした
+
+### Verified
+
+- フルパイプラインの往復（design → design:verify → design:c4 → codegen → tsc → test:gen → trace 100% → verify）、各成果物の相互整合（生成コードが tsc 通過・エンティティスタブ宣言・cg export→diff 自己一致・c4 の未宣言参照なし）、`--version`/`-v`、不正コマンドの終了コード
+
 ## [0.5.87] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 17 巡）を実施し、1 件の不具合を修正。

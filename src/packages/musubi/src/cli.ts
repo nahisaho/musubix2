@@ -133,13 +133,37 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     usage: 'musubix requirements <analyze|validate> <file>',
     description: '要件分析',
   },
+  req: {
+    usage: 'musubix req <analyze|validate> <file>',
+    description: '要件分析（requirements の別名）',
+  },
+  'req:wizard': {
+    usage: 'musubix req:wizard',
+    description: '要件作成ウィザード',
+  },
+  'req:interview': {
+    usage: 'musubix req:interview [<input>] [--answer <id> <text>] [--state] [--generate] [--reset]',
+    description: '要件インタビュー（1問1答）',
+  },
   design: {
     usage: 'musubix design generate <requirements.md> [--out <design.json>] | musubix design verify <design.json>',
     description: '設計生成 (--out で再利用可能な JSON 成果物を書き出し design:verify / design:c4 へ連携)',
   },
+  'design:verify': {
+    usage: 'musubix design:verify <design.json>',
+    description: 'SOLID 検証（設計 JSON を検証）',
+  },
+  'design:c4': {
+    usage: 'musubix design:c4 <design.json|reqs.md> [--level context|container|component|code] [--format mermaid|plantuml]',
+    description: 'C4 モデル図生成（Mermaid / PlantUML）',
+  },
   codegen: {
     usage: 'musubix codegen [generate] <name> [--type class|interface|function|...]',
     description: 'コード生成',
+  },
+  'test:gen': {
+    usage: 'musubix test:gen <source.ts|dir>',
+    description: 'テスト生成（TS/JS の Vitest 雛形）',
   },
   tasks: {
     usage: 'musubix tasks <validate|list|stats> [--file <path>]',
