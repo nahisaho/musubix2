@@ -387,4 +387,14 @@ describe('DES-DES-001: SOLIDValidator', () => {
     const v = createSOLIDValidator();
     expect(v).toBeInstanceOf(SOLIDValidator);
   });
+
+  // v0.5.76 — tolerate partial/hand-written design JSON without crashing on
+  // `undefined.length` (sections or their array fields may be missing).
+  it('does not crash on partial designs with missing fields', () => {
+    const v = new SOLIDValidator();
+    expect(() => v.validate({ sections: [{ id: 'S1' }] } as never)).not.toThrow();
+    expect(() => v.validate({} as never)).not.toThrow();
+    const report = v.validate({ sections: [{ id: 'S1' }] } as never);
+    expect(typeof report.score).toBe('number');
+  });
 });

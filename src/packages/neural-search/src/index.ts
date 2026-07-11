@@ -118,7 +118,10 @@ export class TfIdfEmbeddingModel implements IEmbeddingModel {
     }
 
     for (const [term, df] of this.documentFrequency) {
-      this.idfScores.set(term, Math.log(this.documentCount / df));
+      // Smoothed IDF (sklearn-style): log((1+N)/(1+df)) + 1. Never zero, so a
+      // single-document fit yields a usable (TF-weighted) vector instead of the
+      // all-zeros a raw log(N/df) produces when every term appears in all docs.
+      this.idfScores.set(term, Math.log((1 + this.documentCount) / (1 + df)) + 1);
     }
   }
 

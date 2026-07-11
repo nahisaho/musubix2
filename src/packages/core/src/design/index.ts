@@ -478,31 +478,35 @@ export class SOLIDValidator {
       DIP: 100,
     };
 
-    for (const section of design.sections) {
+    // Tolerate partial/hand-written design JSON: sections (and their array
+    // fields) may be missing rather than crashing with `undefined.length`.
+    for (const section of design.sections ?? []) {
+      const reqCount = (section.requirementIds ?? []).length;
+      const ifaceCount = (section.interfaces ?? []).length;
       // SRP: Each section should focus on few requirements
-      if (section.requirementIds.length > 5) {
+      if (reqCount > 5) {
         violations.push({
           principle: 'SRP',
           section: section.id,
-          message: `Section handles ${section.requirementIds.length} requirements (>5)`,
+          message: `Section handles ${reqCount} requirements (>5)`,
           suggestion: 'Consider splitting this section into smaller, focused sections',
         });
         principleScores.SRP = Math.max(0, principleScores.SRP - 20);
       }
 
       // ISP: Check if too many interfaces suggested
-      if (section.interfaces.length > 4) {
+      if (ifaceCount > 4) {
         violations.push({
           principle: 'ISP',
           section: section.id,
-          message: `Section suggests ${section.interfaces.length} interfaces (>4)`,
+          message: `Section suggests ${ifaceCount} interfaces (>4)`,
           suggestion: 'Consider splitting large interfaces into smaller, role-specific ones',
         });
         principleScores.ISP = Math.max(0, principleScores.ISP - 15);
       }
 
       // DIP: Check if section has no interfaces (concrete dependency)
-      if (section.interfaces.length === 0 && section.requirementIds.length > 1) {
+      if (ifaceCount === 0 && reqCount > 1) {
         violations.push({
           principle: 'DIP',
           section: section.id,

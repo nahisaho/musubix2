@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.76] - 2026-07-11
+
+dogfooding 実装テスト 50 本（第 6 巡）を実施し、5 件の不具合を修正。うち 3 件は MCP の policy カテゴリ全体が静かに機能不全だった問題。
+
+### Fixed
+
+- **MCP policy ツール群が実在しないメソッドを呼び出し、エラーを握りつぶして偽の成功を返していた** — `policy.articles.list` は `listArticles()`（正しくは `listPolicies()`）を呼び常に `[]` を返し、`policy.validate` は `validate()`（正しくは `validateAll()`、async）を呼び常に `{valid:true}`（偽の合格）を返し、`policy.gate.run` は `run()`（正しくは `runAll()`、async）を呼び常に `{passed:true}` を返していた。いずれも `catch` が例外を握りつぶして偽の結果を返していた。正しいメソッド呼び出しに修正し、`catch` はエラーを表面化するよう変更（9 条文の一覧・実際のコンプライアンスレポート・実ゲート結果を返すようになった）
+- **`design:verify` が部分的な JSON でクラッシュ** — セクションが `interfaces`/`requirementIds` を欠く手書き/不完全な design JSON に対し `Cannot read properties of undefined (reading 'length')` で異常終了していた。欠損フィールドを許容するよう防御的に修正
+- **`neural.embed` が常に全ゼロベクトルを返していた** — 単一文書で TF-IDF を fit すると全語の IDF が `log(1/1)=0` となりゼロベクトルになっていた。sklearn 方式の平滑化 IDF（`log((1+N)/(1+df))+1`）に変更し、単一文書でも有用な（TF 重み付き）ベクトルを返すよう修正
+
+### Verified
+
+- MCP 全ツールを正しいパラメータで検証（lean/z3/neural/code-graph）、Observer パターン → codegen 雛形の正確性、大規模 CodeGraph（30 ファイル 0.4 秒）、混在言語 EARS、部分/不正 JSON へのロバスト性
+
 ## [0.5.75] - 2026-07-11
 
 dogfooding 実装テスト 50 本（第 5 巡）を実施し、2 件の不具合を修正。

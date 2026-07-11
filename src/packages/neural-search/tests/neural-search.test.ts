@@ -199,6 +199,15 @@ describe('DES-LRN-004: TfIdfEmbeddingModel', () => {
     expect(v1).toEqual(v2);
   });
 
+  // v0.5.76 — smoothed IDF: a single-document fit must not yield an all-zeros
+  // vector (raw log(N/df) is 0 when every term appears in the only document).
+  it('produces a non-zero embedding when fit on a single document', async () => {
+    const solo = createTfIdfEmbeddingModel(64);
+    solo.fit(['user authentication login']);
+    const vec = await solo.embed('user authentication login');
+    expect(vec.some((x) => x !== 0)).toBe(true);
+  });
+
   it('should produce vectors of the correct dimension', async () => {
     const vec = await model.embed('hello world');
     expect(vec).toHaveLength(64);

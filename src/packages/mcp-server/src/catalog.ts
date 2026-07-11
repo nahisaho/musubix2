@@ -504,10 +504,12 @@ function policyTools(): CatalogEntry[] {
         try {
           const policy = await import('@musubix2/policy') as any;
           const engine = new policy.PolicyEngine();
-          const result = engine.validate(params['artifact'], params['articleIds'] as string[] | undefined);
-          return ok(result);
-        } catch {
-          return ok({ valid: true, violations: [] });
+          // validateAll(context) is the real (async) method; validate(...) never
+          // existed, so the old catch returned a false "valid: true" every call.
+          const report = await engine.validateAll((params['artifact'] ?? {}) as never);
+          return ok(report);
+        } catch (err) {
+          return fail(errMsg(err));
         }
       },
     ),
@@ -523,10 +525,12 @@ function policyTools(): CatalogEntry[] {
         try {
           const policy = await import('@musubix2/policy') as any;
           const runner = new policy.QualityGateRunner();
-          const result = runner.run(params['gate'] as string, params['context']);
-          return ok(result);
-        } catch {
-          return ok({ passed: true, gate: params['gate'], details: [] });
+          // runAll(context) is the real (async) method; run(...) never existed,
+          // so the old catch returned a false "passed: true" every call.
+          const results = await runner.runAll((params['context'] ?? {}) as never);
+          return ok({ gate: params['gate'], results, passed: runner.allPassed(results) });
+        } catch (err) {
+          return fail(errMsg(err));
         }
       },
     ),
@@ -539,10 +543,11 @@ function policyTools(): CatalogEntry[] {
         try {
           const policy = await import('@musubix2/policy') as any;
           const engine = new policy.PolicyEngine();
-          const articles = engine.listArticles();
-          return ok(articles);
-        } catch {
-          return ok([]);
+          // listPolicies() is the actual method; listArticles() never existed,
+          // so this silently returned [] via the catch on every call.
+          return ok(engine.listPolicies());
+        } catch (err) {
+          return fail(errMsg(err));
         }
       },
     ),

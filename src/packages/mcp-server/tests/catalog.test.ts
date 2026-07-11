@@ -561,3 +561,29 @@ describe('every tool handler returns a well-formed ToolResult', () => {
     }
   }
 });
+
+// v0.5.76 — the policy MCP tools called non-existent methods (listArticles /
+// validate / run) and swallowed the resulting error into a false pass/empty.
+describe('v0.5.76 policy MCP tools', () => {
+  it('policy.articles.list returns the constitution articles', async () => {
+    const r = await findTool('policy', 'policy.articles.list').handler({});
+    expect(r.success).toBe(true);
+    expect((r.data as unknown[]).length).toBeGreaterThanOrEqual(9);
+  });
+
+  it('policy.validate returns a real compliance report', async () => {
+    const r = await findTool('policy', 'policy.validate').handler({
+      artifact: { type: 'code', content: 'x', metadata: {} },
+    });
+    expect(r.success).toBe(true);
+    expect(Array.isArray((r.data as { articles: unknown[] }).articles)).toBe(true);
+  });
+
+  it('policy.gate.run returns real gate results', async () => {
+    const r = await findTool('policy', 'policy.gate.run').handler({
+      gate: 'coverage', context: { type: 'code', content: 'x', metadata: {} },
+    });
+    expect(r.success).toBe(true);
+    expect(Array.isArray((r.data as { results: unknown[] }).results)).toBe(true);
+  });
+});
