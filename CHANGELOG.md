@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.79] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 9 巡）を実施し、2 件の不具合を修正。
+
+### Fixed
+
+- **PascalCase のエンティティ型名が小文字化されていた** — codegen の型推論で `SHALL return a UserProfile` が `Userprofile`（内部の大文字が消失）になり、`OrderLineItem` も `Orderlineitem` になっていた。`pascalJoin`/`camelJoin` が各語の先頭以外を強制小文字化していたのが原因。既存の内部大文字を保持しつつ先頭のみ正規化するよう修正（`session token` → `SessionToken` など従来の挙動は維持）
+- **`knowledge traverse` がデフォルト深さ 3 で長い連鎖を無言で切り捨てていた** — 6 ノードの連鎖でも 4 ノードしか返さず、全グラフに到達する手段が無かった。`--depth N` を追加（不正値はエラー）
+
+### Verified
+
+- 全 6 EARS パターン、param 推論、State enum、SMT 意味論、多言語 CodeGraph、workflow 状態機械、エラーパス（読取専用/ディレクトリ/バイナリ/構文エラーファイル）のハンドリング、決定性、`--depth` の境界
+
 ## [0.5.78] - 2026-07-11
 
 dogfooding 実装テスト 50 本（第 8 巡）を実施し、1 件の不具合を修正。

@@ -3344,10 +3344,18 @@ export async function handleKnowledge(
     case 'traverse': {
       const startId = args[0];
       if (!startId) {
-        console.error('❌ Usage: musubix knowledge traverse <startId>');
+        console.error('❌ Usage: musubix knowledge traverse <startId> [--depth N]');
         return ExitCode.GENERAL_ERROR;
       }
-      const traversed = await store.traverse(startId);
+      // Expose the traversal depth (store default is 3, which silently truncates
+      // longer chains). `--depth N` lets callers reach the full graph.
+      const depthFlag = flags['depth'];
+      const depth = depthFlag !== undefined ? Number(depthFlag) : undefined;
+      if (depth !== undefined && (!Number.isFinite(depth) || depth < 1)) {
+        console.error(`❌ Invalid --depth "${String(depthFlag)}" (must be a positive integer).`);
+        return ExitCode.VALIDATION_ERROR;
+      }
+      const traversed = await store.traverse(startId, depth !== undefined ? { depth } : undefined);
       console.log(`Traversal from ${startId}: ${traversed.length} nodes`);
       for (const node of traversed) {
         console.log(`  ${node.id} (${node.type})`);

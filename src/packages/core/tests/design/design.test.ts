@@ -44,6 +44,14 @@ describe('deriveMethodSignature (v0.5.46)', () => {
     expect(sig.returnType).toBe('SessionToken');
   });
 
+  // v0.5.79 — an already-PascalCase entity keeps its internal casing (was
+  // lowercased to "Userprofile").
+  it('preserves internal casing of an already-PascalCase entity', () => {
+    const sig = deriveMethodSignature('THE system SHALL return a UserProfile.');
+    expect(sig.returnType).toBe('UserProfile');
+    expect(sig.name).toBe('returnUserProfile');
+  });
+
   // v0.5.64 — parameters are inferred from an input clause.
   it('infers parameters from a "submits …" clause', () => {
     const sig = deriveMethodSignature('WHEN a user submits an email and password, THE system SHALL create an account.');

@@ -86,14 +86,21 @@ function operationParts(text: string, fallbackTitle: string): { negated: boolean
   return { negated, words };
 }
 
+// Preserve a word's existing internal casing (so an already-PascalCase entity
+// like "UserProfile" survives instead of becoming "Userprofile"); only the
+// first character is normalized. An all-lowercase word is unaffected.
+function capFirst(w: string): string {
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
 function camelJoin(parts: string[]): string {
   return parts
-    .map((w, i) => (i === 0 ? w.charAt(0).toLowerCase() + w.slice(1) : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .map((w, i) => (i === 0 ? w.charAt(0).toLowerCase() + w.slice(1) : capFirst(w)))
     .join('');
 }
 
 function pascalJoin(parts: string[]): string {
-  return parts.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+  return parts.map(capFirst).join('');
 }
 
 /**

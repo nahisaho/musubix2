@@ -162,6 +162,29 @@ describe('CLI Commands C — Knowledge', () => {
     expect(out).toContain('C (entity)');
     rmSync(base, { recursive: true, force: true });
   });
+
+  // v0.5.79 — `--depth` bounds traversal; default (3) silently truncated longer
+  // chains with no way to reach the full graph.
+  it('honors --depth for traversal', async () => {
+    const base = join(process.cwd(), 'packages', 'musubi', 'tests', '_fixture_know_depth');
+    rmSync(base, { recursive: true, force: true });
+    const flags = { path: base };
+    for (const n of ['A', 'B', 'C', 'D']) {await handleKnowledge('put', [n, 'entity', n], flags);}
+    await handleKnowledge('link', ['A', 'r', 'B'], flags);
+    await handleKnowledge('link', ['B', 'r', 'C'], flags);
+    await handleKnowledge('link', ['C', 'r', 'D'], flags);
+
+    logSpy.mockClear();
+    await handleKnowledge('traverse', ['A'], { ...flags, depth: 1 });
+    expect(logSpy.mock.calls.map((c) => String(c[0])).join('\n')).toContain('2 nodes'); // A → B
+
+    logSpy.mockClear();
+    await handleKnowledge('traverse', ['A'], { ...flags, depth: 10 });
+    expect(logSpy.mock.calls.map((c) => String(c[0])).join('\n')).toContain('4 nodes'); // A→B→C→D
+
+    expect(await handleKnowledge('traverse', ['A'], { ...flags, depth: 'abc' })).toBe(ExitCode.VALIDATION_ERROR);
+    rmSync(base, { recursive: true, force: true });
+  });
 });
 
 // ── Decision ───────────────────────────────────────────────────────────────
