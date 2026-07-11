@@ -49,7 +49,9 @@ export class C4ModelGenerator {
     const elements: C4Element[] = [];
     const seenIds = new Set<string>();
     for (const e of this.elements) {
-      if (!levelFilter.includes(e.type) || seenIds.has(e.id)) {continue;}
+      // Skip elements with no id — they can't be a Mermaid node (and would crash
+      // alias generation on `id.replace`). Also skip off-level and duplicate ids.
+      if (!e.id || !levelFilter.includes(e.type) || seenIds.has(e.id)) {continue;}
       seenIds.add(e.id);
       elements.push(e);
     }

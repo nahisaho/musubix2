@@ -117,6 +117,18 @@ describe('DES-DES-002: C4ModelGenerator', () => {
     expect(mermaid.match(/System\(a,/g)).toHaveLength(1);
   });
 
+  // v0.5.92 — an element with no id must be skipped, not crash alias generation
+  // (`id.replace` on undefined).
+  it('skips elements with no id instead of crashing', () => {
+    const gen = new C4ModelGenerator();
+    gen.addElement({ id: 'a', name: 'A', type: 'system', description: 'x' });
+    gen.addElement({ name: 'B', type: 'system', description: 'y' } as never); // no id
+    const diagram = gen.generateDiagram('context', 't');
+    expect(diagram.elements).toHaveLength(1);
+    expect(() => gen.toMermaid(diagram)).not.toThrow();
+    expect(gen.toMermaid(diagram)).toContain('System(a,');
+  });
+
   it('should generate valid PlantUML output', () => {
     const gen = makeGenerator();
     const diagram = gen.generateDiagram('context', 'System Context');

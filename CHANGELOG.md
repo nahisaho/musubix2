@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.92] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 22 巡）を実施し、1 件の不具合を修正。
+
+### Fixed
+
+- **`design:c4` が id の無い要素でクラッシュ** — 手書きの C4 モデル JSON に `id` を持たない要素があると、Mermaid エイリアス生成の `id.replace(...)` が `Cannot read properties of undefined (reading 'replace')` で異常終了していた。id の無い要素（Mermaid ノードになれない）はスキップするよう修正
+
+### Verified
+
+- design:c4 の各種不正入力（type/name/title 欠落、null relationships/elements、from/to 欠落の関係）がクラッシュせず処理される、codegen の不正入力（component name 欠落 → `Component` デフォルト、components 欠落 → 要件ベースにフォールバック、重複 states の enum 重複排除）、params 特殊文字
+
 ## [0.5.91] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 21 巡）を実施し、2 件の不具合を修正（design JSON 由来の codegen 堅牢性）。
