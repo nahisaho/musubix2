@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.86] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 16 巡）を実施し、1 件の不具合を修正。i18n パスとガイドを重点検証。
+
+### Fixed
+
+- **`test:gen` が非 TS/JS ファイルに対して誤解を招く汎用スタブを生成していた** — テストジェネレータは Vitest 用で `export function`/`export class` を解析するため TS/JS 専用だが、Python など（`EXT_TO_LANG` の全 16 言語）を受理し、関数を解析できずに `describe('module')` の汎用 Vitest スタブを出力していた（Python に TS テストを生成）。TS/JS 拡張子（ts/tsx/js/jsx/mjs/cjs）のみを対象とし、それ以外は「TS/JS のみ対応」と明示してエラーにするよう修正
+
+### Verified
+
+- 全日本語タイトル要件の codegen（valid TS・tsc 通過・SOLID 100）、混在 JP/EN タイトル、絵文字・全角・全角スペースを含む要件、MCP 13 カテゴリ 61 ツールの整合、自然言語ガイドのツール名 40 件が全て実在、Chain of Responsibility 検出、リファクタリングガイドの cg フロー
+
 ## [0.5.85] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 15 巡）を実施し、1 件の不具合を修正＋ガイドのドリフトを解消。MCP stdio プロトコル（JSON-RPC）を実測検証。

@@ -527,7 +527,17 @@ describe('handleTestGen', () => {
     writeFileSync(md, '## REQ-AUT-001: Login\nTHE system SHALL authenticate users.\n');
     const code = await handleTestGen(md);
     expect(code).toBe(ExitCode.GENERAL_ERROR);
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('reads source code'));
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('TS/JS only'));
+  });
+
+  // v0.5.85 — test:gen only understands TS/JS; a Python file must be rejected
+  // clearly rather than getting a misleading generic Vitest stub.
+  it('rejects a non-TS/JS source file (Python) with a clear message', async () => {
+    const py = join(FIXTURE_DIR, 'calc.py');
+    writeFileSync(py, 'def add(a, b):\n    return a + b\n');
+    const code = await handleTestGen(py);
+    expect(code).toBe(ExitCode.GENERAL_ERROR);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('TS/JS only'));
   });
 
   // ISSUE-15: a directory argument must not crash with EISDIR.

@@ -1000,6 +1000,10 @@ const RESERVED_WORDS = new Set([
   'protected', 'package', 'null', 'true', 'false', 'with', 'debugger',
 ]);
 
+// Languages the UnitTestGenerator can actually analyze (it emits Vitest and
+// matches `export function`/`export class`). test:gen restricts to these.
+const TEST_GEN_EXT = new Set(['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs']);
+
 const WALK_IGNORE = new Set(['node_modules', '.git', 'dist', 'coverage', '.next', 'build']);
 
 /**
@@ -3153,12 +3157,14 @@ export async function handleTestGen(filePath: string): Promise<ExitCodeValue> {
       return ExitCode.GENERAL_ERROR;
     }
     const generator = createUnitTestGenerator();
-    // Accept a single file or a directory (skeletons generated per file).
-    const files = collectFiles(filePath, (ext) => ext in EXT_TO_LANG);
+    // The generator emits Vitest and parses `export function`/`export class`, so
+    // it only understands TS/JS. Restrict to those rather than emitting a
+    // misleading generic Vitest stub for a Python/Go/… file it can't analyze.
+    const files = collectFiles(filePath, (ext) => TEST_GEN_EXT.has(ext));
     if (files.length === 0) {
       console.error(
-        `❌ No source files found under: ${filePath}\n` +
-          `   test:gen reads source code (${Object.keys(EXT_TO_LANG).join(', ')}), not requirements.\n` +
+        `❌ No TypeScript/JavaScript source found under: ${filePath}\n` +
+          `   test:gen generates Vitest tests for TS/JS only (${[...TEST_GEN_EXT].join(', ')}).\n` +
           '   Generate code first:  musubix codegen <reqs.md> --out impl.ts  →  musubix test:gen impl.ts',
       );
       return ExitCode.GENERAL_ERROR;
