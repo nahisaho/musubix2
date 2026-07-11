@@ -3737,8 +3737,10 @@ export async function handleScaffold(
       }
       try {
         const created = writeScaffold(`skills/${name}`, {
+          // Include `action` — `skills validate` requires it, so a scaffolded
+          // skill must pass the tool's own validation out of the box.
           'skill.json': JSON.stringify(
-            { name, description: `${name} skill`, version: '0.1.0' },
+            { name, description: `${name} skill`, action: 'run', version: '0.1.0' },
             null,
             2,
           ) + '\n',

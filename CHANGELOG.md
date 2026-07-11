@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.87] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 17 巡）を実施し、1 件の不具合を修正。
+
+### Fixed
+
+- **`scaffold skill` が生成する skill.json が自身の `skills validate` を通らなかった** — `scaffold skill` は `{name, description, version}` を書き出す一方、`skills validate` は `action` フィールドを必須としており、生成直後のスキルが「Missing required field: action」で検証に失敗していた（`skills create` パスは `action` を含む）。`scaffold skill` にも `action: "run"` を含め、生成物がそのまま検証を通るよう修正
+
+### Verified
+
+- explain（言語非依存の行解析：Python/Go/markdown/JSON/空ファイル）、dfg（Python の単純代入）、scaffold の全成果物の妥当性（package/skill の index.ts が tsc 通過、project の config が有効 JSON）、init 構造・冪等性・`--force`、`skills create` パスの検証
+
 ## [0.5.86] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 16 巡）を実施し、1 件の不具合を修正。i18n パスとガイドを重点検証。

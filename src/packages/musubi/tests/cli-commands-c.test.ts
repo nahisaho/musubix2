@@ -373,6 +373,14 @@ describe('CLI Commands C — Scaffold', () => {
     expect(existsSync(join(dir, 'skills/my-skill/index.ts'))).toBe(true);
   });
 
+  // v0.5.87 — a scaffolded skill must pass `skills validate` out of the box
+  // (the writer previously omitted the required `action` field).
+  it('scaffold skill produces a definition that passes skills validate', async () => {
+    expect(await handleScaffold('skill', ['valid-skill'])).toBe(ExitCode.SUCCESS);
+    const code = await handleSkills('validate', [join(dir, 'skills/valid-skill/skill.json')], {});
+    expect(code).toBe(ExitCode.SUCCESS);
+  });
+
   it('scaffold refuses to overwrite an existing target', async () => {
     await handleScaffold('package', ['dup']);
     const second = await handleScaffold('package', ['dup']);
