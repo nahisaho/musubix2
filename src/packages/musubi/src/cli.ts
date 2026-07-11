@@ -2086,9 +2086,10 @@ export async function handleCodegraph(
           }
         }
       }
+      // A bare `cg gate` defaults to the most common CI check: no dependency
+      // cycles (`--max-cycles 0`). Previously it errored asking for a rule.
       if (maxCycles === null && forbidRules.length === 0) {
-        console.error('❌ Usage: musubix cg gate [--max-cycles N] [--forbid A:B[,C:D]] [--json]');
-        return ExitCode.VALIDATION_ERROR;
+        maxCycles = 0;
       }
       const { nodes, edges } = loadCodeGraphData();
       if (nodes.length === 0) {

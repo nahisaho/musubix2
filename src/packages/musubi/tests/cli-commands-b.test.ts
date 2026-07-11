@@ -830,6 +830,9 @@ describe('CLI Commands B — Codegraph', () => {
       expect(await handleCodegraph('cycles', [])).toBe(ExitCode.SUCCESS);
       const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
       expect(out).toContain('No circular file dependencies');
+
+      // v0.5.89 — a bare `cg gate` defaults to no-cycles; a clean graph passes.
+      expect(await handleCodegraph('gate', [])).toBe(ExitCode.SUCCESS);
     } finally {
       process.chdir(prevCwd);
       rmSync(dir, { recursive: true, force: true });
@@ -865,8 +868,9 @@ describe('CLI Commands B — Codegraph', () => {
       expect(gate.passed).toBe(false);
       expect(gate.checks[0].pass).toBe(false);
 
-      // No rules → validation error.
-      expect(await handleCodegraph('gate', [])).toBe(ExitCode.VALIDATION_ERROR);
+      // v0.5.89 — a bare `cg gate` defaults to `--max-cycles 0`; this fixture
+      // has a cycle, so it fails (was a usage/VALIDATION_ERROR before).
+      expect(await handleCodegraph('gate', [])).toBe(ExitCode.GENERAL_ERROR);
     } finally {
       process.chdir(prevCwd);
       rmSync(dir, { recursive: true, force: true });

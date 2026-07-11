@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.89] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 19 巡）を実施。コマンド/サブコマンドの整合性を全数監査（不整合なし）し、`cg gate` の使い勝手を改善。
+
+### Improved
+
+- **引数なしの `cg gate` が使い方エラーになっていた** — CI で最も一般的な用途は「循環依存ゼロ」の検査だが、ルール未指定だと `❌ Usage: …` を返していた。引数なしの `cg gate` は `--max-cycles 0`（循環ゼロ）をデフォルトとし、クリーンなグラフでは pass（exit 0）、循環があれば fail（exit 1）するよう改善
+
+### Verified
+
+- 全 33 コマンドの `--help` レンダリング、全コマンドの広告サブコマンド ↔ 実装 switch case の完全一致（skills/decision/knowledge/synthesis/learn/…）、広告サブコマンドの実動作（decision index/accept/deprecate、knowledge query/traverse、learn patterns、deep-research iterative、synthesis version-space、policy info）、tasks stats の集計、各種出力の正当性
+
 ## [0.5.88] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 18 巡）を実施し、1 件の不具合を修正。
