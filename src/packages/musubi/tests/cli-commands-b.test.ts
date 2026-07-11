@@ -1061,6 +1061,14 @@ describe('CLI Commands B — Codegraph', () => {
       expect(out).toContain('function=');
       expect(out).toContain('Top called functions:');
       expect(out).toContain('helper_fn');
+
+      // v0.5.84 — --json emits valid JSON (was ignored, unlike other cg subcommands).
+      logSpy.mockClear();
+      expect(await handleCodegraph('stats', ['--json'])).toBe(ExitCode.SUCCESS);
+      const parsed = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+      expect(typeof parsed.nodes).toBe('number');
+      expect(parsed.nodeKinds).toBeDefined();
+      expect(Array.isArray(parsed.topCalledFunctions)).toBe(true);
     } finally {
       process.chdir(prevCwd);
       rmSync(dir, { recursive: true, force: true });

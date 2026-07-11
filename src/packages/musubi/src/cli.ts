@@ -1647,9 +1647,6 @@ export async function handleCodegraph(
       const engine = loadCodeGraph();
       const stats = engine.getStats();
       const { nodes, edges } = loadCodeGraphData();
-      console.log(`Nodes: ${stats.nodeCount}`);
-      console.log(`Edges: ${stats.edgeCount}`);
-      console.log(`Languages: ${[...stats.languages].join(', ') || 'none'}`);
 
       // Node-kind and edge-kind breakdowns.
       const nodeKinds = new Map<string, number>();
@@ -1660,15 +1657,6 @@ export async function handleCodegraph(
       }
       const edgeKinds = new Map<string, number>();
       for (const e of edges) {edgeKinds.set(e.kind, (edgeKinds.get(e.kind) ?? 0) + 1);}
-      console.log(`Files: ${files.size}`);
-      if (nodeKinds.size > 0) {
-        const parts = [...nodeKinds.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`);
-        console.log(`Node kinds: ${parts.join(', ')}`);
-      }
-      if (edgeKinds.size > 0) {
-        const parts = [...edgeKinds.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`);
-        console.log(`Edge kinds: ${parts.join(', ')}`);
-      }
 
       // Top-5 most-called functions (in-degree over `calls` edges).
       const callInDegree = new Map<string, number>();
@@ -1676,6 +1664,32 @@ export async function handleCodegraph(
         if (e.kind === 'calls') {callInDegree.set(e.to, (callInDegree.get(e.to) ?? 0) + 1);}
       }
       const top = [...callInDegree.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const sortedKinds = (m: Map<string, number>) =>
+        Object.fromEntries([...m.entries()].sort((a, b) => b[1] - a[1]));
+
+      if (args.includes('--json')) {
+        console.log(JSON.stringify({
+          nodes: stats.nodeCount,
+          edges: stats.edgeCount,
+          languages: [...stats.languages],
+          files: files.size,
+          nodeKinds: sortedKinds(nodeKinds),
+          edgeKinds: sortedKinds(edgeKinds),
+          topCalledFunctions: top.map(([name, callers]) => ({ name, callers })),
+        }, null, 2));
+        return ExitCode.SUCCESS;
+      }
+
+      console.log(`Nodes: ${stats.nodeCount}`);
+      console.log(`Edges: ${stats.edgeCount}`);
+      console.log(`Languages: ${[...stats.languages].join(', ') || 'none'}`);
+      console.log(`Files: ${files.size}`);
+      if (nodeKinds.size > 0) {
+        console.log(`Node kinds: ${[...nodeKinds.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+      }
+      if (edgeKinds.size > 0) {
+        console.log(`Edge kinds: ${[...edgeKinds.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+      }
       if (top.length > 0) {
         console.log('Top called functions:');
         for (const [name, deg] of top) {console.log(`  ${name} — ${deg} caller(s)`);}

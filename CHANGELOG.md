@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.84] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 14 巡）を実施し、1 件の不具合を修正。
+
+### Fixed
+
+- **`cg stats --json` が JSON を出力しなかった** — 他の cg サブコマンド（impact/export/diff/path/cycles）が `--json` に対応する中、`cg stats` だけがフラグを無視して人間可読テキストを出力し、JSON としてパースできなかった。nodes/edges/languages/files/nodeKinds/edgeKinds/topCalledFunctions を含む JSON を出力するよう対応（テキスト出力は従来どおり）
+
+### Verified
+
+- `--key=value` 記法を全コマンドで確認、パス処理（空白入り・相対 `../`・末尾スラッシュ・`./`・ドット入りファイル名）、cg 系 `--json` の妥当性（impact/export/diff/path/cycles/candidates）、プロジェクト名バリデーション（空・数字始まり）
+
 ## [0.5.83] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 13 巡）を実施し、2 件の不具合を修正。
