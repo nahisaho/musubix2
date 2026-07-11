@@ -165,11 +165,20 @@ export function deriveMethodSignature(
   if (words.length === 0) {return { name, params, returnType: 'void' }; }
 
   const verb = words[0].toLowerCase();
-  const objectWords = words.slice(1);
+  let objectWords = words.slice(1);
+  // A leading collection phrase ("a list of OrderItems", "array of Users")
+  // denotes a collection of the following noun → Noun[], not a "ListOrderItems"
+  // type. Strip the indicator (and an optional "of") and mark it as a list.
+  const COLLECTION_WORDS = new Set(['list', 'array', 'collection', 'set', 'sequence']);
+  let phraseIsCollection = false;
+  if (objectWords.length > 1 && COLLECTION_WORDS.has(objectWords[0].toLowerCase())) {
+    phraseIsCollection = true;
+    objectWords = objectWords.slice(objectWords[1]?.toLowerCase() === 'of' ? 2 : 1);
+  }
   let returnType = 'void';
   if (negated || BOOLEAN_VERBS.has(verb)) {
     returnType = 'boolean';
-  } else if (LIST_VERBS.has(verb)) {
+  } else if (LIST_VERBS.has(verb) || (phraseIsCollection && VALUE_VERBS.has(verb))) {
     returnType = objectWords.length > 0 ? `${pascalJoin(objectWords)}[]` : 'unknown[]';
   } else if (VALUE_VERBS.has(verb) && objectWords.length > 0) {
     returnType = pascalJoin(objectWords);

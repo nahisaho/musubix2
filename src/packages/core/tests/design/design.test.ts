@@ -75,6 +75,14 @@ describe('deriveMethodSignature (v0.5.46)', () => {
     expect(deriveMethodSignature('THE system SHALL list active sessions.').returnType).toBe('ActiveSessions[]');
   });
 
+  // v0.5.80 — "return a list/array/collection of X" is a collection → X[],
+  // not a made-up "ListOfX" type.
+  it('infers an array from a "list of X" phrase', () => {
+    expect(deriveMethodSignature('THE system SHALL return a list of OrderItems.').returnType).toBe('OrderItems[]');
+    expect(deriveMethodSignature('THE system SHALL return an array of Users.').returnType).toBe('Users[]');
+    expect(deriveMethodSignature('THE system SHALL return a collection of Orders.').returnType).toBe('Orders[]');
+  });
+
   it('defaults to void for verbs with no clear result', () => {
     expect(deriveMethodSignature('THE system SHALL email a reset link.').returnType).toBe('void');
   });

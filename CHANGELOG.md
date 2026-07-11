@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.80] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 10 巡）を実施し、1 件の不具合を修正。
+
+### Fixed
+
+- **「list/array/collection of X」がコレクション型として推論されなかった** — codegen の戻り値型推論で `SHALL return a list of OrderItems` が `ListOrderItems`（実在しない造語型）になっていた。先頭のコレクション語（list/array/collection/set/sequence）＋任意の「of」を検出し、後続の名詞のコレクション（`OrderItems[]`）として推論するよう修正。エンティティスタブも `interface OrderItems {}` を宣言し、生成物は tsc を通る（`UserProfile` などのケース保持や `session token` → `SessionToken` は従来どおり）
+
+### Verified
+
+- コレクション各形（`set of Tags` → `Tags[]`、`sequence of Events` → `Events[]`、二重 `[]` なし）、Strategy/CoR パターン検出、要件ドキュメント生成、エンティティスタブ宣言＋ tsc 通過、EARS 全パターン分類
+
 ## [0.5.79] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 9 巡）を実施し、2 件の不具合を修正。
