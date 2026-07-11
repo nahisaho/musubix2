@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.82] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 12 巡）を実施し、1 件の不具合を修正。
+
+### Fixed
+
+- **`search`（TF-IDF）で語彙が 128 を超えると無関係な文書に誤った類似度が付いていた** — fit 済みモデルが `vocabIdx % dimensions`（既定 128 次元）でバケットを決めるため、語彙が 128 語を超えると別々の語が衝突し、クエリ語を全く含まない文書（例: コードファイル）に 0.493 のような偽スコアが付いていた。fit 時にベクトル次元を語彙サイズまで拡張し、各語が自身のインデックスを衝突なく使えるよう修正。クエリ語を共有しない文書はスコア 0 になった
+
+### Verified
+
+- dfg（複数行関数本体、未使用/使用前定義）、cg candidates（関数を持つファイルのランキング）、cg deps 方向、Feature Toggle + State の同居 codegen、頭字語エンティティ（JWT）、synthesis（prefix 除去・大文字化・矛盾例）、重複 ID 検出、ネストディレクトリのセキュリティ走査
+
 ## [0.5.81] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 11 巡）を実施し、2 件の不具合を修正。

@@ -233,6 +233,21 @@ describe('DES-LRN-004: TfIdfEmbeddingModel', () => {
     expect(cosine(catMat, ml)).toBeCloseTo(0, 5);
   });
 
+  // v0.5.82 — a vocabulary larger than the base dimension (128) must not cause
+  // `vocabIdx % dimensions` collisions that give unrelated docs spurious scores.
+  it('stays collision-free when the vocabulary exceeds base dimensions', async () => {
+    const big = createTfIdfEmbeddingModel(128);
+    const corpus: string[] = [];
+    for (let i = 0; i < 60; i++) {corpus.push(`alpha${i} beta${i} gamma${i}`);} // ~180 unique terms
+    corpus.push('database sharding strategies for horizontal scaling');
+    corpus.push('export function handler const value return result'); // no query terms
+    big.fit(corpus);
+    expect(big.dimensions).toBeGreaterThan(128);
+    const q = await big.embed('database sharding');
+    expect(cosine(q, await big.embed(corpus[corpus.length - 2]))).toBeGreaterThan(0.1); // db doc
+    expect(cosine(q, await big.embed(corpus[corpus.length - 1]))).toBeCloseTo(0, 5); // code doc
+  });
+
   it('ignores out-of-vocabulary query terms instead of scoring on them', async () => {
     // "purple" and "helicopter" are not in the corpus; only "cat" should count.
     const query = await model.embed('purple cat helicopter');

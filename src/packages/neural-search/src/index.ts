@@ -84,7 +84,8 @@ function tokenize(text: string): string[] {
  * Uses the hashing trick to project TF-IDF scores to fixed dimensions.
  */
 export class TfIdfEmbeddingModel implements IEmbeddingModel {
-  readonly dimensions: number;
+  dimensions: number;
+  private readonly baseDimensions: number;
   private vocabulary: Map<string, number> = new Map();
   private idfScores: Map<string, number> = new Map();
   private documentCount = 0;
@@ -92,6 +93,7 @@ export class TfIdfEmbeddingModel implements IEmbeddingModel {
 
   constructor(dimensions: number = 128) {
     this.dimensions = dimensions;
+    this.baseDimensions = dimensions;
   }
 
   /** Build vocabulary and IDF scores from a corpus of documents. */
@@ -116,6 +118,12 @@ export class TfIdfEmbeddingModel implements IEmbeddingModel {
         }
       }
     }
+
+    // Size the vector to fit the whole vocabulary so a fitted embedding uses
+    // each term's own index as a collision-free bucket. Otherwise `vocabIdx %
+    // dimensions` conflates distinct terms once the vocabulary exceeds
+    // `dimensions` (128), giving unrelated documents spurious similarity.
+    this.dimensions = Math.max(this.baseDimensions, this.vocabulary.size);
 
     for (const [term, df] of this.documentFrequency) {
       // Smoothed IDF (sklearn-style): log((1+N)/(1+df)) + 1. Never zero, so a
