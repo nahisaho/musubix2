@@ -450,12 +450,19 @@ export class DesignGenerator {
         .split(/[\s_\-,、]+/)
         .map((w) => w.replace(/[^A-Za-z0-9]/g, ''))
         .filter((w) => w.length > 3);
+      let name = '';
       if (words.length > 0) {
-        const name = words
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-          .join('');
-        if (name) {interfaces.push(`I${name}`);}
+        name = words.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+      } else {
+        // A non-ASCII title (e.g. Japanese "短縮リンク作成") yields no words, so
+        // fall back to the English SHALL-clause operation (createShortLink →
+        // ICreateShortLink). Without this, non-ASCII-titled sections get no
+        // interfaces and trip a spurious DIP violation, even though codegen
+        // still extracts an I<Service> interface.
+        const op = deriveOperation(req.text, '');
+        name = op ? op.charAt(0).toUpperCase() + op.slice(1) : '';
       }
+      if (name) {interfaces.push(`I${name}`);}
     }
     return [...new Set(interfaces)];
   }

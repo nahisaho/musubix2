@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.85] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 15 巡）を実施し、1 件の不具合を修正＋ガイドのドリフトを解消。MCP stdio プロトコル（JSON-RPC）を実測検証。
+
+### Fixed
+
+- **非ASCII（日本語）タイトルの要件で interface が生成されず、偽の DIP 違反で SOLID スコアが下がっていた** — 0.5.69 の `suggestInterfaces` 修正で非英数字を除去した結果、日本語タイトルは語が残らず interface が空になっていた（codegen は `I<Service>` を生成するのに design:verify では「interface なし」と判定され不整合）。タイトルから語が得られない場合は英語の SHALL 句（操作名）から interface 名を導出するフォールバックを追加（`短縮リンク作成` → `ICreateShortLink`）。グリーンフィールドガイドの URL 短縮サービス例が再び SOLID 100/100 になった
+
+### Docs
+
+- グリーンフィールドガイドのメソッド例を現行挙動に更新（`createShortLink(longUrl)` → `createShortLink(longURL)`、`redirectOriginalUrl` → `redirectOriginalURL`）。0.5.79/0.5.81 の頭字語ケース保持により、要件文の「long URL」から `longURL` が生成される
+
+### Verified
+
+- MCP stdio（initialize / tools/list=61 / tools/call / 不正 JSON 耐性 / 未知ツールの isError）、グリーンフィールドガイドの全コマンド（analyze/design/verify/codegen）
+
 ## [0.5.84] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 14 巡）を実施し、1 件の不具合を修正。

@@ -4,7 +4,7 @@
 （Specification Driven Development）ワークフローで開発する手順を、実際のコマンドと
 出力とともに解説します。題材は **URL短縮サービス** です。
 
-> このガイド内のコマンド出力は MUSUBIX2 `v0.5.84` で実際に実行して取得したものです。
+> このガイド内のコマンド出力は MUSUBIX2 `v0.5.85` で実際に実行して取得したものです。
 
 ---
 
@@ -149,7 +149,7 @@ MUSUBIX2 は **ドメイン（ID プレフィックス）ごとに要件を凝�
 
 | セクション | 検出パターン | コンポーネント（メソッド） |
 |-----------|-------------|--------------------------|
-| REQ-LINK | Observer, State | `LinkService(createShortLink / redirectOriginalUrl / resolveLink)` |
+| REQ-LINK | Observer, State | `LinkService(createShortLink / redirectOriginalURL / resolveLink)` |
 | REQ-STAT | Observer | `RecordClickEventService(recordClickEvent)` |
 | REQ-SEC | Strategy | `SecService(rejectRequest / rejectStoreClientIpAddresses)` |
 
@@ -194,8 +194,8 @@ export interface ShortLink {
 
 // Implements: REQ-LINK-001, REQ-LINK-002, REQ-LINK-003
 export interface ILinkService {
-  createShortLink(longUrl: string): ShortLink;
-  redirectOriginalUrl(): void;
+  createShortLink(longURL: string): ShortLink;
+  redirectOriginalURL(): void;
   resolveLink(): Link;
 }
 
@@ -208,7 +208,7 @@ export class LinkService implements ILinkService {
   private state: LinkServiceState = LinkServiceState.Idle;
   private readonly listeners: Array<(event: unknown) => void> = [];
   on(handler: (event: unknown) => void): void { this.listeners.push(handler); }
-  createShortLink(longUrl: string): ShortLink { throw new Error('Not implemented'); }
+  createShortLink(longURL: string): ShortLink { throw new Error('Not implemented'); }
   // …
 }
 ```
@@ -219,7 +219,7 @@ export class LinkService implements ILinkService {
 - **戻り値型の推論**（`createShortLink(...): ShortLink`）と、未定義エンティティ型の
   プレースホルダ宣言（`interface ShortLink {}`）→ 生成物は `tsc --strict` を通ります
 - **引数の推論**: 入力を表す句（「submits a long URL」）からパラメータを導出
-  （`createShortLink(longUrl: string)`）
+  （`createShortLink(longURL: string)`）
 - **設計パターンの雛形**: Observer → `on/emit`、State → 状態 enum、
   Feature Toggle → `enabled` フラグ ガード
 - **State enum の状態推論**: 「WHILE a link is **within** its expiry window」から

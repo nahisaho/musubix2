@@ -212,6 +212,22 @@ describe('DES-DES-001: DesignGenerator', () => {
     expect(doc.sections[0].interfaces[0]).toMatch(/^I/);
   });
 
+  // v0.5.85 — a non-ASCII (e.g. Japanese) title must still yield an interface,
+  // derived from the English SHALL clause, so a multi-req section doesn't trip a
+  // spurious DIP violation while codegen still extracts an I<Service> interface.
+  it('derives interfaces from the SHALL clause when the title is non-ASCII', () => {
+    const generator = new DesignGenerator();
+    const reqs: ParsedRequirementInput[] = [
+      { id: 'REQ-LINK-001', title: '短縮リンク作成', text: 'WHEN a user submits a URL, THE system SHALL create a short link.', pattern: 'event-driven' },
+      { id: 'REQ-LINK-002', title: 'リダイレクト', text: 'WHEN visited, THE system SHALL redirect the request.', pattern: 'event-driven' },
+    ];
+    const doc = generator.generate(reqs);
+    expect(doc.sections[0].interfaces.length).toBeGreaterThan(0);
+    for (const iface of doc.sections[0].interfaces) {
+      expect(iface).toMatch(/^I[A-Za-z0-9]*$/); // valid identifier, ASCII
+    }
+  });
+
   // v0.5.69 — interface names must be valid TS identifiers even when the title
   // contains punctuation ("In-progress tracking" → not "IIn-progressTracking").
   it('produces valid identifier interface names from punctuated titles', () => {
