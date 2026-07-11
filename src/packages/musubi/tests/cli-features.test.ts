@@ -48,6 +48,17 @@ describe('REQ-ARC-003: parseArgs', () => {
     expect(result.flags['h']).toBe(true);
   });
 
+  // v0.5.83 — support `--key=value` in addition to `--key value`.
+  it('parses --key=value syntax', () => {
+    const result = parseArgs(['codegen', 'r.md', '--out=dist/app.ts']);
+    expect(result.flags['out']).toBe('dist/app.ts');
+  });
+
+  it('parses --key=value with an empty value', () => {
+    const result = parseArgs(['x', '--name=']);
+    expect(result.flags['name']).toBe('');
+  });
+
   it('parses --help as boolean flag', () => {
     const result = parseArgs(['init', '--help']);
     expect(result.flags['help']).toBe(true);

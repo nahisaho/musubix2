@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.83] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 13 巡）を実施し、2 件の不具合を修正。
+
+### Fixed
+
+- **`--key=value` 記法が解釈されなかった** — `codegen r.md --out=dist/app.ts` のような等号記法が未対応で、フラグ全体（`out=dist/app.ts`）が boolean フラグ名として扱われ `--out` が効かず（標準出力に出力）ファイルが書かれなかった。`--key=value` と `--key value` の両方を解釈するよう修正
+- **値なしの `--out` が生の Node エラーでクラッシュ** — `codegen r.md --out`（値なし）はフラグが boolean `true` になり、`writeFileSync(true, …)` が `ERR_INVALID_ARG_TYPE` を投げていた。文字列以外のフラグ値は「未指定」として扱う `flagStr` ヘルパーを追加し、クラッシュを防止
+
+### Verified
+
+- neural search の境界条件（重複文書・topK>コーパス・空クエリ・topK=0）、SOLID スコアの下限、coverage の丸め（3/7=43%）、50 要件のトレース（0.3 秒）、ontology 推移推論（Dog⊑…⊑LivingThing）、フラグ解析（未知フラグ無視・重複フラグ・短縮フラグ）
+
 ## [0.5.82] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 12 巡）を実施し、1 件の不具合を修正。

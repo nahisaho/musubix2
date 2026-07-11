@@ -77,7 +77,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
       break;
     }
     if (token.startsWith('--')) {
-      const key = token.slice(2);
+      const body = token.slice(2);
+      // Support `--key=value` in addition to `--key value`.
+      const eq = body.indexOf('=');
+      if (eq >= 0) {
+        flags[body.slice(0, eq)] = body.slice(eq + 1);
+        i++;
+        continue;
+      }
+      const key = body;
       // Peek at next token to decide boolean vs string
       if (i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
         flags[key] = argv[i + 1];
@@ -102,6 +110,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   return { command, subcommand, args, flags };
+}
+
+/**
+ * Read a flag as a string value. A flag given with no value (`--out` at the end
+ * of a line) parses to boolean `true`; treat that as "not provided" so it never
+ * reaches fs APIs as a non-string (which throws a raw ERR_INVALID_ARG_TYPE).
+ */
+function flagStr(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }
 
 // ── Help text ──────────────────────────────────────────────────────────────
@@ -4328,7 +4345,7 @@ export function getDefaultCommands(): CLICommand[] {
           console.error('❌ Usage: musubix design [generate] <requirements-file> [--out <design.json>]');
           return ExitCode.VALIDATION_ERROR;
         }
-        return await handleDesignGenerate(filePath, args['out'] as string | undefined);
+        return await handleDesignGenerate(filePath, flagStr(args['out']));
       },
     },
     {
@@ -4397,7 +4414,7 @@ export function getDefaultCommands(): CLICommand[] {
           return ExitCode.VALIDATION_ERROR;
         }
         const type = (args['type'] as string | undefined) ?? 'class';
-        return await handleCodegen(name, type, args['out'] as string | undefined);
+        return await handleCodegen(name, type, flagStr(args['out']));
       },
     },
     {

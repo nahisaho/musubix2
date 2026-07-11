@@ -587,6 +587,13 @@ describe('Group A dispatcher integration', () => {
     // typescript (and no flag) still work.
     expect(await dispatcher.run(['codegen', 'MyClass', '--lang', 'typescript'])).toBe(ExitCode.SUCCESS);
   });
+
+  // v0.5.83 — `--out` with no value (parses to boolean true) must not crash the
+  // fs write with a raw ERR_INVALID_ARG_TYPE.
+  it('does not crash when --out is given with no filename', async () => {
+    const dispatcher = createCLIDispatcher();
+    expect(await dispatcher.run(['codegen', 'MyClass', '--out'])).toBe(ExitCode.SUCCESS);
+  });
 });
 
 // ── v0.5.1 fixes: verb tolerance, exit-code propagation, parser diagnostic ──
