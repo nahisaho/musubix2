@@ -101,6 +101,22 @@ describe('DES-DES-002: C4ModelGenerator', () => {
     expect(mermaid).toContain('"REQ-ORD-001"'); // readable label preserved
   });
 
+  // v0.5.90 — duplicate element ids / relationships (from hand-written or merged
+  // design JSON) must not emit duplicate Mermaid declarations (invalid alias).
+  it('dedupes duplicate element ids and identical relationships', () => {
+    const gen = new C4ModelGenerator();
+    gen.addElement({ id: 'a', name: 'A', type: 'system', description: 'x' });
+    gen.addElement({ id: 'a', name: 'A dup', type: 'system', description: 'y' });
+    gen.addElement({ id: 'b', name: 'B', type: 'system', description: 'z' });
+    gen.addRelationship({ from: 'a', to: 'b', description: 'r' });
+    gen.addRelationship({ from: 'a', to: 'b', description: 'r' });
+    const d = gen.generateDiagram('context', 't');
+    expect(d.elements.filter((e) => e.id === 'a')).toHaveLength(1);
+    expect(d.relationships).toHaveLength(1);
+    const mermaid = gen.toMermaid(d);
+    expect(mermaid.match(/System\(a,/g)).toHaveLength(1);
+  });
+
   it('should generate valid PlantUML output', () => {
     const gen = makeGenerator();
     const diagram = gen.generateDiagram('context', 'System Context');

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.90] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 20 巡）を実施し、1 件の不具合を修正。
+
+### Fixed
+
+- **`design:c4` が重複する要素 ID / 関係で無効な Mermaid を出力** — 手書きやマージされた design JSON に同一 ID の要素が含まれると、同じエイリアスの Mermaid ノードが 2 つ出力され（`System(a, …)` が重複 → 無効）、同一の関係も重複して出力されていた。要素を ID で重複排除（先勝ち）し、同一の関係（from/to/description）も 1 本にまとめるよう修正。`design generate` はこの入力を生成しないが、外部生成・手書きの design JSON を受理する際の堅牢性を改善
+
+### Verified
+
+- SMT 意味論（IF-THEN 含意・SHALL NOT 否定・WHILE 状態・complex の `(and …)`・空条件のプレースホルダ）、パターン検出の精度（"verify"→Strategy 非発火、"notify" の "if" 非発火）、C4 の未宣言要素フィルタ・自己参照、EARS 全パターン
+
 ## [0.5.89] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 19 巡）を実施。コマンド/サブコマンドの整合性を全数監査（不整合なし）し、`cg gate` の使い勝手を改善。

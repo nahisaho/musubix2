@@ -43,17 +43,29 @@ export class C4ModelGenerator {
 
   generateDiagram(level: C4Level, title: string): C4Diagram {
     const levelFilter = this.getLevelFilter(level);
-    const kept = new Set(
-      this.elements.filter((e) => levelFilter.includes(e.type)).map((e) => e.id),
-    );
-    return {
-      level,
-      title,
-      elements: this.elements.filter((e) => levelFilter.includes(e.type)),
-      // Keep a relationship only when *both* endpoints are elements shown at this
-      // level; otherwise the diagram would reference an undeclared element.
-      relationships: this.relationships.filter((r) => kept.has(r.from) && kept.has(r.to)),
-    };
+    // Dedupe elements by id (first wins) — a hand-written/merged design JSON may
+    // repeat an id, which would emit two Mermaid nodes with the same alias
+    // (invalid). Only elements shown at this level are kept.
+    const elements: C4Element[] = [];
+    const seenIds = new Set<string>();
+    for (const e of this.elements) {
+      if (!levelFilter.includes(e.type) || seenIds.has(e.id)) {continue;}
+      seenIds.add(e.id);
+      elements.push(e);
+    }
+    const kept = seenIds;
+    // Keep a relationship only when *both* endpoints are elements shown at this
+    // level (else it references an undeclared element); dedupe identical edges.
+    const relationships: C4Relationship[] = [];
+    const seenRels = new Set<string>();
+    for (const r of this.relationships) {
+      if (!kept.has(r.from) || !kept.has(r.to)) {continue;}
+      const key = `${r.from}\t${r.to}\t${r.description}`;
+      if (seenRels.has(key)) {continue;}
+      seenRels.add(key);
+      relationships.push(r);
+    }
+    return { level, title, elements, relationships };
   }
 
   /** Mermaid C4 aliases must be identifiers; ids like `REQ-ORD-001` need escaping. */
