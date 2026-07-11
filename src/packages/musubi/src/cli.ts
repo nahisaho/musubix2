@@ -2428,6 +2428,10 @@ export async function handleWorkflow(
         console.error('❌ Usage: musubix workflow approve <phase>');
         return ExitCode.GENERAL_ERROR;
       }
+      if (!PHASE_ORDER.includes(phase)) {
+        console.error(`❌ Unknown phase "${phase}". Valid: ${PHASE_ORDER.join(', ')}`);
+        return ExitCode.VALIDATION_ERROR;
+      }
       tracker.approve(phase);
       saveWorkflowState(tracker);
       console.log(`✅ Approved: ${phase}`);
@@ -2438,6 +2442,10 @@ export async function handleWorkflow(
       if (!phase) {
         console.error('❌ Usage: musubix workflow transition <phase>');
         return ExitCode.GENERAL_ERROR;
+      }
+      if (!PHASE_ORDER.includes(phase)) {
+        console.error(`❌ Unknown phase "${phase}". Valid: ${PHASE_ORDER.join(', ')}`);
+        return ExitCode.VALIDATION_ERROR;
       }
       const result = await controller.transitionTo(phase);
       if (result.success) {

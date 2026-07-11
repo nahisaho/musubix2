@@ -1209,6 +1209,13 @@ describe('CLI Commands B — Workflow', () => {
     expect(code).toBe(ExitCode.GENERAL_ERROR);
   });
 
+  // v0.5.78 — approving/transitioning an unknown phase must be rejected, not
+  // silently succeed (`workflow approve bogus` used to report "Approved: bogus").
+  it('rejects an unknown phase for approve and transition', async () => {
+    expect(await handleWorkflow('approve', ['bogus'])).toBe(ExitCode.VALIDATION_ERROR);
+    expect(await handleWorkflow('transition', ['nope'])).toBe(ExitCode.VALIDATION_ERROR);
+  });
+
   it('workflow transition returns SUCCESS or PHASE_BLOCKED', async () => {
     const code = await handleWorkflow('transition', ['design']);
     expect([ExitCode.SUCCESS, ExitCode.PHASE_BLOCKED]).toContain(code);

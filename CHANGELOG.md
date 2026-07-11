@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.78] - 2026-07-11
+
+dogfooding 実装テスト 50 本（第 8 巡）を実施し、1 件の不具合を修正。
+
+### Fixed
+
+- **`workflow approve` / `workflow transition` が未知のフェーズ名を受理していた** — `workflow approve bogus` が「✅ Approved: bogus」と成功していた。`PHASE_ORDER`（requirements/design/task-breakdown/implementation/completion）に対して検証し、未知のフェーズはエラーにするよう修正
+
+### Known limitations (verified, not fixed)
+
+- 複数の CLI プロセスが同一のストアファイル（`.knowledge`/`.musubix`）へ**並行書き込み**すると lost-update が発生しうる（read-modify-write の競合）。逐次実行では正常。CLI の通常利用（逐次）では問題にならず、ファイルロックの導入はコストが見合わないため据え置き
+- **UTF-16 エンコードのファイル**は未対応（UTF-8 前提）。要件/ソースファイルは UTF-8 が標準
+
+### Verified
+
+- 全 6 EARS パターン → 設計パターン検出、param 推論（`provides X and Y` → 2 引数）、State enum の状態重複排除、複合 EARS の SMT 分解（`(and active triggered)`）、SHALL NOT の否定意味論、coverage の丸め、ドメインコード境界（2〜6 文字）、design/codegen の決定性
+
 ## [0.5.77] - 2026-07-11
 
 dogfooding 実装テスト 50 本（第 7 巡）を実施し、1 件の不具合を修正。MCP 61 ツールを全数監査し、正常性を確認。
