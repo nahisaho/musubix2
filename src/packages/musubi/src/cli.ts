@@ -2988,6 +2988,26 @@ interface CodegenTarget {
   states: string[];
 }
 
+/**
+ * Normalize methods from a (possibly hand-written) design JSON: dedupe by name
+ * so codegen never emits two implementations, and default a missing/empty
+ * returnType to `void` so it never emits `m():  {` (invalid TS).
+ */
+function dedupeByName(methods: CodegenMethod[]): CodegenMethod[] {
+  const seen = new Set<string>();
+  const out: CodegenMethod[] = [];
+  for (const m of methods) {
+    if (!m?.name || seen.has(m.name)) {continue;}
+    seen.add(m.name);
+    out.push({
+      name: m.name,
+      params: m.params ?? '',
+      returnType: m.returnType && m.returnType.trim() ? m.returnType : 'void',
+    });
+  }
+  return out;
+}
+
 function extractCodegenTargets(content: string): CodegenTarget[] {
   const trimmed = content.trimStart();
   if (trimmed.startsWith('{')) {
@@ -3012,7 +3032,9 @@ function extractCodegenTargets(content: string): CodegenTarget[] {
         return comps.map(({ c, patterns }) => ({
           name: toPascalCase(c.name ?? 'Component'),
           type: 'class',
-          methods: c.methods ?? [],
+          // Dedupe methods by name — a hand-written/merged design JSON may repeat
+          // one, which would emit two implementations (TS2393: duplicate function).
+          methods: dedupeByName(c.methods ?? []),
           requirementIds: c.requirementIds ?? [],
           patterns,
           states: c.states ?? [],

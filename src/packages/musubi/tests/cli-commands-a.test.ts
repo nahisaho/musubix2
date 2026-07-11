@@ -494,6 +494,56 @@ describe('handleCodegen', () => {
       spy.mockRestore();
     }
   });
+
+  // v0.5.91 — duplicate method names in a (hand-written) design JSON must not
+  // emit two implementations (TS2393: duplicate function implementation).
+  it('dedupes duplicate method names from a design artifact', async () => {
+    const design = join(FIXTURE_DIR, 'dup-methods.json');
+    writeFileSync(design, JSON.stringify({
+      id: 'D', title: 'T', version: '1.0', generatedAt: '2026-01-01',
+      sections: [{
+        id: 'S1', title: 'Svc', requirementIds: ['REQ-AA-001'], description: 'x',
+        interfaces: [], patterns: [],
+        components: [{ name: 'Foo', type: 'class', methods: [
+          { name: 'run', params: '', returnType: 'void' },
+          { name: 'run', params: '', returnType: 'void' },
+        ] }],
+      }],
+    }));
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleCodegen(design)).toBe(ExitCode.SUCCESS);
+      const impls = logs.join('\n').match(/\brun\(\)[^;]*\{/g) ?? [];
+      expect(impls).toHaveLength(1); // exactly one method implementation
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // v0.5.91 — an empty/missing returnType must default to `void`, not emit
+  // `m():  {` (invalid TS).
+  it('defaults an empty returnType to void', async () => {
+    const design = join(FIXTURE_DIR, 'empty-rettype.json');
+    writeFileSync(design, JSON.stringify({
+      id: 'D', title: 'T', version: '1.0', generatedAt: '2026-01-01',
+      sections: [{
+        id: 'S1', title: 'S', requirementIds: ['REQ-AA-001'], description: 'x',
+        interfaces: [], patterns: [],
+        components: [{ name: 'C', type: 'class', methods: [{ name: 'm', params: '', returnType: '' }] }],
+      }],
+    }));
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      expect(await handleCodegen(design)).toBe(ExitCode.SUCCESS);
+      const out = logs.join('\n');
+      expect(out).toContain('m(): void');
+      expect(out).not.toMatch(/m\(\):\s{2,}\{/); // never `m():  {`
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 // ── handleTestGen ──────────────────────────────────────────────────────────

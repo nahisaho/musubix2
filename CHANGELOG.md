@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.91] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 21 巡）を実施し、2 件の不具合を修正（design JSON 由来の codegen 堅牢性）。
+
+### Fixed
+
+- **重複するメソッド名で codegen が二重実装を出力（TS2393）** — 手書き/マージされた design JSON のコンポーネントに同名メソッドが複数あると、実装が 2 つ生成され `tsc` が「Duplicate function implementation」エラーになっていた。メソッドを名前で重複排除（先勝ち）するよう修正
+- **空の returnType で `m():  {` という無効な TS を出力** — メソッドの `returnType` が空文字/未指定だと `m(): {` のように型が欠落した無効なコードを生成していた。空/未指定の returnType は `void` にデフォルトするよう修正（params も同様に正規化）
+
+### Verified
+
+- 空メソッド配列・空タイトル・重複 REQ ID・重複 Implements・10 セクションの深いネスト・同一テキスト要件の verify — いずれもクラッシュや無効出力なし
+
 ## [0.5.90] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 20 巡）を実施し、1 件の不具合を修正。
