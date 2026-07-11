@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.81] - 2026-07-12
+
+dogfooding 実装テスト 50 本（第 11 巡）を実施し、2 件の不具合を修正。
+
+### Fixed
+
+- **設定値のシークレット検出で低エントロピーのダミー値を誤検出** — `API_KEY=aaaaaaaaaaaaaaaa` や `abababab` のような明らかにダミーの値をハードコード秘密情報として検出していた。異なる文字が 4 種未満の値は本物の鍵ではないとして除外（実際の高エントロピー鍵・AWS シークレットは従来どおり検出）
+- **パラメータ名の先頭が全大文字の頭字語だと不自然な camelCase になっていた** — `accepts a JSON payload` から `jSONPayload` という引数名を生成していた。先頭語が全大文字の頭字語（JSON/API など）の場合は全体を小文字化し、慣用的な `jsonPayload` にするよう修正
+
+### Verified
+
+- taint sanitizer（`?` パラメータ化 / `encodeURIComponent` / `parseInt` / `Number()` は無害、`String()` キャストは検出）、multi-hop 伝播、テンプレートリテラルのメソッド呼び出し、Python `%`/`.format` 検出、param 推論（複数引数・複合名詞）、コレクション型推論
+
 ## [0.5.80] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 10 巡）を実施し、1 件の不具合を修正。

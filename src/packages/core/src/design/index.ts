@@ -95,7 +95,13 @@ function capFirst(w: string): string {
 
 function camelJoin(parts: string[]): string {
   return parts
-    .map((w, i) => (i === 0 ? w.charAt(0).toLowerCase() + w.slice(1) : capFirst(w)))
+    .map((w, i) => {
+      if (i !== 0) {return capFirst(w);}
+      // First word is lower-camel. An all-caps acronym ("JSON", "API") becomes
+      // "json"/"api" (conventional camelCase), not "jSON"/"aPI".
+      if (w.length > 1 && w === w.toUpperCase()) {return w.toLowerCase();}
+      return w.charAt(0).toLowerCase() + w.slice(1);
+    })
     .join('');
 }
 

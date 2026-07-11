@@ -200,6 +200,9 @@ export function isLikelyConfigSecret(matchText: string): boolean {
   }
   // Env / variable / template references, not literals.
   if (/[$#]\{|\$\w|<[^>]+>|\{\{|%\(|process\.env|os\.environ|getenv/i.test(v)) {return false;}
+  // Very low character variety (e.g. "aaaaaaaa", "ababab") is a filler value,
+  // not a real credential — a genuine key/token has entropy.
+  if (new Set(v).size < 4) {return false;}
   return true;
 }
 

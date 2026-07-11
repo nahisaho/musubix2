@@ -58,8 +58,9 @@ describe('DES-COD-003: SecretDetector', () => {
       .some((f) => f.type === 'hardcoded-credential')).toBe(true);
     expect(detector.scan('password: supersecret123456', 'c.yml')
       .some((f) => f.type === 'hardcoded-credential')).toBe(true);
-    // Placeholders / env refs / booleans are not secrets.
-    for (const line of ['password: changeme', 'api_key: ${API_KEY}', 'api_key: your-api-key-here', 'password: null', 'password: abc']) {
+    // Placeholders / env refs / booleans / low-entropy fillers are not secrets.
+    for (const line of ['password: changeme', 'api_key: ${API_KEY}', 'api_key: your-api-key-here',
+      'password: null', 'password: abc', 'api_key: aaaaaaaaaaaaaaaa', 'password: abababababab']) {
       expect(detector.scan(line, 'c.yml').filter((f) => f.type === 'hardcoded-credential')).toHaveLength(0);
     }
   });

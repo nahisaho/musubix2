@@ -63,6 +63,13 @@ describe('deriveMethodSignature (v0.5.46)', () => {
     expect(deriveMethodSignature('THE system SHALL issue a session token.').params).toBe('');
   });
 
+  // v0.5.81 — an all-caps acronym leading a param name is lower-cased for
+  // conventional camelCase (jsonPayload, not jSONPayload).
+  it('lower-cases an all-caps acronym as the first word of a param', () => {
+    expect(deriveMethodSignature('WHEN the client accepts a JSON payload, THE system SHALL parse it.').params)
+      .toBe('jsonPayload: string');
+  });
+
   it('infers boolean for validating verbs', () => {
     expect(deriveMethodSignature('THE system SHALL validate the credentials.').returnType).toBe('boolean');
   });
