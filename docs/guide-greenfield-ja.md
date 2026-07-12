@@ -151,7 +151,7 @@ MUSUBIX2 は **ドメイン（ID プレフィックス）ごとに要件を凝�
 |-----------|-------------|--------------------------|
 | REQ-LINK | Observer, State | `LinkService(createShortLink / redirectOriginalURL / resolveLink)` |
 | REQ-STAT | Observer | `RecordClickEventService(recordClickEvent)` |
-| REQ-SEC | Strategy | `SecService(rejectRequest / rejectStoreClientIpAddresses)` |
+| REQ-SEC | Strategy | `SecService(rejectRequest / rejectStoreClientIPAddresses)` |
 
 複数要件のドメイン（LINK, SEC）は 1 つの凝集サービス（`LinkService` / `SecService`、
 ドメイン名由来）にまとまります。単一要件の REQ-STAT はタイトル由来ですが、タイトルが
