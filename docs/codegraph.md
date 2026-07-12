@@ -11,10 +11,10 @@ so `index` runs once and every other subcommand reads that snapshot.
 ## Workflow
 
 ```bash
-npx musubix cg index src/            # build the graph (writes .musubix/codegraph.json)
-npx musubix cg stats                 # inspect what was captured
-npx musubix cg impact src/auth.ts    # what breaks if auth.ts changes?
-npx musubix cg gate --max-cycles 0   # CI: fail on any circular dependency
+npx musubix2 cg index src/            # build the graph (writes .musubix/codegraph.json)
+npx musubix2 cg stats                 # inspect what was captured
+npx musubix2 cg impact src/auth.ts    # what breaks if auth.ts changes?
+npx musubix2 cg gate --max-cycles 0   # CI: fail on any circular dependency
 ```
 
 ## What gets captured
@@ -55,7 +55,7 @@ persisted graph exactly.
 > basename に一致が無い場合のみ、フルパス（`services/` などのディレクトリ指定）に
 > フォールバックします。
 
-Run `npx musubix cg <subcommand> --help` for per-command usage.
+Run `npx musubix2 cg <subcommand> --help` for per-command usage.
 
 ### `cg impact <fragment> [--direct] [--depth N] [--json]`
 
@@ -63,10 +63,10 @@ Which files are (transitively) affected if the matched file changes. Splits
 **direct** (depth-1) dependents from **indirect** ones.
 
 ```bash
-npx musubix cg impact lib/cmdline.c            # full transitive closure
-npx musubix cg impact lib/cmdline.c --direct   # only immediate callers
-npx musubix cg impact lib/cmdline.c --depth 2  # up to 2 hops
-npx musubix cg impact lib/cmdline.c --json     # machine-readable
+npx musubix2 cg impact lib/cmdline.c            # full transitive closure
+npx musubix2 cg impact lib/cmdline.c --direct   # only immediate callers
+npx musubix2 cg impact lib/cmdline.c --depth 2  # up to 2 hops
+npx musubix2 cg impact lib/cmdline.c --json     # machine-readable
 ```
 
 ### `cg path <from-fragment> <to-fragment> [--json]`
@@ -75,11 +75,11 @@ Shows the shortest dependency chain from a file matching `<from>` to one
 matching `<to>` (over depends-on edges) — answers "why does A need B?".
 
 ```bash
-npx musubix cg path src/api.ts src/db.ts
+npx musubix2 cg path src/api.ts src/db.ts
 #   ◉ src/api.ts
 #   → src/service.ts
 #   → src/db.ts
-npx musubix cg path src/api.ts src/db.ts --all   # every shortest path (up to 20)
+npx musubix2 cg path src/api.ts src/db.ts --all   # every shortest path (up to 20)
 ```
 
 ### `cg candidates [N] [--json]`
@@ -113,9 +113,9 @@ on any violation** (exit 1 = failed, 0 = passed, 2 = no rule given).
   (layering rule; comma-separate multiple rules).
 
 ```bash
-npx musubix cg gate --max-cycles 0                 # no cycles allowed
-npx musubix cg gate --forbid "ui/:db/,api/:ui/"    # layering rules
-npx musubix cg gate --max-cycles 5 --json          # for scripting
+npx musubix2 cg gate --max-cycles 0                 # no cycles allowed
+npx musubix2 cg gate --forbid "ui/:db/,api/:ui/"    # layering rules
+npx musubix2 cg gate --max-cycles 5 --json          # for scripting
 ```
 
 ### `cg export [fragment] [--format dot|json] [--out <file>] [--cluster]`
@@ -126,9 +126,9 @@ nodes into a `subgraph cluster_<dir>` per directory, which makes large graphs
 navigable in Graphviz.
 
 ```bash
-npx musubix cg export --out graph.dot && dot -Tsvg graph.dot -o graph.svg
-npx musubix cg export --cluster --out graph.dot   # grouped by directory
-npx musubix cg export auth --format json          # subgraph as JSON
+npx musubix2 cg export --out graph.dot && dot -Tsvg graph.dot -o graph.svg
+npx musubix2 cg export --cluster --out graph.dot   # grouped by directory
+npx musubix2 cg export auth --format json          # subgraph as JSON
 ```
 
 ### `cg diff <baseline.json> [current.json] [--json]`
@@ -140,8 +140,8 @@ change-impact review across branches.
 ```bash
 cp .musubix/codegraph.json /tmp/before.json   # snapshot before a change
 # … make changes, then re-index …
-npx musubix cg index src/
-npx musubix cg diff /tmp/before.json           # what changed?
+npx musubix2 cg index src/
+npx musubix2 cg diff /tmp/before.json           # what changed?
 ```
 
 ## JSON output for automation
@@ -150,8 +150,8 @@ npx musubix cg diff /tmp/before.json           # what changed?
 machine-readable output that pipes cleanly into `jq` or CI scripts:
 
 ```bash
-npx musubix cg impact src/core.ts --json | jq '.counts.direct'
-npx musubix cg cycles --json | jq '.count'
+npx musubix2 cg impact src/core.ts --json | jq '.counts.direct'
+npx musubix2 cg cycles --json | jq '.count'
 ```
 
 ## CI integration example (GitHub Actions)
@@ -159,8 +159,8 @@ npx musubix cg cycles --json | jq '.count'
 ```yaml
 - name: Architecture gate
   run: |
-    npx musubix cg index src/
-    npx musubix cg gate --max-cycles 0 --forbid "ui/:infra/"
+    npx musubix2 cg index src/
+    npx musubix2 cg gate --max-cycles 0 --forbid "ui/:infra/"
 ```
 
 The `gate` step fails the job (non-zero exit) when a new circular dependency or

@@ -30,6 +30,10 @@ MUSUBIX2 CLI の全コマンドを機能別に整理したリファレンスで�
 
 ## 共通事項
 
+- **コマンド名**: npm パッケージ名は **`musubix2`** です。
+  - `npx` 経由なら **`npx musubix2 <command>`**（`npx musubix` は別パッケージを探しに行くため不可）。
+  - `npm install -g musubix2` 済みなら **`musubix`・`musubix2` どちらでも** 実行できます
+    （bin が両方作られます）。本ドキュメントでは簡潔に `musubix <command>` と表記します。
 - **フラグ記法**: `--key value` と `--key=value` の両方に対応します。値なしのフラグ
   （`--strict` / `--json` / `--force` など）はブール値として扱われます。
 - **`--json`**: 対応コマンドは機械可読な JSON を出力します（後述の各コマンドを参照）。
