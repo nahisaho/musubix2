@@ -11,8 +11,9 @@
 
 ## 0. 仕組み — なぜ自然言語で動くのか
 
-`musubix init --platform claude`（または `copilot` / `both`）を実行すると、次の 2 つが
-セットアップされ、AI エージェントが MUSUBIX2 を「道具」として使えるようになります。
+`musubix init --platform claude`（`copilot` / `both` も可）を実行すると、次の 2 つが
+セットアップされ、AI エージェント（Claude Code / GitHub Copilot / GitHub Copilot CLI）が
+MUSUBIX2 を「道具」として使えるようになります。
 
 1. **`.mcp.json`** — MCP（Model Context Protocol）サーバー `musubix2 mcp` の登録。
    このサーバーは **61 個のツール**（EARS 検証・設計生成・コード生成・形式検証・
@@ -25,12 +26,16 @@
 ```
 あなた（自然言語）
    ↓  「〜な機能が欲しい」
-Claude Code / Copilot  ── CLAUDE.md（SDD フェーズ強制）に従い
+Claude Code / GitHub Copilot / GitHub Copilot CLI  ── 指示書（SDD フェーズ強制）に従い
    ↓  MCP ツール呼び出し
 musubix2 MCP サーバー（61 ツール）
    ↓
 要件・設計・コード・テスト・検証結果
 ```
+
+MUSUBIX2 の MCP サーバー（`musubix mcp`、stdio）は **クライアント非依存** です。
+MCP に対応する任意の AI クライアント —— **Claude Code / GitHub Copilot（VS Code エージェント
+モード）/ GitHub Copilot CLI** など —— から同じ 61 ツールを呼び出せます。
 
 つまり **コマンドを覚えなくても**、会話するだけで SDD のガードレールが効きます。
 
@@ -54,11 +59,26 @@ cd myapp
 | `storage/specs/requirements.md` | 要件のひな形 |
 
 Claude Code でこのディレクトリを開けば、`.mcp.json` により MUSUBIX2 の MCP ツールが
-自動でロードされます（`/mcp` で接続状態を確認できます）。GitHub Copilot の場合は
-`--platform copilot` で `.github/copilot-instructions.md` が生成されます。
+自動でロードされます（`/mcp` で接続状態を確認できます）。
+
+**GitHub Copilot / GitHub Copilot CLI の場合**は `--platform copilot`（両方まとめてなら
+`--platform both`）を指定します。次が生成されます。
+
+| ファイル | 対象 | 役割 |
+|---------|------|------|
+| `.github/copilot-instructions.md` | Copilot / Copilot CLI | SDD フェーズ強制ルール（指示書） |
+| `.vscode/mcp.json` | VS Code エージェントモード | MCP サーバー `musubix2 mcp` の登録 |
+| `.github/skills/<skill>/SKILL.md` | Copilot | 8 つの SDD Agent Skills |
+
+- **VS Code の GitHub Copilot（エージェントモード）**: `.vscode/mcp.json` により MCP ツールが
+  ロードされます。
+- **GitHub Copilot CLI**: MCP サーバーとして stdio サーバー `musubix mcp` を登録すると
+  （Copilot CLI の MCP 設定 / `/mcp` で管理）、CLI から同じ 61 ツールを呼び出せます。
+  `.github/copilot-instructions.md` はカスタム指示として読み込まれます。
 
 > MCP サーバーは手動でも起動できます: `musubix mcp`（stdio）または
-> `musubix mcp --transport sse --port 3100`。
+> `musubix mcp --transport sse --port 3100`。この stdio サーバーが Claude Code /
+> GitHub Copilot / GitHub Copilot CLI 共通の接続点です。
 
 ---
 

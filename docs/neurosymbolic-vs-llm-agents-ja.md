@@ -17,8 +17,9 @@ MUSUBIX2 は **ニューロシンボリック** という設計をとります�
 トレーサビリティ・機械可読な形式成果物** を提供します。
 
 重要なのは、MUSUBIX2 は LLM エージェントの **置き換えではなく補完** だという点です。
-実際 MUSUBIX2 は MCP（Model Context Protocol）経由で Claude Code / Copilot から呼び出せ、
-LLM エージェントに「記号的な背骨」を与えます（[自然言語ガイド](./guide-natural-language-ja.md)）。
+実際 MUSUBIX2 は MCP（Model Context Protocol）経由で Claude Code / GitHub Copilot /
+GitHub Copilot CLI から呼び出せ、LLM エージェントに「記号的な背骨」を与えます
+（[自然言語ガイド](./guide-natural-language-ja.md)）。
 
 ---
 
@@ -160,13 +161,15 @@ LLM に「この要件、矛盾してない？」と聞くのと違い、答え�
 ## 「vs」ではなく「with」— エージェントに記号の背骨を与える
 
 MUSUBIX2 は Claude Code や Devin と競合するものではありません。`init --platform claude`
-で MCP サーバー（**61 ツール**）が登録され、LLM エージェントは自然言語の依頼を
-MUSUBIX2 の記号エンジンに解決させられます。
+（GitHub Copilot／Copilot CLI なら `copilot`、両方なら `both`）で MCP サーバー
+（**61 ツール**）が登録され、LLM エージェントは自然言語の依頼を MUSUBIX2 の記号
+エンジンに解決させられます。stdio サーバー `musubix mcp` はクライアント非依存で、
+Claude Code / GitHub Copilot / GitHub Copilot CLI 共通の接続点です。
 
 ```
 あなた: 「この要件で設計して、トレーサビリティも確認して」
    ↓
-Claude Code ── MCP ツール呼び出し ──> musubix2（決定的な設計生成・trace 検証）
+Claude Code / GitHub Copilot / Copilot CLI ── MCP ツール呼び出し ──> musubix2（決定的な設計生成・trace 検証）
 ```
 
 つまり **LLM の柔軟さ × 記号エンジンの保証** を同時に得られます。詳細は

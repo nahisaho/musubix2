@@ -68,13 +68,20 @@ url-shortener/
 
 ### AI エージェント連携（任意）
 
-`--platform`（`claude` / `copilot` / `both`）を付けると、上記に加えて
-`CLAUDE.md`・`.mcp.json`（MCP サーバー：61 ツール）・`.claude/skills/`（8 つの
-SDD スキル）がセットアップされ、Claude Code / GitHub Copilot から MUSUBIX2 を
-使えるようになります。
+`--platform`（`claude` / `copilot` / `both`）を付けると、上記に加えて MCP サーバー
+（`musubix2 mcp`：61 ツール）とエージェント指示書・スキルがセットアップされ、
+**Claude Code / GitHub Copilot / GitHub Copilot CLI** から MUSUBIX2 を使えるようになります。
+
+- `--platform claude` → `CLAUDE.md`・`.mcp.json`・`.claude/skills/`（8 スキル）
+- `--platform copilot` → `.github/copilot-instructions.md`・`.vscode/mcp.json`・`.github/skills/`
+  （GitHub Copilot／Copilot CLI 用）
+- `--platform both` → 両方
+
+MCP サーバー `musubix mcp`（stdio）はクライアント非依存で、Claude Code /
+GitHub Copilot（VS Code）/ GitHub Copilot CLI 共通の接続点です。
 
 ```bash
-musubix init url-shortener --platform claude --name "URLShortener"
+musubix init url-shortener --platform both --name "URLShortener"
 ```
 
 ---
