@@ -40,7 +40,7 @@ WHEN ユーザーが設計文書の生成を要求する:
 5. ユーザーレビュー ⏸️
 ```
 
-**CLI**: `npx musubix design <req-file>`
+**CLI**: `npx musubix2 design <req-file>`
 
 ### 2. C4 ダイアグラム生成
 
@@ -51,7 +51,7 @@ WHEN ユーザーが C4 ダイアグラムの生成を要求する:
 3. 設計文書に埋め込み
 ```
 
-**CLI**: `npx musubix design:c4 <file> [--level context|container|component]`
+**CLI**: `npx musubix2 design:c4 <file> [--level context|container|component]`
 
 ### 3. ADR 管理
 
@@ -63,7 +63,7 @@ WHEN ユーザーが ADR の作成・管理を要求する:
 4. DecisionManager.index() でインデクシング
 ```
 
-**CLI**: `npx musubix decision <create|list|get|accept|deprecate|search|index>`
+**CLI**: `npx musubix2 decision <create|list|get|accept|deprecate|search|index>`
 
 ### 4. 設計検証
 
@@ -74,7 +74,7 @@ WHEN ユーザーが設計文書の検証を要求する:
 3. 要件との対応漏れを検出
 ```
 
-**CLI**: `npx musubix design:verify <design-file>`
+**CLI**: `npx musubix2 design:verify <design-file>`
 
 ## 設計文書フォーマット
 
@@ -91,7 +91,7 @@ WHEN ユーザーが設計文書の検証を要求する:
 
 （TypeScript インターフェース / Mermaid 図）
 
-**CLI契約**: `npx musubix ...`
+**CLI契約**: `npx musubix2 ...`
 ```
 
 ## ADR フォーマット

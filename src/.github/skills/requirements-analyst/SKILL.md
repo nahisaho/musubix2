@@ -55,7 +55,7 @@ WHEN ユーザーが要件文書の検証を要求する:
 5. TraceabilityValidator でカバレッジレポート生成
 ```
 
-**CLI**: `npx musubix req <file>`
+**CLI**: `npx musubix2 req <file>`
 
 ### 2. 対話的要件作成
 
@@ -69,7 +69,7 @@ WHEN ユーザーが新規要件の作成を要求する:
 6. ユーザー承認 ⏸️
 ```
 
-**CLI**: `npx musubix req:wizard`
+**CLI**: `npx musubix2 req:wizard`
 
 ### 3. 要件インタビュー（1問1答フロー）
 
@@ -87,11 +87,11 @@ WHEN ユーザーが要件仕様書の生成を要求する（情報不足時）
 
 **CLI**:
 ```
-npx musubix req:interview <input-text>             # 入力分析 → 最初の質問
-npx musubix req:interview --answer <id> <response>  # 質問に回答
-npx musubix req:interview --state                    # 現在の状態表示
-npx musubix req:interview --generate                 # 仕様書生成
-npx musubix req:interview --reset                    # リセット
+npx musubix2 req:interview <input-text>             # 入力分析 → 最初の質問
+npx musubix2 req:interview --answer <id> <response>  # 質問に回答
+npx musubix2 req:interview --state                    # 現在の状態表示
+npx musubix2 req:interview --generate                 # 仕様書生成
+npx musubix2 req:interview --reset                    # リセット
 ```
 
 **MCP Tools**: `sdd.requirements.interview.start` / `.answer` / `.state` / `.generate`
@@ -122,7 +122,7 @@ THE システム SHALL...
 
 **トレーサビリティ**: DES-XXX-NNN
 **パッケージ**: `package-name`
-**CLI**: `npx musubix ...`
+**CLI**: `npx musubix2 ...`
 ```
 
 ## 品質ゲート

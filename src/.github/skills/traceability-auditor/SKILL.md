@@ -46,7 +46,7 @@ WHEN ユーザーがトレーサビリティマトリクスの生成を要求す
 4. Markdown 形式で出力
 ```
 
-**CLI**: `npx musubix trace matrix [--format md|json|csv]`
+**CLI**: `npx musubix2 trace matrix [--json]`
 
 ### 2. トレーサビリティ検証
 
@@ -59,8 +59,8 @@ WHEN ユーザーがトレーサビリティの検証を要求する:
 5. 欠落リンクをレポート
 ```
 
-**CLI**: `npx musubix trace validate`
-**CLI**: `npx musubix trace:verify`
+**CLI**: `npx musubix2 trace validate`
+**CLI**: `npx musubix2 trace:verify`
 
 ### 3. 影響分析
 
@@ -71,7 +71,7 @@ WHEN ユーザーが変更影響分析を要求する:
 3. 必要な更新箇所をレポート
 ```
 
-**CLI**: `npx musubix trace impact <req-id|des-id>`
+**CLI**: `npx musubix2 trace impact <req-id|des-id>`
 
 ### 4. 影響分析レポート
 

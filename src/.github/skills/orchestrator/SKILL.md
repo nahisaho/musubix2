@@ -393,7 +393,7 @@ HTTP/SSE（`SSETransport`）経由で `MCPServer` に接続する。
 |-------------|-----------|------|
 | `musubix init` | musubi | プロジェクト初期化 |
 | `musubix tasks` | workflow-engine | タスク管理 (validate/list/stats) |
-| `musubix req` | core | 要件管理 (create/list/validate/trace) |
+| `musubix req` | core | 要件管理 (analyze/validate) |
 | `musubix req:wizard` | core | 要件作成ウィザード |
 | `musubix req:interview` | core | 1問1答ヒアリング → 要件定義書生成 |
 | `musubix design` | core | 設計生成 |

@@ -52,7 +52,7 @@ WHEN ユーザーがポリシー検証を要求する:
 3. 違反がある場合、修正提案を生成
 ```
 
-**CLI**: `npx musubix policy validate`
+**CLI**: `npx musubix2 policy validate`
 
 ### 2. 個別条項チェック
 
@@ -62,7 +62,7 @@ WHEN ユーザーが特定条項の検証を要求する:
 2. 詳細レポートを出力
 ```
 
-**CLI**: `npx musubix policy info <article-number>`
+**CLI**: `npx musubix2 policy info <article-number>`
 
 ### 3. ポリシー一覧・詳細
 
@@ -72,8 +72,8 @@ WHEN ユーザーがポリシー情報を要求する:
 2. 指定条項の詳細（原則、検証方法、違反例）を表示
 ```
 
-**CLI**: `npx musubix policy list`
-**CLI**: `npx musubix policy info <article-number>`
+**CLI**: `npx musubix2 policy list`
+**CLI**: `npx musubix2 policy info <article-number>`
 
 ### 4. バランスルール（90/10）
 
