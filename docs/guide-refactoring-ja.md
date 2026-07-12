@@ -45,10 +45,14 @@ src/
 
 ## 1. インデックス作成
 
+> **実行方法**: 以下の `musubix …` は `npm install -g musubix2` 済みの前提です。
+> グローバルインストールしない場合は各コマンドを **`npx musubix2 …`** に読み替えて
+> ください（npm パッケージ名は `musubix2`。`npx musubix` は別パッケージになります）。
+
 まずコードをインデックスします。
 
 ```bash
-musubix cg index src
+musubix cg index src        # または: npx musubix2 cg index src
 ```
 
 ```

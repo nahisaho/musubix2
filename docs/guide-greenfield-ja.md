@@ -33,6 +33,10 @@ MUSUBIX2 は「要件 → 設計 → コード → テスト」を**トレーサ
 npm install -g musubix2       # もしくは各コマンドを npx musubix2 … で実行
 ```
 
+> npm パッケージ名は **`musubix2`** です。`npx` で使う場合は必ず **`npx musubix2 …`**
+> としてください（`npx musubix` は別パッケージを取得してしまいます）。グローバル
+> インストール後は `musubix …` でも `musubix2 …` でも実行できます。
+
 プロジェクトを初期化します。基本形は SDD の骨格（`steering/`・`storage/specs/`・
 `musubix.config.json`）を生成します。
 
