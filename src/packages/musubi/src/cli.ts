@@ -190,7 +190,7 @@ const COMMAND_HELP: Record<string, { usage: string; description: string }> = {
     description: 'プロジェクト状況',
   },
   ontology: {
-    usage: 'musubix ontology <add|list|validate|stats> [args]',
+    usage: 'musubix ontology <add|list|query|validate|stats> [args] [--json]',
     description: 'オントロジー管理',
   },
   cg: {
@@ -938,7 +938,9 @@ function saveOntologyStore(store: ReturnType<typeof createOntologyStore>): void 
 export async function handleOntology(
   sub: string | undefined,
   args: string[] = [],
+  flags: Record<string, unknown> = {},
 ): Promise<ExitCodeValue> {
+  const asJson = flags['json'] === true;
   switch (sub) {
     case 'add': {
       const [subject, predicate, object] = args;
@@ -956,11 +958,42 @@ export async function handleOntology(
     case 'list': {
       const store = loadOntologyStore();
       const triples = store.getAll();
+      if (asJson) {
+        console.log(JSON.stringify({ triples, count: triples.length }, null, 2));
+        return ExitCode.SUCCESS;
+      }
       if (triples.length === 0) {
         console.log('No triples stored yet. Add one with: musubix ontology add <s> <p> <o>');
       } else {
         console.log(`Triples (${triples.length}):`);
         for (const t of triples) {
+          console.log(`  ${t.subject} —[${t.predicate}]→ ${t.object}`);
+        }
+      }
+      return ExitCode.SUCCESS;
+    }
+    case 'query': {
+      // Match triples by subject / optional predicate / optional object.
+      const [subject, predicate, object] = args;
+      if (!subject) {
+        console.error('❌ Usage: musubix ontology query <subject> [predicate] [object] [--json]');
+        return ExitCode.VALIDATION_ERROR;
+      }
+      const store = loadOntologyStore();
+      const results = store.query({
+        subject,
+        predicate: predicate || undefined,
+        object: object || undefined,
+      });
+      if (asJson) {
+        console.log(JSON.stringify({ results, count: results.length }, null, 2));
+        return ExitCode.SUCCESS;
+      }
+      if (results.length === 0) {
+        console.log(`No triples match subject "${subject}".`);
+      } else {
+        console.log(`Triples (${results.length}):`);
+        for (const t of results) {
           console.log(`  ${t.subject} —[${t.predicate}]→ ${t.object}`);
         }
       }
@@ -986,6 +1019,10 @@ export async function handleOntology(
     }
     case 'stats': {
       const store = loadOntologyStore();
+      if (asJson) {
+        console.log(JSON.stringify({ triples: store.size() }, null, 2));
+        return ExitCode.SUCCESS;
+      }
       console.log(`Triples: ${store.size()}`);
       return ExitCode.SUCCESS;
     }
@@ -2465,6 +2502,7 @@ function saveWorkflowState(tracker: ReturnType<typeof createStateTracker>): void
 export async function handleWorkflow(
   sub: string | undefined,
   args: string[],
+  flags: Record<string, unknown> = {},
 ): Promise<ExitCodeValue> {
   const tracker = createStateTracker();
   loadWorkflowState(tracker);
@@ -2473,6 +2511,13 @@ export async function handleWorkflow(
   switch (sub) {
     case 'status': {
       const state = tracker.getState();
+      if (flags['json'] === true) {
+        console.log(JSON.stringify({
+          currentPhase: state.currentPhase,
+          approvals: PHASE_ORDER.map((phase) => ({ phase, approved: tracker.isApproved(phase) })),
+        }, null, 2));
+        return ExitCode.SUCCESS;
+      }
       console.log(`Current phase: ${state.currentPhase}`);
       console.log('Phase approvals:');
       for (const phase of PHASE_ORDER) {
@@ -3461,6 +3506,14 @@ export async function handleKnowledge(
     }
     case 'stats': {
       const stats = store.getStats();
+      if (flags['json'] === true) {
+        console.log(JSON.stringify({
+          entities: stats.entityCount,
+          relations: stats.relationCount,
+          types: Object.keys(stats.types),
+        }, null, 2));
+        return ExitCode.SUCCESS;
+      }
       console.log(`Entities: ${stats.entityCount}`);
       console.log(`Relations: ${stats.relationCount}`);
       console.log(`Types: ${Object.keys(stats.types).join(', ') || 'none'}`);
@@ -3504,6 +3557,12 @@ export async function handleDecision(
     }
     case 'list': {
       const adrs = await manager.list();
+      if (flags['json'] === true) {
+        console.log(JSON.stringify(
+          adrs.map((a) => ({ id: a.id, title: a.title, status: a.status })), null, 2,
+        ));
+        return ExitCode.SUCCESS;
+      }
       if (adrs.length === 0) {
         console.log('No ADRs found');
       } else {
@@ -4552,7 +4611,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        return await handleOntology(sub, positionalArgs);
+        return await handleOntology(sub, positionalArgs, args);
       },
     },
     {
@@ -4609,7 +4668,7 @@ export function getDefaultCommands(): CLICommand[] {
         }
         const sub = args['subcommand'] as string | undefined;
         const positionalArgs = (args['args'] as string[] | undefined) ?? [];
-        return await handleWorkflow(sub, positionalArgs);
+        return await handleWorkflow(sub, positionalArgs, args);
       },
     },
     {

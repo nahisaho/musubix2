@@ -120,6 +120,15 @@ describe('CLI Commands C — Knowledge', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Entities'));
   });
 
+  // v0.5.93 — knowledge stats --json emits structured output.
+  it('knowledge stats --json emits JSON', async () => {
+    logSpy.mockClear();
+    expect(await handleKnowledge('stats', [], { json: true })).toBe(ExitCode.SUCCESS);
+    const parsed = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+    expect(typeof parsed.entities).toBe('number');
+    expect(Array.isArray(parsed.types)).toBe(true);
+  });
+
   it('knowledge get returns GENERAL_ERROR without id', async () => {
     const code = await handleKnowledge('get', [], {});
     expect(code).toBe(ExitCode.GENERAL_ERROR);
@@ -206,6 +215,14 @@ describe('CLI Commands C — Decision', () => {
   it('decision list returns SUCCESS', async () => {
     const code = await handleDecision('list', [], {});
     expect(code).toBe(ExitCode.SUCCESS);
+  });
+
+  // v0.5.93 — decision list --json emits a JSON array.
+  it('decision list --json emits a JSON array', async () => {
+    logSpy.mockClear();
+    expect(await handleDecision('list', [], { json: true })).toBe(ExitCode.SUCCESS);
+    const parsed = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+    expect(Array.isArray(parsed)).toBe(true);
   });
 
   it('decision create returns GENERAL_ERROR without title', async () => {

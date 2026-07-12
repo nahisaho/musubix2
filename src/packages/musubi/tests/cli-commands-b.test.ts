@@ -1210,6 +1210,15 @@ describe('CLI Commands B — Workflow', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Current phase'));
   });
 
+  // v0.5.93 — workflow status --json emits structured output.
+  it('workflow status --json emits JSON', async () => {
+    logSpy.mockClear();
+    expect(await handleWorkflow('status', [], { json: true })).toBe(ExitCode.SUCCESS);
+    const parsed = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+    expect(typeof parsed.currentPhase).toBe('string');
+    expect(Array.isArray(parsed.approvals)).toBe(true);
+  });
+
   it('workflow approve returns SUCCESS', async () => {
     const code = await handleWorkflow('approve', ['requirements']);
     expect(code).toBe(ExitCode.SUCCESS);
@@ -1520,5 +1529,24 @@ describe('v0.5.6 ontology persistence', () => {
     await handleOntology('list', []);
     const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
     expect(printed).toContain('A —[rel]→ B');
+  });
+
+  // v0.5.93 — `ontology query` (CLI parity with the MCP tool + the store's API).
+  it('query matches triples by subject (and --json)', async () => {
+    await handleOntology('add', ['Dog', 'isa', 'Animal']);
+    await handleOntology('add', ['Dog', 'hasLegs', 'four']);
+    await handleOntology('add', ['Cat', 'isa', 'Animal']);
+    logSpy.mockClear();
+    expect(await handleOntology('query', ['Dog'])).toBe(ExitCode.SUCCESS);
+    const printed = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(printed).toContain('Dog —[isa]→ Animal');
+    expect(printed).not.toContain('Cat');
+
+    logSpy.mockClear();
+    expect(await handleOntology('query', ['Dog'], { json: true })).toBe(ExitCode.SUCCESS);
+    const parsed = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('\n'));
+    expect(parsed.count).toBe(2);
+
+    expect(await handleOntology('query', [])).toBe(ExitCode.VALIDATION_ERROR);
   });
 });

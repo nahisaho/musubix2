@@ -8,7 +8,7 @@ if (args.length === 0 || (args[0] === '--help' || args[0] === '-h')) {
   process.exit(0);
 }
 
-if (args.includes('--version') || args.includes('-v')) {
+if (args.includes('--version') || args.includes('-v') || args[0] === 'version') {
   const pkg = await import('../package.json', { with: { type: 'json' } });
   console.log(`musubix2 v${pkg.default.version}`);
   process.exit(0);

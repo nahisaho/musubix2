@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.93] - 2026-07-12
+
+キャンペーンで洗い出した既知の機能欠落（CLI 一貫性）を解消。
+
+### Added
+
+- **`version`（bare）コマンド** — `--version` / `-v` に加え、`musubix version` でもバージョンを表示できるように
+- **`ontology query <subject> [predicate] [object]`** — CLI にオントロジーのトリプル検索を追加（ストア・MCP は対応済みだったが CLI に無かった）。`--json` 対応
+- **`--json` パリティ** — `workflow status` / `knowledge stats` / `decision list` / `ontology list` / `ontology stats` に `--json` を追加（他の構造化出力コマンドと揃えた）
+
+### Verified
+
+- 追加した全コマンド/フラグの動作、既存テスト（1979 passing）
+
 ## [0.5.92] - 2026-07-12
 
 dogfooding 実装テスト 50 本（第 22 巡）を実施し、1 件の不具合を修正。
